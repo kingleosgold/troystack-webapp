@@ -619,7 +619,7 @@ export default function Settings() {
         <SettingsSection title="Get the App">
           <SettingsRow
             label="Download for iOS"
-            href="https://apps.apple.com/app/stack-tracker-gold/id6740512854"
+            href="https://apps.apple.com/app/apple-store/id6757343766?pt=96487801&ct=webapp&mt=8"
             onExternalClick={externalLink.openExternal}
             rightElement={<span className="text-gold text-xs font-medium">App Store</span>}
           />
