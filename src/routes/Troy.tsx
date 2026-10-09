@@ -24,7 +24,7 @@ import {
   type Quota,
   type TroyConversationSummary,
   type TroyMessage,
-  type VisitorTurn,
+  answeredTurns,
 } from '../services/troy';
 import { ApiError, getJson } from '../lib/apiClient';
 import { parseSpreadsheet } from '../lib/parseSpreadsheet';
@@ -216,6 +216,8 @@ export default function Troy() {
   const [messages, setMessages] = useState<TroyMessage[]>(() => (user ? [] : readVisitorChat()));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A visitor's question that didn't get through, offered to send again.
+  const [unsent, setUnsent] = useState<string | null>(null);
   const [quotaHit, setQuotaHit] = useState<Quota | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
   // A saved chat still loading. Nothing is sent until it's on screen, so the
@@ -376,10 +378,9 @@ export default function Troy() {
 
   const sendVisitor = useCallback(
     async (text: string, history: TroyMessage[]) => {
-      const turns: VisitorTurn[] = history.filter((m) => m.role === 'user' || m.role === 'assistant').map((m) => ({ role: m.role, content: m.content }));
       const controller = new AbortController();
       abortRef.current = controller;
-      const res = await askAsVisitor(text, turns, controller.signal);
+      const res = await askAsVisitor(text, answeredTurns(history), controller.signal);
       setMessages((prev) => [...prev, { id: localId('troy'), role: 'assistant', content: res.reply, created_at: new Date().toISOString() }]);
       qc.setQueryData(['troy-visitor-status'], { questionsUsed: res.questionsUsed, questionsLimit: res.questionsLimit, resetsAt: res.resetsAt });
     },
@@ -396,6 +397,7 @@ export default function Troy() {
         return;
       }
       setError(null);
+      setUnsent(null);
       setQuotaHit(null);
       const userMsg: TroyMessage = { id: localId('me'), role: 'user', content: t, created_at: new Date().toISOString() };
       const history = messages;
@@ -414,6 +416,11 @@ export default function Troy() {
           qc.setQueryData(['troy-visitor-status'], null);
         } else if (e instanceof ApiError && e.status === 404 && /profile/i.test(e.message)) {
           setError('Your account is still being set up. Give it a minute and try again.');
+        } else if (!signedIn) {
+          // A visitor's chat lives in this tab. The question comes off it, so
+          // it isn't kept or sent as history, and it waits to be sent again.
+          setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+          setUnsent(t);
         } else {
           setError("Troy couldn't answer that just now. Try again in a moment.");
         }
@@ -656,6 +663,15 @@ export default function Troy() {
             {error && (
               <div className="rounded-xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg-2" role="alert">
                 {error}
+              </div>
+            )}
+            {unsent && !signedIn && (
+              <div className="rounded-xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg-2" role="alert">
+                <p>Troy couldn't answer that just now.</p>
+                <p className="mt-1 truncate text-fg-3">{unsent}</p>
+                <button type="button" onClick={() => void send(unsent)} disabled={busy} className="mt-2 font-semibold text-gold hover:underline disabled:opacity-40">
+                  Ask again
+                </button>
               </div>
             )}
           </div>
