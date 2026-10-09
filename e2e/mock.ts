@@ -42,6 +42,10 @@ export interface MockOptions {
   checkoutConflict?: boolean;
   /** Reading the profile row fails, so the plan can't be read. */
   failProfileRead?: boolean;
+  /** Metals the prices answer leaves out, as when a feed is down for one. */
+  missingPrices?: Array<'gold' | 'silver' | 'platinum' | 'palladium'>;
+  /** The 30-day vault history request fails. */
+  failVaultHistory?: boolean;
   /**
    * The profile reads Free until a sync after a checkout attempt puts back the
    * Gold the API knows about, as when the app wrote Free over a web plan and
@@ -82,11 +86,21 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     calls.push(`${req.method()} ${p}`);
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
 
-    if (p === '/v1/prices') return fulfillJson(route, read('prices.json'));
+    if (p === '/v1/prices') {
+      const body = JSON.parse(read('prices.json')) as { prices: Record<string, unknown> };
+      for (const m of opts.missingPrices ?? []) delete body.prices[m];
+      return fulfillJson(route, body);
+    }
     if (p === '/v1/sparkline-24h') return fulfillJson(route, read('sparkline.json'));
     if (p === '/v1/prices/history') return fulfillJson(route, read(url.searchParams.get('range') === 'ALL' || url.searchParams.get('range') === '5Y' ? 'history-all.json' : 'history-1y.json'));
     if (p === '/v1/historical-spot') return fulfillJson(route, { gold: 3980.1, silver: 47.2, platinum: 1500, palladium: 1050 });
-    if (p === '/v1/vault-watch') return fulfillJson(route, url.searchParams.get('days') ? read('vault-history.json') : read('vault.json'));
+    if (p === '/v1/vault-watch') {
+      if (url.searchParams.get('days')) {
+        if (opts.failVaultHistory) return fulfillJson(route, { error: 'Vault history unavailable' }, 500);
+        return fulfillJson(route, read('vault-history.json'));
+      }
+      return fulfillJson(route, read('vault.json'));
+    }
     if (p === '/v1/stack-signal/latest') return fulfillJson(route, read('latest.json'));
     if (p === '/v1/stack-signal') return fulfillJson(route, read('signal.json'));
     if (p.startsWith('/v1/stack-signal/')) return fulfillJson(route, read('article.json'));
@@ -205,6 +219,9 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, [], 200);
     }
     if (url.pathname.startsWith('/auth/v1/user')) return fulfillJson(route, sessionUser());
+    // Email and password sign-in on the page itself, with no reload.
+    if (url.pathname === '/auth/v1/token' && req.method() === 'POST') return fulfillJson(route, sessionFor());
+    if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204, headers: CORS });
     return fulfillJson(route, {});
   });
 
@@ -236,13 +253,8 @@ function sessionUser() {
   };
 }
 
-/**
- * Puts a signed-in session where supabase-js looks for it, before the page
- * loads. With `once`, only the first page load of the test gets it, so a
- * sign-out that reloads the page stays signed out.
- */
-export async function signIn(page: Page, { once = false }: { once?: boolean } = {}) {
-  const session = {
+function sessionFor() {
+  return {
     access_token: 'e2e-access-token',
     token_type: 'bearer',
     expires_in: 3600,
@@ -250,6 +262,15 @@ export async function signIn(page: Page, { once = false }: { once?: boolean } = 
     refresh_token: 'e2e-refresh-token',
     user: sessionUser(),
   };
+}
+
+/**
+ * Puts a signed-in session where supabase-js looks for it, before the page
+ * loads. With `once`, only the first page load of the test gets it, so a
+ * sign-out that reloads the page stays signed out.
+ */
+export async function signIn(page: Page, { once = false }: { once?: boolean } = {}) {
+  const session = sessionFor();
   await page.addInitScript(
     ({ value, once }) => {
       if (once) {

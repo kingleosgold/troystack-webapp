@@ -171,6 +171,16 @@ test('a troystack.com trial link goes from sign-in straight to checkout, tagged 
   expect(req.headers()['authorization']).toMatch(/^Bearer /);
 });
 
+test.describe('vault', () => {
+  test("a Gold account sees a way to retry when the 30-day history doesn't load", async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier: 'gold', failVaultHistory: true });
+    await page.goto('/vault');
+    await expect(page.getByText("The 30-day history didn't load.")).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  });
+});
+
 test.describe('stack', () => {
   test('a visitor can add a holding and see it valued at spot', async ({ page }) => {
     await mockBackends(page);
@@ -185,6 +195,36 @@ test.describe('stack', () => {
     // 20 oz at $60.24
     await expect(page.getByText('$1,204.80').filter({ visible: true }).first()).toBeVisible();
     await shot(page, 'stack-guest');
+  });
+
+  test('signing out drops the cached guest stack along with the stored one', async ({ page }) => {
+    await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    await page.goto('/stack?add=1');
+    const dialog = page.getByRole('dialog', { name: 'Add a holding' });
+    await dialog.getByLabel('Product').fill('South African Krugerrand');
+    await dialog.getByRole('button', { name: 'Add to stack' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('South African Krugerrand').filter({ visible: true }).first()).toBeVisible();
+
+    // Sign in on the page. The account already has holdings, so the guest
+    // stack stays in this browser rather than moving in.
+    await goInApp(page, '/auth');
+    await page.getByLabel('Email').fill('stacker@example.com');
+    await page.getByLabel('Password', { exact: true }).fill('correct horse');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(page).toHaveURL(/\/$/);
+
+    await goInApp(page, '/settings');
+    await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
+    await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
+    // Signing out lands on the home page, signed out, with no reload.
+    await expect(page).toHaveURL(/\/$/);
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('sb-')).length)).toBe(0);
+
+    // Back on the stack as a guest, nothing from before comes back.
+    await goInApp(page, '/stack');
+    await expect(page.getByRole('heading', { name: /stack/i }).first()).toBeVisible();
+    await expect(page.getByText('South African Krugerrand')).toHaveCount(0);
   });
 
   test("clearing a visitor's stack empties it on every page", async ({ page }) => {
@@ -282,6 +322,16 @@ test.describe('stack', () => {
     await page.goto('/stack');
     await expect(page.getByText('American Silver Eagle').first()).toBeVisible();
     await expect.poll(() => mock.calls.filter((c) => c === 'POST /v1/snapshots').length).toBe(1);
+  });
+
+  test("no snapshot is recorded while a metal in the stack has no price", async ({ page }) => {
+    await signIn(page);
+    const platinum = { ...SAMPLE_HOLDINGS[1], id: 'r3', metal: 'platinum', type: 'Platinum Maple Leaf', purchase_price: 1500 };
+    const mock = await mockBackends(page, { holdings: [...SAMPLE_HOLDINGS, platinum], missingPrices: ['platinum'] });
+    await page.goto('/stack');
+    await expect(page.getByText('Platinum Maple Leaf').first()).toBeVisible();
+    await page.waitForTimeout(1500);
+    expect(mock.calls.filter((c) => c === 'POST /v1/snapshots')).toHaveLength(0);
   });
 
   test('signed in, it shows the same rows the app saved', async ({ page }) => {
