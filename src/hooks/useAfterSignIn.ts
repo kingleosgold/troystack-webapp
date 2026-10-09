@@ -31,14 +31,18 @@ import {
  * being sent to buy it again. If the plan can't be read in time, checkout
  * opens and the API turns away an account that already has a plan.
  */
-export function useAfterSignIn(): { openingCheckout: boolean } {
+export type CheckoutOverlay = null | 'One moment' | 'Opening checkout';
+
+export function useAfterSignIn(): { checkoutOverlay: CheckoutOverlay } {
   const { user, session, loading } = useAuth();
   const { tier, loading: planLoading } = useSubscription();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
-  const [openingCheckout, setOpeningCheckout] = useState(false);
+  const [checkoutOverlay, setCheckoutOverlay] = useState<CheckoutOverlay>(null);
   const handledFor = useRef<string | null>(null);
-  const [planWaitOver, setPlanWaitOver] = useState(false);
+  // The account whose plan didn't load in time. Tied to the account, so a
+  // second sign-in on the same page waits for its own plan.
+  const [waitOverFor, setWaitOverFor] = useState<string | null>(null);
   // Stripe sends people back with a full page load, so the address the page
   // opened at says whether this visit is a return from checkout.
   const landedFromStripe = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('session_id'));
@@ -60,10 +64,9 @@ export function useAfterSignIn(): { openingCheckout: boolean } {
   // waiting on it forever when it can't be read.
   useEffect(() => {
     if (!user || !planLoading) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPlanWaitOver(false);
-    const id = window.setTimeout(() => setPlanWaitOver(true), 5000);
-    return () => window.clearTimeout(id);
+    const id = user.id;
+    const timer = window.setTimeout(() => setWaitOverFor(id), 5000);
+    return () => window.clearTimeout(timer);
   }, [user, planLoading]);
 
   useEffect(() => {
@@ -76,6 +79,8 @@ export function useAfterSignIn(): { openingCheckout: boolean } {
       // A return from Stripe that finds nobody signed in has nothing to
       // settle, so a sign-in later on this page is handled as usual.
       landedFromStripe.current = false;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCheckoutOverlay(null);
       return;
     }
     if (onResetPage) return;
@@ -90,32 +95,39 @@ export function useAfterSignIn(): { openingCheckout: boolean } {
       return;
     }
 
-    if (planLoading && !planWaitOver && hasCheckoutIntent()) return;
+    if (planLoading && waitOverFor !== user.id && hasCheckoutIntent()) {
+      // Covers the wait wherever the sign-in landed, so nobody browses off
+      // and gets pulled to Stripe a few seconds later.
+      setCheckoutOverlay('One moment');
+      return;
+    }
     handledFor.current = key;
 
     const intent = takeCheckoutIntent();
     if (intent) {
-      // Stripe brings them back to Settings, so an older return path is done with.
-      forgetNextPath();
       if (!planLoading && (tier === 'gold' || tier === 'lifetime')) {
-        navigate('/settings?checkout=have-gold', { replace: true });
+        // Nothing to buy. Back to where they were going, or Settings says so.
+        setCheckoutOverlay(null);
+        navigate(takeNextPath() ?? '/settings?checkout=have-gold', { replace: true });
         return;
       }
+      // Stripe brings them back to Settings, so an older return path is done with.
+      forgetNextPath();
       // The browser is about to leave for Stripe; the overlay covers the wait.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setOpeningCheckout(true);
+      setCheckoutOverlay('Opening checkout');
       startCheckout(user.id, session?.access_token, intent.plan, intent.campaign).catch((err: unknown) => {
-        setOpeningCheckout(false);
+        setCheckoutOverlay(null);
         // 409 is the API saying the account already holds a plan.
         const haveGold = err instanceof ApiError && err.status === 409;
         navigate(haveGold ? '/settings?checkout=have-gold' : '/settings?checkout=failed', { replace: true });
       });
       return;
     }
+    setCheckoutOverlay(null);
     const next = takeNextPath();
     if (next) navigate(next, { replace: true });
     else if (onAuthPage) navigate('/', { replace: true });
-  }, [loading, user, session?.access_token, onAuthPage, onResetPage, navigate, tier, planLoading, planWaitOver]);
+  }, [loading, user, session?.access_token, onAuthPage, onResetPage, navigate, tier, planLoading, waitOverFor]);
 
-  return { openingCheckout };
+  return { checkoutOverlay };
 }
