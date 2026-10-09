@@ -116,6 +116,8 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   const started: Array<Record<string, unknown>> = [];
   // While false, holdings writes fail the way a dropped connection does.
   let connectionUp = true;
+  // While false, reading the stack fails the way a dropped connection does.
+  let readsUp = true;
   // The profile row. Verifying a checkout turns it to Gold, as the real route does.
   let profile: Record<string, unknown> = { subscription_tier: opts.tier ?? 'free', subscription_status: null, trial_end: null };
   let checkoutTried = false;
@@ -282,6 +284,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     }
     if (url.pathname.startsWith('/rest/v1/holdings')) {
       if (req.method() === 'GET' && opts.failHoldingsRead) return fulfillJson(route, { message: 'upstream connect error' }, 503);
+      if (req.method() === 'GET' && !readsUp) return route.abort('internetdisconnected');
       if (req.method() === 'GET') return fulfillJson(route, opts.holdings ?? []);
       if (req.method() === 'POST') {
         inserts.push(req.postDataJSON());
@@ -313,6 +316,9 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     asks,
     setConnection(up: boolean) {
       connectionUp = up;
+    },
+    setReads(up: boolean) {
+      readsUp = up;
     },
     releaseChatLoads() {
       releaseChatLoads();

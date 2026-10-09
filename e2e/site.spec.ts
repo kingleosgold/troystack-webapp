@@ -236,6 +236,9 @@ test.describe('stack', () => {
     await page.getByLabel('Password', { exact: true }).fill('correct horse');
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page).toHaveURL(/\/$/);
+    // Reading the account keeps a copy of its stack for reading offline.
+    const copies = () => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('troystack_stack_copy_')).length);
+    await expect.poll(copies).toBe(1);
 
     await goInApp(page, '/settings');
     await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
@@ -243,6 +246,7 @@ test.describe('stack', () => {
     // Signing out lands on the home page, signed out, with no reload.
     await expect(page).toHaveURL(/\/$/);
     await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('sb-')).length)).toBe(0);
+    expect(await copies(), 'the offline copy goes at sign-out too').toBe(0);
 
     // Back on the stack as a guest, nothing from before comes back.
     await goInApp(page, '/stack');
@@ -366,6 +370,33 @@ test.describe('stack', () => {
     await expect(page.getByText(/you added before signing in/)).toHaveCount(0);
     await expect(page.getByText(/saved in this browser and will reach your account/)).toHaveCount(0);
     expect(await page.evaluate(() => [localStorage.getItem('stacktracker_pending_actions'), localStorage.getItem('stacktracker_holdings')])).toEqual([null, null]);
+  });
+
+  test("a reload while the account can't be reached shows the stack as last read, with changes waiting on top", async ({ page }) => {
+    await signIn(page);
+    const mock = await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    await page.goto('/stack');
+    await expect(page.getByText('Gold Maple Leaf').first()).toBeVisible();
+    mock.setConnection(false);
+    mock.setReads(false);
+    await page.getByRole('button', { name: 'Add a holding' }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Add a holding' });
+    await dialog.getByLabel('Product').fill('Gold Buffalo');
+    await dialog.getByRole('button', { name: 'Add to stack' }).click();
+    await expect(dialog).toBeHidden();
+
+    await page.reload();
+    await expect(page.getByText(/Your account can't be reached right now, so this is your stack as of/)).toBeVisible();
+    await expect(page.getByText('Gold Maple Leaf').first()).toBeVisible();
+    await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
+    await expect(page.getByText("Your stack didn't load.")).toHaveCount(0);
+
+    // Back online, the waiting add goes out and the account is read again.
+    mock.setConnection(true);
+    mock.setReads(true);
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await expect(page.getByText(/can't be reached right now/)).toHaveCount(0);
+    await expect.poll(() => mock.inserts.length).toBeGreaterThanOrEqual(2);
   });
 
   test('a signed-in stack records its daily snapshot even when storage is blocked', async ({ page }) => {
@@ -761,4 +792,16 @@ test.describe('prices that are missing', () => {
     await page.goto('/prices/palladium');
     await expect(page.getByText("There's no live palladium price right now.")).toBeVisible();
   });
+});
+
+test("the sidebar doesn't call an account Free or offer the free week while its plan can't be read", async ({ page }, info) => {
+  test.skip(info.project.name === 'iphone', 'The sidebar is part of the desktop layout');
+  await signIn(page);
+  await mockBackends(page, { failProfileRead: true });
+  await page.goto('/');
+  const sidebar = page.locator('aside');
+  await expect(sidebar.getByText('stacker@example.com')).toBeVisible();
+  await expect(sidebar.getByText('Free', { exact: true })).toHaveCount(0);
+  await expect(sidebar.getByText('Alerts, widgets and Troy on your lock screen.')).toBeVisible();
+  await expect(sidebar.getByText(/free week/)).toHaveCount(0);
 });
