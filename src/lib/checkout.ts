@@ -33,9 +33,20 @@ export function webCheckoutReady(plan: WebPlan = 'yearly'): boolean {
 // page, so the plan someone picked waits here, for half an hour at most.
 const INTENT_KEY = 'stg_checkout_redirect';
 const CAMPAIGN_KEY = 'stg_checkout_campaign';
+
+/**
+ * Where a checkout started, stored on the Stripe session. A surface of this
+ * site, or a site-* token from troystack.com's own links.
+ */
+export type CheckoutCampaign = Campaign | `site-${string}`;
+
+/** A site-* token from a link, shaped the way the API accepts it, or undefined. */
+export function siteCampaign(value: string | null | undefined): CheckoutCampaign | undefined {
+  return typeof value === 'string' && /^site-[a-z0-9-]{1,35}$/.test(value) ? (value as CheckoutCampaign) : undefined;
+}
 const INTENT_TTL_MS = 30 * 60 * 1000;
 
-export function rememberCheckout(plan: WebPlan, campaign?: Campaign, now = Date.now()): void {
+export function rememberCheckout(plan: WebPlan, campaign?: CheckoutCampaign, now = Date.now()): void {
   try {
     localStorage.setItem(INTENT_KEY, JSON.stringify({ plan, at: now }));
     if (campaign) localStorage.setItem(CAMPAIGN_KEY, campaign);
@@ -55,7 +66,7 @@ export function forgetCheckout(): void {
 }
 
 /** The plan picked before signing in, if it was picked in the last half hour. Reading it clears it. */
-export function takeCheckoutIntent(now = Date.now()): { plan: WebPlan; campaign?: Campaign } | null {
+export function takeCheckoutIntent(now = Date.now()): { plan: WebPlan; campaign?: CheckoutCampaign } | null {
   try {
     const raw = localStorage.getItem(INTENT_KEY);
     const campaign = localStorage.getItem(CAMPAIGN_KEY) || undefined;
@@ -71,7 +82,7 @@ export function takeCheckoutIntent(now = Date.now()): { plan: WebPlan; campaign?
       at = typeof parsed.at === 'number' ? parsed.at : 0;
     }
     if (!isWebPlan(plan) || now - at > INTENT_TTL_MS || at > now + 60_000) return null;
-    return { plan, campaign: campaign as Campaign | undefined };
+    return { plan, campaign: campaign as CheckoutCampaign | undefined };
   } catch {
     return null;
   }
@@ -105,7 +116,7 @@ export function takeNextPath(): string | null {
 }
 
 /** Sends the browser to Stripe Checkout. Resolves only if something goes wrong before that. */
-export async function startCheckout(userId: string, token: string | undefined, plan: WebPlan, campaign?: Campaign): Promise<void> {
+export async function startCheckout(userId: string, token: string | undefined, plan: WebPlan, campaign?: CheckoutCampaign): Promise<void> {
   const priceId = PRICE_IDS[plan];
   if (!priceId) throw new Error('Web checkout is not set up here yet.');
   const origin = window.location.origin;

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { excerpt, plainDashes } from './text';
 import { normalizeArticle, usableOneLiner } from './signalApi';
 import { parsePodcastFeed } from './podcastApi';
-import { rememberCheckout, rememberNextPath, safeNextPath, takeCheckoutIntent, takeNextPath } from './checkout';
+import { rememberCheckout, rememberNextPath, safeNextPath, siteCampaign, takeCheckoutIntent, takeNextPath } from './checkout';
 import { appStoreUrl } from './appStore';
 
 describe('copy clean-up', () => {
@@ -72,6 +72,17 @@ describe('sign-in hand-offs', () => {
 
     rememberCheckout('monthly', undefined, now);
     expect(takeCheckoutIntent(now + 31 * 60_000)).toBeNull();
+  });
+
+  it('carries a troystack.com campaign into checkout, and only a well-formed one', () => {
+    expect(siteCampaign('site-pricing')).toBe('site-pricing');
+    expect(siteCampaign('webapp-trial')).toBeUndefined();
+    expect(siteCampaign('site-Pricing')).toBeUndefined();
+    expect(siteCampaign('site-' + 'x'.repeat(40))).toBeUndefined();
+    expect(siteCampaign(null)).toBeUndefined();
+    const now = Date.parse('2026-10-08T20:00:00Z');
+    rememberCheckout('monthly', siteCampaign('site-pricing'), now);
+    expect(takeCheckoutIntent(now + 60_000)).toEqual({ plan: 'monthly', campaign: 'site-pricing' });
   });
 
   it('ignores the bare plan names the old site left behind', () => {
