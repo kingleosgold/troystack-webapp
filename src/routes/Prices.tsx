@@ -49,12 +49,15 @@ function useChartData(metal: Metal, range: Range) {
         t: aligned ? Date.parse(times[i]) : now - (values.length - 1 - i) * ((24 * 3600_000) / Math.max(1, values.length - 1)),
         v,
       }));
-      return { points: points.filter((p) => Number.isFinite(p.t)), loading: sparks.isLoading, error: sparks.isError, refetch: sparks.refetch };
+      return { points: points.filter((p) => Number.isFinite(p.t)), startsLate: false, loading: sparks.isLoading, error: sparks.isError, refetch: sparks.refetch };
     }
-    const points: ChartPoint[] = (history.data ?? [])
+    const all = history.data ?? [];
+    const points: ChartPoint[] = all
       .map((p) => ({ t: Date.parse(`${p.date}T12:00:00Z`), v: p[metal] }))
       .filter((p) => Number.isFinite(p.t) && p.v > 0);
-    return { points, loading: history.isLoading, error: history.isError, refetch: history.refetch };
+    // True when the metal's prices begin after the range does, as platinum and palladium's do.
+    const startsLate = points.length > 1 && all.length > 0 && points[0].t > Date.parse(`${all[0].date}T12:00:00Z`);
+    return { points, startsLate, loading: history.isLoading, error: history.isError, refetch: history.refetch };
   }, [range, metal, sparks.data, sparks.dataUpdatedAt, sparks.isLoading, sparks.isError, sparks.refetch, history.data, history.isLoading, history.isError, history.refetch]);
 }
 
@@ -81,6 +84,11 @@ export default function Prices() {
   if (params.metal && !isMetal(params.metal)) return <Navigate to="/prices" replace />;
 
   const price = spot.data?.prices[metal];
+  // Platinum and palladium history only goes back to early 2025, so their
+  // longest ranges are measured from there.
+  const historyStart = chart.startsLate
+    ? new Date(chart.points[0].t).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+    : null;
   const ratio = spot.data && spot.data.prices.silver > 0 ? spot.data.prices.gold / spot.data.prices.silver : null;
 
   return (
@@ -127,7 +135,7 @@ export default function Prices() {
               <span className={cx('font-semibold', stats.change > 0 ? 'text-up' : stats.change < 0 ? 'text-down' : 'text-fg-3')}>
                 {signedMoney(stats.change)} ({signedPercent(stats.pct)})
               </span>
-              <span className="text-fg-3"> over {range === 'ALL' ? 'the full history' : range === '24H' ? '24 hours' : range}</span>
+              <span className="text-fg-3">{historyStart ? ` since ${historyStart}` : ` over ${range === 'ALL' ? 'the full history' : range === '24H' ? '24 hours' : range}`}</span>
             </div>
           )}
         </div>
@@ -140,11 +148,7 @@ export default function Prices() {
             <PriceChart data={chart.points} color={METAL_VAR[metal]} height={280} granularity={range === '24H' ? 'intraday' : 'daily'} valueLabel={label} />
           </Suspense>
         )}
-        {(metal === 'platinum' || metal === 'palladium') && (range === '5Y' || range === 'ALL') && chart.points.length > 1 && (
-          <p className="mt-2 text-[12px] text-fg-3">
-            {label} prices on TroyStack go back to {new Date(chart.points[0].t).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })}.
-          </p>
-        )}
+        {historyStart && <p className="mt-2 text-[12px] text-fg-3">{label} prices on TroyStack go back to {historyStart}.</p>}
         {stats && (
           <dl className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-line pt-4">
             <div>

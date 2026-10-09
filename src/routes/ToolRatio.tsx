@@ -43,7 +43,7 @@ export default function ToolRatio() {
         title="Gold to silver ratio"
         subtitle="How many ounces of silver one ounce of gold buys. A high number means silver is cheap next to gold, and a low one means it's dear."
       />
-      <div className="grid gap-4 md:grid-cols-[280px_1fr]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[280px_1fr]">
         <Card className="p-5 h-fit">
           <div className="text-[13px] text-fg-3">Right now</div>
           <div className="mt-1 text-[40px] font-semibold tracking-tight text-fg tnum">{now ? now.toFixed(1) : '...'}</div>

@@ -22,7 +22,7 @@ export default function GetApp() {
   usePageMeta({ ...SEO['/app'], canonical: '/app' });
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-6 sm:pt-10">
-      <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr] items-center">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.1fr_1fr] items-center">
         <div>
           <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-gold">TroyStack for iPhone</div>
           <h1 className="mt-2 text-[32px] sm:text-[40px] font-semibold tracking-tight text-fg leading-[1.1]">Your stack and Troy, wherever you are</h1>

@@ -40,7 +40,7 @@ export default function ToolJunkSilver() {
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8">
       <PageHeader eyebrow="Tools" title="Junk silver calculator" subtitle="US dimes, quarters and halves from 1964 and earlier are 90% silver. Here's what they're worth at today's spot." />
-      <div className="grid gap-4 md:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_320px]">
         <Card className="p-5">
           <Segmented<Mode>
             label="How to count"

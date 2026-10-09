@@ -83,7 +83,7 @@ export default function ToolMelt() {
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8">
       <PageHeader eyebrow="Tools" title="Melt value calculator" subtitle="What the metal in a coin, round or bar is worth at live spot." />
-      <div className="grid gap-4 md:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_320px]">
         <Card className="p-5 space-y-4">
           <Segmented<Metal>
             label="Metal"

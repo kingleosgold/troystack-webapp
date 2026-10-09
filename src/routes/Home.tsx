@@ -277,7 +277,7 @@ function GetAppSection() {
   ];
   return (
     <Card className="overflow-hidden">
-      <div className="grid lg:grid-cols-[1.2fr_1fr]">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr]">
         <div className="p-6 sm:p-8">
           <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-gold">TroyStack for iPhone</div>
           <h2 className="mt-2 text-[24px] sm:text-[28px] font-semibold tracking-tight text-fg leading-tight">Your stack and Troy, in your pocket</h2>
@@ -339,7 +339,7 @@ export default function Home() {
         </div>
       )}
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <TroysTake />
         </div>
@@ -349,7 +349,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <SignalList />
         </div>

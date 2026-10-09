@@ -34,7 +34,7 @@ export default function ToolStackingHistory() {
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-6 sm:pt-8">
       <PageHeader eyebrow="Tools" title="Stacking history" subtitle="Buy the same dollar amount every month, starting any year since 1970. Here's where it would stand at today's spot." />
-      <div className="grid gap-4 md:grid-cols-[320px_1fr]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[320px_1fr]">
         <Card className="p-5 space-y-4 h-fit">
           <Segmented<DcaMetal>
             label="Metal"

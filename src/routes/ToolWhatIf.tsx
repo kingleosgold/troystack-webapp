@@ -62,7 +62,7 @@ export default function ToolWhatIf() {
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8">
       <PageHeader eyebrow="Tools" title="What if" subtitle={hasStack ? 'Pick prices and see what your stack would be worth.' : 'Pick prices and see what an amount of metal would be worth. Add your stack and this uses it.'} />
-      <div className="grid gap-4 md:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_320px]">
         <Card className="p-5">
           <div className="flex flex-wrap gap-2 mb-4" aria-label="Quick moves">
             {MOVES.map((mv) => (
