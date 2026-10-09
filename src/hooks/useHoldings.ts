@@ -17,7 +17,6 @@ import {
   applyHoldingUpdates,
   fetchSupabaseHoldings,
   fromRow,
-  guestHoldingsInAccount,
   holdingAfter,
   holdingUpdates,
   insertHoldingRow,
@@ -70,8 +69,8 @@ export function sendQueuedChanges(userId: string) {
  * The stack. Signed in, it's the account's rows in Supabase, the same rows
  * the iPhone app reads. Signed out, it's saved in this browser. The first
  * time someone signs in to an account with no holdings, what they added as a
- * guest moves into the account, the rule the app uses too. It leaves the
- * browser once a read of the account finds it there.
+ * guest moves into the account, the rule the app uses too, and leaves the
+ * browser once the account has taken it.
  *
  * Signed in, a change that can't reach the account because the connection or
  * the server is down waits in this browser and shows as saved. It goes out
@@ -108,22 +107,18 @@ export function useHoldings() {
     setLocalVersion((v) => v + 1);
   }, [qc]);
 
-  // Guest holdings stay in the browser until a read of the account finds
-  // them there, so a move that landed but couldn't be read back loses
-  // nothing. Once found, they go.
-  const letMovedGo = useCallback(
-    async (accountId: string, remote: Holding[]) => {
-      const local = getLocalHoldings();
-      if (local.length === 0 || remote.length === 0) return;
+  // Guest holdings the account has taken leave the browser, just those, so
+  // one the account then deletes isn't offered again. The stack on screen
+  // and its stored copy hold them from then on.
+  const releaseGuestHoldings = useCallback(
+    (taken: Holding[]) => {
       try {
-        const moved = await guestHoldingsInAccount(local, remote, accountId);
-        if (moved.size === 0) return;
-        removeLocalHoldings(moved);
-        qc.setQueryData<Holding[]>(GUEST_KEY, getLocalHoldings());
-        setLocalVersion((v) => v + 1);
+        removeLocalHoldings(new Set(taken.map((h) => h.id)));
       } catch (e) {
-        console.error('checking the browser stack against the account failed', e);
+        console.error('clearing moved holdings from the browser failed', e);
       }
+      qc.setQueryData<Holding[]>(GUEST_KEY, getLocalHoldings());
+      setLocalVersion((v) => v + 1);
     },
     [qc],
   );
@@ -149,6 +144,9 @@ export function useHoldings() {
         return withPending(copy.holdings, readPending(user.id));
       }
       const local = getLocalHoldings();
+      // What the account takes from the guest stack, which leaves the browser
+      // once the stored copy has it.
+      let taken: Holding[] = [];
       if (remote.length === 0 && local.length > 0) {
         // If the move fails, the account's stack still loads and the stack
         // page offers to move them again.
@@ -159,23 +157,24 @@ export function useHoldings() {
           console.error('moving the browser stack failed', e);
         }
         if (moved) {
+          taken = local;
           try {
             remote = await fetchSupabaseHoldings(user.id);
           } catch (e) {
             // The account took them but couldn't be read back. They show,
-            // and the stored copy keeps them, until a read works. The
-            // browser keeps its own until a read finds them in the account.
+            // and the stored copy keeps them, until a read works.
             console.error('reading the account after the move failed', e);
             const at = new Date();
             saveStackCopy(user.id, moved, undefined, at);
             markCopyShown(user.id, at.toISOString());
+            releaseGuestHoldings(taken);
             return withPending(moved, readPending(user.id));
           }
         }
       }
-      await letMovedGo(user.id, remote);
       saveStackCopy(user.id, remote);
       markCopyShown(user.id, null);
+      if (taken.length > 0) releaseGuestHoldings(taken);
       return withPending(remote, readPending(user.id));
     },
     staleTime: 60_000,
@@ -341,19 +340,20 @@ export function useHoldings() {
     return user ? getLocalHoldings() : [];
   }, [user, localVersion, guestStored]);
   // While the account's stack is loading, the automatic move may be running,
-  // and while it can't be read, they may already be in it, so the offer to
-  // move them waits for a read.
-  const offerToMove = query.isFetching || offlineSince ? [] : leftInBrowser;
+  // so the offer to move them waits until it's done.
+  const offerToMove = query.isFetching ? [] : leftInBrowser;
 
   const moveBrowserStackIn = useCallback(async () => {
     if (!user) return;
-    const moved = await uploadLocalHoldings(getLocalHoldings(), user.id);
-    // The account has them, so they show and go into the stored copy before
-    // it's read again, and a read that fails can't hide them.
+    const local = getLocalHoldings();
+    const moved = await uploadLocalHoldings(local, user.id);
+    // The account has them, so they show, go into the stored copy and leave
+    // the browser before it's read again. A read that fails can't hide them.
     const ids = new Set(moved.map((h) => h.id));
     show((prev) => [...moved, ...prev.filter((h) => !ids.has(h.id))], true);
+    releaseGuestHoldings(local);
     await qc.invalidateQueries({ queryKey: key });
-  }, [user, qc, key, show]);
+  }, [user, qc, key, show, releaseGuestHoldings]);
 
   const clearBrowserStack = useCallback(() => {
     emptyGuestStack();
