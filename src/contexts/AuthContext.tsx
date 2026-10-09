@@ -8,7 +8,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   isConfigured: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; needsConfirmation: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signInWithApple: () => Promise<{ error: AuthError | null }>;
@@ -26,14 +26,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Without Supabase there's no session to wait for.
+  const [loading, setLoading] = useState(isSupabaseConfigured);
   const syncedUserRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setLoading(false);
-      return;
-    }
+    if (!isSupabaseConfigured) return;
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -58,16 +56,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user || syncedUserRef.current === user.id) return;
     syncedUserRef.current = user.id;
     syncSubscription(user.id).catch(() => {
-      // Silently ignore — sync is best-effort on login
+      // Ignored on purpose, the sync is best effort
     });
   }, [user]);
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
-    return { error };
+    // With email confirmation on, Supabase returns a user but no session yet.
+    return { error, needsConfirmation: !error && !data.session };
   };
 
   const signIn = async (email: string, password: string) => {
@@ -107,6 +106,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('advisor_usage');
       localStorage.removeItem('stg_upgrade_banner_dismissed');
       localStorage.removeItem('stg_checkout_redirect');
+      localStorage.removeItem('stg_checkout_campaign');
+      localStorage.removeItem('stg_auth_next');
     }
     return { error };
   };
@@ -178,6 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- the hook belongs with its provider
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
