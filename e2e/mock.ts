@@ -36,6 +36,8 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   /** The body of every holdings insert, in order. */
   const inserts: unknown[] = [];
   let failures = opts.failInserts ?? 0;
+  // While false, holdings writes fail the way a dropped connection does.
+  let connectionUp = true;
   // The profile row. Verifying a checkout turns it to Gold, as the real route does.
   let profile: Record<string, unknown> = { subscription_tier: opts.tier ?? 'free', subscription_status: null, trial_end: null };
 
@@ -119,12 +121,14 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       if (req.method() === 'GET') return fulfillJson(route, opts.holdings ?? []);
       if (req.method() === 'POST') {
         inserts.push(req.postDataJSON());
+        if (!connectionUp) return route.abort('internetdisconnected');
         if (failures > 0) {
           failures -= 1;
           return fulfillJson(route, { code: '57014', message: 'canceling statement due to statement timeout' }, 500);
         }
         return fulfillJson(route, [], 201);
       }
+      if (!connectionUp) return route.abort('internetdisconnected');
       return fulfillJson(route, [], 200);
     }
     if (url.pathname.startsWith('/auth/v1/user')) return fulfillJson(route, sessionUser());
@@ -134,7 +138,13 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   // Anything else outside the site (images, Stripe, Apple) stays offline.
   await page.route(/^https:\/\/(?!api\.troystack\.ai|e2e\.supabase\.co)/, (route) => route.abort());
 
-  return { calls, inserts };
+  return {
+    calls,
+    inserts,
+    setConnection(up: boolean) {
+      connectionUp = up;
+    },
+  };
 }
 
 function sessionUser() {

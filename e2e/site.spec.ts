@@ -221,6 +221,31 @@ test.describe('stack', () => {
     expect(JSON.parse(eagle!.notes).note).toBe('Tube one,\nfrom the show');
   });
 
+  test('a holding added while the connection is down waits in the browser, then reaches the account', async ({ page }) => {
+    await signIn(page);
+    const mock = await mockBackends(page);
+    await page.goto('/stack');
+    await expect(page.getByText('Nothing in your stack yet')).toBeVisible();
+    mock.setConnection(false);
+    await page.getByRole('button', { name: 'Add a holding' }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Add a holding' });
+    await dialog.getByLabel('Product').fill('American Silver Eagle');
+    await dialog.getByLabel('Quantity').fill('20');
+    await dialog.getByRole('button', { name: 'Add to stack' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('American Silver Eagle').first()).toBeVisible();
+    await expect(page.getByText("One change is saved in this browser and will reach your account when you're back online.")).toBeVisible();
+    expect(mock.inserts).toHaveLength(1);
+
+    mock.setConnection(true);
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await expect(page.getByText(/saved in this browser and will reach your account/)).toHaveCount(0);
+    expect(mock.inserts).toHaveLength(2);
+    const [first, second] = mock.inserts as Array<{ id: string; type: string }>;
+    expect(second.type).toBe('American Silver Eagle');
+    expect(second.id, 'the same row is sent again, so it can never land twice').toBe(first.id);
+  });
+
   test('a signed-in stack records its daily snapshot even when storage is blocked', async ({ page }) => {
     await signIn(page);
     await page.addInitScript(() => {
