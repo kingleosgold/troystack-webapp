@@ -218,6 +218,9 @@ export default function Troy() {
   const [error, setError] = useState<string | null>(null);
   const [quotaHit, setQuotaHit] = useState<Quota | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
+  // A saved chat still loading. Nothing is sent until it's on screen, so the
+  // load can't land over a question asked in the meantime.
+  const [loadingChat, setLoadingChat] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [importRows, setImportRows] = useState<{ rows: ImportRow[]; source: string } | null>(null);
@@ -257,6 +260,7 @@ export default function Troy() {
     let cancelled = false;
     setError(null);
     setMessages([]);
+    setLoadingChat(true);
     getConversation(conversationId, user.id)
       .then((conv) => {
         if (cancelled) return;
@@ -265,9 +269,13 @@ export default function Troy() {
       })
       .catch(() => {
         if (!cancelled) setError("That conversation didn't load.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingChat(false);
       });
     return () => {
       cancelled = true;
+      setLoadingChat(false);
     };
   }, [user, conversationId]);
 
@@ -368,7 +376,7 @@ export default function Troy() {
   const send = useCallback(
     async (text: string) => {
       const t = text.trim();
-      if (!t || busy) return;
+      if (!t || busy || loadingChat) return;
       if (!hasTroyConsent()) {
         setPending(t);
         setConsentOpen(true);
@@ -401,20 +409,20 @@ export default function Troy() {
         abortRef.current = null;
       }
     },
-    [busy, messages, signedIn, sendSignedIn, sendVisitor, qc],
+    [busy, loadingChat, messages, signedIn, sendSignedIn, sendVisitor, qc],
   );
 
   // A question handed over from another page, /troy?q=...
   useEffect(() => {
     const q = search.get('q');
-    if (!q || autoAsked.current || authLoading) return;
+    if (!q || autoAsked.current || authLoading || loadingChat) return;
     if (!signedIn && visitorStatus.isLoading) return;
     if (!signedIn && !visitorAvailable && isConfigured) return;
     autoAsked.current = true;
     search.delete('q');
     setSearch(search, { replace: true });
     void send(q);
-  }, [search, setSearch, authLoading, signedIn, visitorStatus.isLoading, visitorAvailable, isConfigured, send]);
+  }, [search, setSearch, authLoading, loadingChat, signedIn, visitorStatus.isLoading, visitorAvailable, isConfigured, send]);
 
   const todaysBrief = useCallback(async () => {
     if (!user) return;
@@ -489,7 +497,7 @@ export default function Troy() {
     }
   }, []);
 
-  const isEmpty = messages.length === 0 && !busy;
+  const isEmpty = messages.length === 0 && !busy && !loadingChat;
   const chips = holdings.length > 0 && signedIn ? STACK_CHIPS : MARKET_CHIPS;
   const visitorBlocked = !authLoading && !signedIn && !visitorStatus.isLoading && !visitorAvailable;
   const left = visitorStatus.data ? Math.max(0, visitorStatus.data.questionsLimit - visitorStatus.data.questionsUsed) : null;
@@ -596,6 +604,11 @@ export default function Troy() {
                 )}
               </div>
             )}
+            {loadingChat && (
+              <p className="pt-10 text-center text-[14px] text-fg-3" role="status">
+                Loading this chat
+              </p>
+            )}
             {messages.map((m) => (
               <MessageBubble key={m.id} message={m} userId={user?.id} canListen={isGold && m.role === 'assistant'} />
             ))}
@@ -615,8 +628,8 @@ export default function Troy() {
               onSend={(t) => void send(t)}
               onStop={() => abortRef.current?.abort()}
               busy={busy}
-              disabled={visitorBlocked || Boolean(quotaHit)}
-              placeholder={visitorBlocked ? 'Sign in to ask Troy' : 'Ask Troy anything'}
+              disabled={visitorBlocked || Boolean(quotaHit) || loadingChat}
+              placeholder={visitorBlocked ? 'Sign in to ask Troy' : loadingChat ? 'Loading this chat' : 'Ask Troy anything'}
               maxLength={signedIn ? 2000 : 500}
               onPhoto={signedIn ? (f) => void onPhoto(f) : undefined}
               onSpreadsheet={signedIn ? (f) => void onSpreadsheet(f) : undefined}
