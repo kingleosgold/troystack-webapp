@@ -35,6 +35,7 @@ import {
   withPending,
   type PendingWrite,
 } from '../services/pendingWrites';
+import { copyShownSince, markCopyShown, readStackCopy, saveStackCopy, subscribeStackCopy } from '../services/stackCopy';
 
 const GUEST_KEY = ['holdings', 'guest'];
 
@@ -82,6 +83,8 @@ export function useHoldings() {
     () => (userId ? readPending(userId).length : 0),
     () => 0,
   );
+  // When the stack on screen is the copy from the last read, since when.
+  const offlineSince = useSyncExternalStore(subscribeStackCopy, () => copyShownSince(userId), () => null);
   const refused = useSyncExternalStore(
     subscribePending,
     () => (userId ? readRefused(userId) : 0),
@@ -105,7 +108,18 @@ export function useHoldings() {
       // Their browser copies leave the guest stack with them, before it can
       // be moved into an empty account.
       adoptLegacyPending(user.id);
-      let remote = await fetchSupabaseHoldings(user.id);
+      let remote: Holding[];
+      try {
+        remote = await fetchSupabaseHoldings(user.id);
+      } catch (e) {
+        // A reload with the connection down shows the stack as it was last
+        // read, with changes waiting to be sent on top, rather than losing
+        // what the queue already showed as saved.
+        const copy = readStackCopy(user.id);
+        if (!copy) throw e;
+        markCopyShown(user.id, copy.savedAt);
+        return withPending(copy.holdings, readPending(user.id));
+      }
       if (remote.length === 0) {
         const local = getLocalHoldings();
         if (local.length > 0) {
@@ -120,6 +134,8 @@ export function useHoldings() {
           }
         }
       }
+      saveStackCopy(user.id, remote);
+      markCopyShown(user.id, null);
       return withPending(remote, readPending(user.id));
     },
     staleTime: 60_000,
@@ -302,6 +318,8 @@ export function useHoldings() {
     clearBrowserStack,
     /** Changes saved in this browser that haven't reached the account yet. */
     pendingCount,
+    /** When the account couldn't be read, the time of the copy shown instead. */
+    offlineSince,
     /** Changes made offline that the account refused when they were sent. */
     refused,
     dismissRefused: () => {
