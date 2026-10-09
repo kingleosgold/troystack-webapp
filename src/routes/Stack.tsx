@@ -85,7 +85,11 @@ function StackHistory({ userId }: { userId: string }) {
 function useDailySnapshot(userId: string | undefined, holdings: Holding[], prices: Record<Metal, number>, ready: boolean) {
   const sent = useRef(false);
   useEffect(() => {
-    if (!userId || !ready || sent.current || holdings.length === 0 || !prices.gold || !prices.silver) return;
+    // Every metal in the stack needs a price. One missing from the prices
+    // read would go into history at zero. Gold and silver also go in as the
+    // day's spot.
+    const priced = (m: Metal) => prices[m] > 0;
+    if (!userId || !ready || sent.current || holdings.length === 0 || !priced('gold') || !priced('silver') || holdings.some((h) => !priced(h.metal))) return;
     const key = `troystack_snapshot_${userId}`;
     const today = new Date().toISOString().slice(0, 10);
     try {

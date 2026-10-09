@@ -110,8 +110,12 @@ export default function Vault() {
           campaign="webapp-vault"
           teaser={<div className="h-[240px] rounded-xl bg-surface-2" />}
         >
-          {history.isLoading || chart.length < 2 ? (
+          {history.isLoading ? (
             <Skeleton className="h-[240px] w-full" />
+          ) : history.isError ? (
+            <ErrorNote onRetry={() => void history.refetch()}>The 30-day history didn't load.</ErrorNote>
+          ) : chart.length < 2 ? (
+            <p className="py-10 text-center text-[14px] text-fg-3">There aren't enough days of vault reports for a trend yet.</p>
           ) : (
             <Suspense fallback={<Skeleton className="h-[240px] w-full" />}>
               <PriceChart data={chart} color={METAL_VAR[metal]} height={240} granularity="daily" formatValue={(v) => ozCompact(v)} valueLabel="Registered" />
