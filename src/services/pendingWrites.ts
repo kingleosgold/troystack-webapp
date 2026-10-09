@@ -1,5 +1,8 @@
-import type { Holding } from '../types/holding';
-import { fromRow, HoldingWriteError, type HoldingRow, type HoldingUpdates } from './supabaseHoldings';
+import type { Holding, HoldingFormData } from '../types/holding';
+import { parseNotes } from '../lib/holdingNotes';
+import { isMetal } from '../lib/metals';
+import { GUEST_STACK_KEY } from './holdings';
+import { fromRow, HoldingWriteError, toColumns, type HoldingRow, type HoldingUpdates } from './supabaseHoldings';
 
 /**
  * Changes to a signed-in stack that couldn't reach the account because the
@@ -109,6 +112,161 @@ export function clearRefused(userId: string, store: Store | null = defaultStore(
   announce();
 }
 
+/** The old site's list of changes it couldn't send. It had no account on it. */
+const LEGACY_KEY = 'stacktracker_pending_actions';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** The old site's ids for holdings kept in the browser, the time they were made first. */
+const LEGACY_LOCAL_ID = /^(\d{13})-[a-z0-9]+$/;
+
+interface LegacyAction {
+  id?: unknown;
+  type?: unknown;
+  data?: unknown;
+  holdingId?: unknown;
+  timestamp?: unknown;
+}
+
+/**
+ * The old site's form, read the way the new one reads a row. Its free-text
+ * notes may be the app's JSON, which it showed as text and sent back as it
+ * was, so the keys in it are kept.
+ */
+function legacyForm(data: unknown): { form: HoldingFormData; meta: Record<string, unknown> } | null {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  const weight = Number(d.weight);
+  const quantity = Number(d.quantity);
+  if (!isMetal(d.metal) || !(weight > 0) || !(quantity > 0)) return null;
+  const notes = parseNotes(typeof d.notes === 'string' ? d.notes : null);
+  return {
+    form: {
+      metal: d.metal,
+      type: typeof d.type === 'string' ? d.type : '',
+      weight,
+      weightUnit: d.weightUnit === 'g' || d.weightUnit === 'kg' ? d.weightUnit : 'oz',
+      quantity,
+      purchasePrice: Number(d.purchasePrice) || 0,
+      purchaseDate: typeof d.purchaseDate === 'string' ? d.purchaseDate.slice(0, 10) : '',
+      dealer: notes.dealer,
+      taxes: notes.taxes,
+      shipping: notes.shipping,
+      spotAtPurchase: notes.spotAtPurchase,
+      premium: notes.premium,
+      note: notes.note,
+    },
+    meta: notes.meta,
+  };
+}
+
+function readJsonArray(store: Store, key: string): unknown[] | null {
+  try {
+    const parsed: unknown = JSON.parse(store.getItem(key) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The browser copy the old site made of a holding added offline. It made
+ * the copy right after it queued the add, and the copy's id starts with the
+ * time it was made, so the copy is the one made within two seconds after.
+ */
+function copyOf(copies: unknown[], at: number, taken: Set<string>): string | null {
+  let best: { id: string; gap: number } | null = null;
+  for (const c of copies) {
+    const id = c && typeof c === 'object' ? (c as Record<string, unknown>).id : null;
+    if (typeof id !== 'string' || taken.has(id)) continue;
+    const m = LEGACY_LOCAL_ID.exec(id);
+    if (!m) continue;
+    const gap = Number(m[1]) - at;
+    if (gap >= 0 && gap <= 2000 && (!best || gap < best.gap)) best = { id, gap };
+  }
+  return best?.id ?? null;
+}
+
+/**
+ * The old site kept the changes it couldn't send in one list with no account
+ * on it, and cleared that list at sign-out, so what's in it belongs to whoever
+ * is signed in. They move into this account's list, ahead of anything newer,
+ * and the old list goes. An add the old site made offline also left a copy in
+ * the browser stack, and the copy goes too, so the stack page doesn't offer to
+ * add it a second time. An edit or delete of that copy folds into its add. A
+ * change that could never land, like an edit of a holding the old site only
+ * had in the browser, is dropped. Running it twice moves nothing twice.
+ * Returns how many changes moved.
+ */
+export function adoptLegacyPending(userId: string, store: Store | null = defaultStore()): number {
+  if (!store) return 0;
+  let present: boolean;
+  try {
+    present = store.getItem(LEGACY_KEY) !== null;
+  } catch {
+    return 0;
+  }
+  if (!present) return 0;
+  const actions = readJsonArray(store, LEGACY_KEY) ?? [];
+  const copies = readJsonArray(store, GUEST_STACK_KEY) ?? [];
+
+  const out: Array<PendingWrite | null> = [];
+  const addForCopy = new Map<string, number>();
+  actions.forEach((raw, i) => {
+    if (!raw || typeof raw !== 'object') return;
+    const a = raw as LegacyAction;
+    const ts = Number(a.timestamp);
+    const at = Number.isFinite(ts) && ts > 0 ? ts : Date.now();
+    const when = new Date(at).toISOString();
+    const wid = `legacy:${typeof a.id === 'string' && a.id ? a.id : `${i}-${at}`}`;
+    const target = typeof a.holdingId === 'string' ? a.holdingId : '';
+
+    if (a.type === 'add') {
+      const f = legacyForm(a.data);
+      if (!f) return;
+      const row: HoldingRow = { id: crypto.randomUUID(), user_id: userId, ...toColumns(f.form, f.meta), created_at: when, updated_at: when };
+      out.push({ wid, kind: 'add', row });
+      const copy = copyOf(copies, at, new Set(addForCopy.keys()));
+      if (copy) addForCopy.set(copy, out.length - 1);
+    } else if ((a.type === 'update' || a.type === 'delete') && UUID.test(target)) {
+      if (a.type === 'delete') {
+        out.push({ wid, kind: 'delete', id: target, deletedAt: when });
+        return;
+      }
+      const f = legacyForm(a.data);
+      if (!f) return;
+      const updates: HoldingUpdates = { ...toColumns(f.form, f.meta), updated_at: when };
+      out.push({ wid, kind: 'update', id: target, updates, holding: fromRow({ id: target, user_id: userId, created_at: null, ...updates }) });
+    } else if ((a.type === 'update' || a.type === 'delete') && addForCopy.has(target)) {
+      const at2 = addForCopy.get(target)!;
+      const add = out[at2];
+      if (!add || add.kind !== 'add') return;
+      if (a.type === 'delete') {
+        out[at2] = null;
+        return;
+      }
+      const f = legacyForm(a.data);
+      if (f) out[at2] = { ...add, row: { ...add.row, ...toColumns(f.form, f.meta), updated_at: when } };
+    }
+  });
+
+  const current = readPending(userId, store);
+  const have = new Set(current.map((w) => w.wid));
+  const moved = out.filter((w): w is PendingWrite => w !== null && !have.has(w.wid));
+  // If the account's list can't be saved, the old list stays for next time.
+  if (moved.length > 0 && !savePending(userId, [...moved, ...current], store)) return 0;
+  try {
+    store.removeItem(LEGACY_KEY);
+    if (addForCopy.size > 0) {
+      const left = copies.filter((c) => !addForCopy.has(String((c as Record<string, unknown> | null)?.id)));
+      if (left.length > 0) store.setItem(GUEST_STACK_KEY, JSON.stringify(left));
+      else store.removeItem(GUEST_STACK_KEY);
+    }
+  } catch {
+    // The adds carry their old ids, so a second try can't queue them twice.
+  }
+  announce();
+  return moved.length;
+}
+
 /** Calls back when any account's list changes, in this tab or another. */
 export function subscribePending(callback: () => void): () => void {
   const onStorage = (e: StorageEvent) => {
@@ -129,7 +287,8 @@ export function withPending(remote: Holding[], pending: PendingWrite[]): Holding
     if (w.kind === 'add') {
       if (!list.some((h) => h.id === w.row.id)) list = [fromRow(w.row), ...list];
     } else if (w.kind === 'update') {
-      list = list.map((h) => (h.id === w.id ? w.holding : h));
+      // The holding keeps the date it was added, which an edit doesn't change.
+      list = list.map((h) => (h.id === w.id ? { ...w.holding, createdAt: h.createdAt } : h));
     } else {
       list = list.filter((h) => h.id !== w.id);
     }
@@ -161,6 +320,8 @@ export async function sendPending(
 ): Promise<SendResult> {
   let sent = 0;
   let refused = 0;
+  // Changes the old site left go first, since they're older.
+  adoptLegacyPending(userId, store);
   for (;;) {
     const [next] = readPending(userId, store);
     if (!next) break;

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../lib/supabase', () => ({ supabase: {} }));
 
 import { HoldingWriteError, holdingAfter, holdingUpdates, newHoldingRow, fromRow } from './supabaseHoldings';
-import { canRetry, clearRefused, readPending, readRefused, savePending, sendPending, withPending, type PendingWrite } from './pendingWrites';
+import { adoptLegacyPending, canRetry, clearRefused, readPending, readRefused, savePending, sendPending, withPending, type PendingWrite } from './pendingWrites';
 import { stableUuid } from '../lib/stableId';
 import type { HoldingFormData } from '../types/holding';
 
@@ -124,6 +124,149 @@ describe('changes waiting in the browser', () => {
   it('count a dropped connection or a server error as worth retrying, a refusal not', () => {
     expect(canRetry(new HoldingWriteError('x', true))).toBe(true);
     expect(canRetry(new HoldingWriteError('x', false))).toBe(false);
+  });
+});
+
+describe('changes the old site left in the browser', () => {
+  const LEGACY = 'stacktracker_pending_actions';
+  const GUEST = 'stacktracker_holdings';
+  const U1 = '0b5ad7a0-6f1e-4c55-9b7e-3d1f5e2a9c01';
+  const U2 = '0b5ad7a0-6f1e-4c55-9b7e-3d1f5e2a9c02';
+  const T = Date.parse('2026-10-08T14:00:00Z');
+  const oldForm = (over: Record<string, unknown> = {}) => ({
+    metal: 'silver',
+    type: 'American Silver Eagle',
+    weight: 31.1035,
+    weightUnit: 'g',
+    quantity: 20,
+    purchasePrice: 38,
+    purchaseDate: '2026-10-01',
+    notes: 'From the coin show',
+    ...over,
+  });
+
+  it("move into this account's list ahead of newer changes, and the old list goes", () => {
+    const store = memoryStore();
+    const newer = addWrite({ type: 'Newer' });
+    savePending(USER, [newer], store);
+    store.setItem(
+      LEGACY,
+      JSON.stringify([
+        { id: 'a1', type: 'add', data: oldForm(), timestamp: T },
+        { id: 'a2', type: 'update', holdingId: U1, data: oldForm({ type: 'Gold Maple Leaf', metal: 'gold', weight: 1, weightUnit: 'oz', quantity: 2, purchasePrice: 4100, notes: '' }), timestamp: T + 60_000 },
+        { id: 'a3', type: 'delete', holdingId: U2, timestamp: T + 120_000 },
+      ]),
+    );
+    expect(adoptLegacyPending(USER, store)).toBe(3);
+    expect(store.getItem(LEGACY)).toBeNull();
+    const list = readPending(USER, store);
+    expect(list.map((w) => w.kind)).toEqual(['add', 'update', 'delete', 'add']);
+    expect(list[3].wid).toBe(newer.wid);
+    const add = list[0] as PendingWrite & { kind: 'add' };
+    expect(add.row.user_id).toBe(USER);
+    expect(add.row.type).toBe('American Silver Eagle');
+    expect(Number(add.row.weight)).toBeCloseTo(1, 4);
+    expect(add.row.weight_unit).toBe('g');
+    expect(add.row.created_at).toBe('2026-10-08T14:00:00.000Z');
+    expect(JSON.parse(String(add.row.notes)).note).toBe('From the coin show');
+    const edit = list[1] as PendingWrite & { kind: 'update' };
+    expect(edit.id).toBe(U1);
+    expect(edit.updates.purchase_price).toBe(4100);
+    expect(edit.holding.type).toBe('Gold Maple Leaf');
+    expect(list[2]).toMatchObject({ kind: 'delete', id: U2, deletedAt: '2026-10-08T14:02:00.000Z' });
+  });
+
+  it('take the browser copies of offline adds out of the guest stack, folding edits and deletes of them into the adds', () => {
+    const store = memoryStore();
+    const T2 = T + 300_000;
+    store.setItem(
+      GUEST,
+      JSON.stringify([
+        { id: `${T + 1}-abc1234`, metal: 'silver', type: 'American Silver Eagle', weight: 1, weightUnit: 'g', quantity: 30 },
+        { id: `${T2 + 2}-def5678`, metal: 'gold', type: 'Buffalo', weight: 1, weightUnit: 'oz', quantity: 1 },
+        { id: `${T - 600_000}-zzz9999`, metal: 'silver', type: 'Added as a guest', weight: 1, weightUnit: 'oz', quantity: 5 },
+      ]),
+    );
+    store.setItem(
+      LEGACY,
+      JSON.stringify([
+        { id: 'b1', type: 'add', data: oldForm(), timestamp: T },
+        { id: 'b2', type: 'update', holdingId: `${T + 1}-abc1234`, data: oldForm({ quantity: 30 }), timestamp: T + 1_000 },
+        { id: 'b3', type: 'add', data: oldForm({ metal: 'gold', type: 'Buffalo', weight: 1, weightUnit: 'oz', quantity: 1 }), timestamp: T2 },
+        { id: 'b4', type: 'delete', holdingId: `${T2 + 2}-def5678`, timestamp: T2 + 5_000 },
+        { id: 'b5', type: 'update', holdingId: '1600000000000-nothere', data: oldForm(), timestamp: T2 + 6_000 },
+        { id: 'b6', type: 'update', holdingId: U1, data: { metal: 'tin' }, timestamp: T2 + 7_000 },
+      ]),
+    );
+    expect(adoptLegacyPending(USER, store)).toBe(1);
+    const [only] = readPending(USER, store) as Array<PendingWrite & { kind: 'add' }>;
+    expect(only.kind).toBe('add');
+    expect(only.row.quantity, 'the later edit of the copy is in the add').toBe(30);
+    const left = JSON.parse(store.getItem(GUEST)!) as Array<{ type: string }>;
+    expect(left.map((h) => h.type), "the guest's own holding stays to be offered").toEqual(['Added as a guest']);
+  });
+
+  it("keep the app's notes keys the old site showed as text and sent back", () => {
+    const store = memoryStore();
+    store.setItem(LEGACY, JSON.stringify([{ id: 'c1', type: 'update', holdingId: U1, data: oldForm({ notes: '{"local_id":1700000000001,"source":"APMEX","shipping":9.95}' }), timestamp: T }]));
+    adoptLegacyPending(USER, store);
+    const [edit] = readPending(USER, store) as Array<PendingWrite & { kind: 'update' }>;
+    expect(JSON.parse(edit.updates.notes)).toMatchObject({ local_id: 1700000000001, source: 'APMEX', shipping: 9.95 });
+    expect(edit.holding.dealer).toBe('APMEX');
+  });
+
+  it('move nothing twice, even if the old list comes back', () => {
+    const store = memoryStore();
+    const list = JSON.stringify([{ id: 'd1', type: 'add', data: oldForm(), timestamp: T }]);
+    store.setItem(LEGACY, list);
+    expect(adoptLegacyPending(USER, store)).toBe(1);
+    store.setItem(LEGACY, list);
+    expect(adoptLegacyPending(USER, store)).toBe(0);
+    expect(readPending(USER, store)).toHaveLength(1);
+    expect(store.getItem(LEGACY)).toBeNull();
+  });
+
+  it("drop an unreadable old list, and keep a readable one when this browser won't save", () => {
+    const store = memoryStore();
+    store.setItem(LEGACY, 'not json');
+    expect(adoptLegacyPending(USER, store)).toBe(0);
+    expect(store.getItem(LEGACY)).toBeNull();
+
+    const full = memoryStore();
+    full.setItem(LEGACY, JSON.stringify([{ id: 'e1', type: 'add', data: oldForm(), timestamp: T }]));
+    full.setItem = () => {
+      throw new Error('quota');
+    };
+    expect(adoptLegacyPending(USER, full)).toBe(0);
+    expect(full.getItem(LEGACY)).not.toBeNull();
+    expect(adoptLegacyPending(USER, null)).toBe(0);
+  });
+
+  it('go out before anything newer when the list is sent', async () => {
+    const store = memoryStore();
+    savePending(USER, [addWrite({ type: 'Newer' })], store);
+    store.setItem(LEGACY, JSON.stringify([{ id: 'f1', type: 'add', data: oldForm({ type: 'Older' }), timestamp: T }]));
+    const seen: string[] = [];
+    const result = await sendPending(
+      USER,
+      async (w) => {
+        seen.push(w.kind === 'add' ? String(w.row.type) : w.kind);
+      },
+      store,
+    );
+    expect(seen).toEqual(['Older', 'Newer']);
+    expect(result).toEqual({ sent: 2, refused: 0, waiting: 0 });
+  });
+
+  it('keep the date a holding was added while an edit of it waits', () => {
+    const existing = fromRow({ ...newHoldingRow(FORM, USER), created_at: '2026-01-05T00:00:00Z' });
+    const store = memoryStore();
+    store.setItem(LEGACY, JSON.stringify([{ id: 'g1', type: 'update', holdingId: existing.id, data: oldForm({ quantity: 25 }), timestamp: T }]));
+    // newHoldingRow's ids are UUIDs, the way the account's are.
+    adoptLegacyPending(USER, store);
+    const shown = withPending([existing], readPending(USER, store));
+    expect(shown[0].quantity).toBe(25);
+    expect(shown[0].createdAt).toBe('2026-01-05T00:00:00Z');
   });
 });
 

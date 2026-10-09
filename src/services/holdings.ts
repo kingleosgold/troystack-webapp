@@ -10,6 +10,9 @@ import { isMetal } from '../lib/metals';
 
 const STORAGE_KEY = 'stacktracker_holdings';
 
+/** Where the guest stack is kept, for code that reads it with its own storage. */
+export const GUEST_STACK_KEY = STORAGE_KEY;
+
 function readRaw(): unknown[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
@@ -113,6 +116,15 @@ export function updateLocalHolding(existing: Holding, form: HoldingFormData): Ho
 
 export function deleteLocalHolding(id: string): void {
   save(getLocalHoldings().filter((h) => h.id !== id));
+}
+
+/** The guest stack as stored, for noticing when it changes. */
+export function guestStackSnapshot(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
 }
 
 export function clearLocalHoldings(): void {
