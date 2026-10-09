@@ -42,7 +42,7 @@
     "purity": ".999 fine",
     "face": "£2",
     "mint": "The Royal Mint",
-    "years": "1997 to today",
+    "years": "1997 to today, .999 since 2013",
     "title": "British Silver Britannia melt value today",
     "about": "The Royal Mint's silver bullion coin. It's been .999 fine since 2013. Britannias from 1997 to 2012 were struck in .958 Britannia silver on a slightly heavier blank, so they still hold an ounce.",
     "description": "How much silver is in a British Silver Britannia, what it's worth at live spot, and its weight, purity and years."
@@ -117,7 +117,7 @@
     "purity": ".999 fine",
     "face": "10 yuan",
     "mint": "People's Bank of China",
-    "years": "1983 to today",
+    "years": "1983 to today, 30 g since 2016",
     "title": "Chinese Silver Panda melt value today",
     "about": "China's silver bullion coin, with a new panda design every year, so it draws collectors as well as stackers. Since 2016 it's been struck in 30 grams of silver rather than a full troy ounce, which is about 0.96 oz.",
     "description": "How much silver is in a Chinese Silver Panda, what it's worth at live spot, and its weight, purity and years."
@@ -167,7 +167,7 @@
     "mint": "United States Mint",
     "years": "1921 to 1935",
     "title": "Peace silver dollar melt value today",
-    "about": "The Peace dollar followed the Morgan in 1921 and was struck until 1935, with the same silver in each coin. Like Morgans, they usually sell above melt even when worn, and a few dates are scarce.",
+    "about": "The Peace dollar followed the Morgan in 1921 and was struck until 1935, with the same 0.7734 oz of silver as a Morgan. Like Morgans, they usually sell above melt even when worn, and a few dates are scarce.",
     "description": "How much silver is in a Peace silver dollar, what it's worth at live spot, and its weight, purity and years."
   },
   {
@@ -339,7 +339,7 @@
     "fineness": 0.999,
     "purity": ".999 fine",
     "title": "1 oz silver round value today",
-    "about": "A round is a coin-shaped piece of silver made by a private mint. It isn't legal tender and has no face value, so it usually costs less over spot than a government coin with the same silver.",
+    "about": "A round is a coin-shaped piece of silver made by a private mint. It isn't legal tender and has no face value. Rounds usually cost less over spot than government coins with the same silver.",
     "description": "What a 1 oz silver round is worth at live silver spot, with its weight and purity and what to know before you buy or sell one."
   },
   {
@@ -363,7 +363,7 @@
     "fineness": 0.999,
     "purity": ".999 fine",
     "title": "100 oz silver bar value today",
-    "about": "The biggest bar most people buy, a little under seven pounds of .999 silver. It has the lowest premium per ounce of anything here, but you sell it whole, so some stackers prefer smaller bars they can sell a few at a time.",
+    "about": "The biggest bar most people buy, a little under seven pounds of .999 silver. It has the lowest premium per ounce of any silver here, but you sell it whole, so some stackers prefer smaller bars they can sell a few at a time.",
     "description": "What a 100 oz silver bar is worth at live silver spot, with its weight and purity and what to know before you buy or sell one."
   },
   {
@@ -456,7 +456,7 @@
     "mint": "United States Mint",
     "years": "2006 to today",
     "title": "American Gold Buffalo melt value today",
-    "about": "The US Mint's pure gold coin, with James Earle Fraser's design from the Buffalo nickel. At 24 karat it's softer than a 22 karat Eagle, so it scratches more easily. Handle it by the edges.",
+    "about": "The US Mint's pure gold coin, with James Earle Fraser's design from the Buffalo nickel. At 24 karat it's softer than a 22 karat Eagle and scratches more easily, so it's best kept in its capsule.",
     "description": "How much gold is in an American Gold Buffalo, what it's worth at live spot, and its weight, purity and years."
   },
   {
@@ -517,7 +517,7 @@
     "purity": ".9999 fine",
     "face": "£100",
     "mint": "The Royal Mint",
-    "years": "1987 to today",
+    "years": "1987 to today, .9999 since 2013",
     "title": "British Gold Britannia melt value today",
     "about": "The Royal Mint's gold bullion coin, .9999 gold since 2013. Earlier Britannias were 22 karat but still held an ounce of gold. Because it's UK legal tender, it's free of capital gains tax for UK residents.",
     "description": "How much gold is in a British Gold Britannia, what it's worth at live spot, and its weight, purity and years."
@@ -548,7 +548,7 @@
     "purity": ".999 fine",
     "face": "500 yuan",
     "mint": "People's Bank of China",
-    "years": "1982 to today",
+    "years": "1982 to today, 30 g since 2016",
     "title": "Chinese Gold Panda melt value today",
     "about": "China's gold bullion coin, with a new panda each year. Since 2016 the size that used to be one ounce has been 30 grams of gold, which is about 0.96 oz.",
     "description": "How much gold is in a Chinese Gold Panda, what it's worth at live spot, and its weight, purity and years."
