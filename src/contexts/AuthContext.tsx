@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { clearStackCopies } from '../services/stackCopy';
 
 interface AuthContextType {
   user: User | null;
@@ -106,6 +107,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // after it was cleared here would keep showing, and the next guest add
       // would write it back.
       queryClient.removeQueries({ queryKey: ['holdings'] });
+      // So do the copies kept for reading the stack offline.
+      clearStackCopies();
       if (error) {
         // The sign-out didn't reach the server, a dropped connection say, and
         // the client keeps its session when that happens. This browser still
