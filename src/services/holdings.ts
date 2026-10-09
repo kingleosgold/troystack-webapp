@@ -118,6 +118,13 @@ export function deleteLocalHolding(id: string): void {
   save(getLocalHoldings().filter((h) => h.id !== id));
 }
 
+/** Takes holdings out of the guest stack, as once a read finds them in the account. */
+export function removeLocalHoldings(ids: Set<string>): void {
+  const left = getLocalHoldings().filter((h) => !ids.has(h.id));
+  if (left.length === 0) clearLocalHoldings();
+  else save(left);
+}
+
 /** The guest stack as stored, for noticing when it changes. */
 export function guestStackSnapshot(): string {
   try {

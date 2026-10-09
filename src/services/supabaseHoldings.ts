@@ -246,43 +246,63 @@ export async function deleteSupabaseHolding(id: string, userId: string): Promise
   return softDeleteHolding(id, new Date().toISOString(), userId);
 }
 
+/** The account's id for a holding moved in from this browser's guest stack. */
+function guestRowId(userId: string, guestId: string): Promise<string> {
+  return stableUuid(`${userId}:guest:${guestId}`);
+}
+
 /**
- * Copies holdings saved in this browser into an account. Each row's id comes
- * from the account and the browser holding, so a second copy, from another
- * tab or a retry after a lost answer, finds the rows already there. The
- * account keeps whole pieces, so a fractional count from an older build
- * becomes one piece holding the same ounces and cost.
+ * A holding from this browser's guest stack as an account row. The account
+ * keeps whole pieces, so a fractional count from an older build becomes one
+ * piece holding the same ounces, cost and premium. Weight, price and premium
+ * are per piece, so they scale with the count. Spot at purchase is per ounce,
+ * and taxes, shipping and any cost basis the app set are totals for the
+ * line, so they stay as they are.
  */
-export async function uploadLocalHoldings(local: Holding[], userId: string): Promise<void> {
-  if (local.length === 0) return;
-  const now = new Date().toISOString();
-  const rows: HoldingRow[] = await Promise.all(
-    local.map(async (h) => {
-      const whole = Number.isInteger(h.quantity) && h.quantity > 0;
-      const scale = whole ? 1 : h.quantity;
-      return {
-        id: await stableUuid(`${userId}:guest:${h.id}`),
-        user_id: userId,
-        metal: h.metal,
-        type: h.type,
-        weight: h.weight * scale,
-        weight_unit: h.weightUnit,
-        quantity: whole ? h.quantity : 1,
-        purchase_price: h.purchasePrice * scale,
-        purchase_date: h.purchaseDate || null,
-        notes: buildNotes(h.notesMeta, {
-          dealer: h.dealer,
-          taxes: h.taxes,
-          shipping: h.shipping,
-          spotAtPurchase: h.spotAtPurchase,
-          premium: h.premium,
-          note: h.note,
-        }),
-        created_at: h.createdAt || now,
-        updated_at: now,
-      };
+async function guestRow(h: Holding, userId: string, now: string): Promise<HoldingRow> {
+  const whole = Number.isInteger(h.quantity) && h.quantity > 0;
+  const scale = whole ? 1 : h.quantity;
+  return {
+    id: await guestRowId(userId, h.id),
+    user_id: userId,
+    metal: h.metal,
+    type: h.type,
+    weight: h.weight * scale,
+    weight_unit: h.weightUnit,
+    quantity: whole ? h.quantity : 1,
+    purchase_price: h.purchasePrice * scale,
+    purchase_date: h.purchaseDate || null,
+    notes: buildNotes(h.notesMeta, {
+      dealer: h.dealer,
+      taxes: h.taxes,
+      shipping: h.shipping,
+      spotAtPurchase: h.spotAtPurchase,
+      premium: h.premium == null ? undefined : h.premium * scale,
+      note: h.note,
     }),
-  );
+    created_at: h.createdAt || now,
+    updated_at: now,
+  };
+}
+
+/**
+ * Copies holdings saved in this browser into an account and returns them as
+ * the account holds them. Each row's id comes from the account and the
+ * browser holding, so a second copy, from another tab or a retry after a
+ * lost answer, finds the rows already there.
+ */
+export async function uploadLocalHoldings(local: Holding[], userId: string): Promise<Holding[]> {
+  if (local.length === 0) return [];
+  const now = new Date().toISOString();
+  const rows = await Promise.all(local.map((h) => guestRow(h, userId, now)));
   const { error, status } = await supabase.from('holdings').upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
   if (error) throw writeFailed(error, status, "The holdings in this browser didn't move into your account. Try again.");
+  return rows.map(fromRow);
+}
+
+/** Which of this browser's guest holdings a read of the account shows there, by their ids in the browser. */
+export async function guestHoldingsInAccount(local: Holding[], remote: Holding[], userId: string): Promise<Set<string>> {
+  const held = new Set(remote.map((h) => h.id));
+  const ids = await Promise.all(local.map((h) => guestRowId(userId, h.id)));
+  return new Set(local.filter((_, i) => held.has(ids[i])).map((h) => h.id));
 }

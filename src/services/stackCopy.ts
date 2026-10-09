@@ -47,6 +47,21 @@ export function readStackCopy(userId: string, store: Store | null = defaultStore
   }
 }
 
+/**
+ * Puts a change the account has taken into its copy, so a reload before the
+ * next read still shows it. The copy keeps the time of that read. With no
+ * copy there's nothing to keep in step, and the next read saves one.
+ */
+export function updateStackCopy(userId: string, change: (holdings: Holding[]) => Holding[], store: Store | null = defaultStore()): void {
+  const copy = readStackCopy(userId, store);
+  if (!copy || !store) return;
+  try {
+    store.setItem(PREFIX + userId, JSON.stringify({ savedAt: copy.savedAt, holdings: change(copy.holdings) }));
+  } catch {
+    // Storage is full or blocked. The next read tries again.
+  }
+}
+
 /** Every account's copy goes, as at sign-out on a shared computer. */
 export function clearStackCopies(): void {
   try {

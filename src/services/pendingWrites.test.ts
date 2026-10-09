@@ -18,6 +18,7 @@ import {
   withPending,
   type PendingWrite,
 } from './pendingWrites';
+import { readStackCopy, saveStackCopy } from './stackCopy';
 import { stableUuid } from '../lib/stableId';
 import type { HoldingFormData } from '../types/holding';
 
@@ -117,6 +118,34 @@ describe('changes waiting in the browser', () => {
     expect(readRefused('user-b', store)).toBe(0);
     clearRefused(USER, store);
     expect(readRefused(USER, store)).toBe(0);
+  });
+
+  it('go into the stored copy as each one reaches the account, so a reload before the next read still shows it', async () => {
+    const store = memoryStore();
+    const maple = fromRow(newHoldingRow({ ...FORM, type: 'Maple Leaf' }, USER));
+    const dimes = fromRow(newHoldingRow({ ...FORM, type: 'Junk dimes' }, USER));
+    saveStackCopy(USER, [maple, dimes], store, new Date('2026-10-09T18:00:00Z'));
+    const buffalo = addWrite({ type: 'Buffalo' });
+    const edit = holdingUpdates(dimes, { ...FORM, type: 'Junk dimes', quantity: 5 });
+    const refusedEdit: PendingWrite = { wid: 'w-edit', kind: 'update', id: dimes.id, updates: edit, holding: holdingAfter(dimes, edit, USER) };
+    const mapleGone: PendingWrite = { wid: 'w-delete', kind: 'delete', id: maple.id, deletedAt: '2026-10-09T19:00:00Z' };
+    const stuck = addWrite({ type: 'Eagle' });
+    savePending(USER, [buffalo, refusedEdit, mapleGone, stuck], store);
+    const result = await sendPending(
+      USER,
+      async (w) => {
+        if (w.wid === refusedEdit.wid) throw new HoldingWriteError("That didn't save. Try again.", false);
+        if (w.wid === stuck.wid) throw new HoldingWriteError("That didn't save. Try again.", true);
+      },
+      store,
+    );
+    expect(result).toEqual({ sent: 2, refused: 1, waiting: 1 });
+    // The add and the delete landed. The refused edit never did, and the add
+    // still waiting shows from the list, not the copy.
+    const copy = readStackCopy(USER, store);
+    expect(copy?.holdings.map((h) => [h.type, h.quantity])).toEqual([['Buffalo', 20], ['Junk dimes', 20]]);
+    expect(copy?.savedAt).toBe('2026-10-09T18:00:00.000Z');
+    expect(withPending(copy!.holdings, readPending(USER, store)).map((h) => h.type)).toEqual(['Eagle', 'Buffalo', 'Junk dimes']);
   });
 
   it("stop rather than loop when the store won't save", async () => {

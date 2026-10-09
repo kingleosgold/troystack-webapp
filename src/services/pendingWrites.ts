@@ -2,6 +2,7 @@ import type { Holding, HoldingFormData } from '../types/holding';
 import { parseNotes } from '../lib/holdingNotes';
 import { isMetal } from '../lib/metals';
 import { GUEST_STACK_KEY } from './holdings';
+import { updateStackCopy } from './stackCopy';
 import { fromRow, HoldingWriteError, toColumns, type HoldingRow, type HoldingUpdates } from './supabaseHoldings';
 
 /**
@@ -402,6 +403,9 @@ export async function sendPending(
     try {
       await send(next);
       sent += 1;
+      // Once it leaves the list, only the stored copy can show it if the
+      // read after this fails, so the copy gets it first.
+      updateStackCopy(userId, (list) => withPending(list, [next]), store);
     } catch (e) {
       if (canRetry(e)) break;
       console.error('a change made offline was refused', e);

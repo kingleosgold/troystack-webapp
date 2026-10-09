@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { clearStackCopies, copyShownSince, markCopyShown, readStackCopy, saveStackCopy, subscribeStackCopy } from './stackCopy';
+import { clearStackCopies, copyShownSince, markCopyShown, readStackCopy, saveStackCopy, subscribeStackCopy, updateStackCopy } from './stackCopy';
 import type { Holding } from '../types/holding';
 
 function memoryStore() {
@@ -19,6 +19,21 @@ describe("the stack copy for reading offline", () => {
     saveStackCopy('user-a', [HOLDING], store, new Date('2026-10-09T18:00:00Z'));
     expect(readStackCopy('user-a', store)).toEqual({ savedAt: '2026-10-09T18:00:00.000Z', holdings: [HOLDING] });
     expect(readStackCopy('user-b', store)).toBeNull();
+  });
+
+  it('takes a change the account has saved, keeping the time of the read it came from', () => {
+    const store = memoryStore();
+    const added = { ...HOLDING, id: 'h2', type: 'Gold Buffalo' };
+    // With no copy there's nothing to change, and none is made from a change alone.
+    updateStackCopy('user-a', (list) => [added, ...list], store);
+    expect(readStackCopy('user-a', store)).toBeNull();
+    saveStackCopy('user-a', [HOLDING], store, new Date('2026-10-09T18:00:00Z'));
+    updateStackCopy('user-a', (list) => [added, ...list], store);
+    updateStackCopy('user-a', (list) => list.filter((h) => h.id !== 'h1'), store);
+    expect(readStackCopy('user-a', store)).toEqual({ savedAt: '2026-10-09T18:00:00.000Z', holdings: [added] });
+    expect(readStackCopy('user-b', store)).toBeNull();
+    const full = { getItem: store.getItem, setItem: () => { throw new Error('quota'); } };
+    expect(() => updateStackCopy('user-a', (list) => list, full)).not.toThrow();
   });
 
   it('reads a broken or missing copy, or blocked storage, as no copy', () => {
