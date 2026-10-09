@@ -140,6 +140,11 @@ export default function Prices() {
             <PriceChart data={chart.points} color={METAL_VAR[metal]} height={280} granularity={range === '24H' ? 'intraday' : 'daily'} valueLabel={label} />
           </Suspense>
         )}
+        {(metal === 'platinum' || metal === 'palladium') && (range === '5Y' || range === 'ALL') && chart.points.length > 1 && (
+          <p className="mt-2 text-[12px] text-fg-3">
+            {label} prices on TroyStack go back to {new Date(chart.points[0].t).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })}.
+          </p>
+        )}
         {stats && (
           <dl className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-line pt-4">
             <div>
