@@ -384,6 +384,30 @@ test.describe('coin values', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mercury dime');
   });
 
+  test('price pages show a gram, a kilo and karat gold at spot', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/prices/gold');
+    const byWeight = page.getByRole('definition').filter({ hasText: '$134.42' });
+    await expect(byWeight.first()).toBeVisible();
+    const karat = page.getByLabel('Gold per gram by purity');
+    await expect(karat.getByText('14 karat, per gram')).toBeVisible();
+    await expect(karat.getByText('$78.41')).toBeVisible();
+    await expect(page.getByLabel('Gold by weight').getByText('$134,415.84')).toBeVisible();
+    await expect(page).toHaveTitle('Gold price today per ounce, gram and karat | TroyStack');
+  });
+
+  test('the melt calculator prices karat gold by weight', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/tools/melt');
+    await page.getByLabel('Coin or bar').selectOption('custom');
+    await page.getByLabel('Weight', { exact: true }).fill('10');
+    await page.getByRole('combobox', { name: 'Unit' }).selectOption('g');
+    await page.getByRole('button', { name: '14k' }).click();
+    await expect(page.getByLabel('Purity %')).toHaveValue('58.33');
+    // 10 grams of 14 karat gold at $4,180.80 an ounce
+    await expect(page.getByText('$784.05').first()).toBeVisible();
+  });
+
   test('a coin page arrives with its own title and facts before any script runs', async ({ request }) => {
     const html = await (await request.get('/coins/mercury-dime.html')).text();
     expect(html).toContain('<title>Mercury dime melt value today | TroyStack</title>');
