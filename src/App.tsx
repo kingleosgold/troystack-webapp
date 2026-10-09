@@ -33,16 +33,16 @@ function OldConversation() {
   return <Navigate to={conversationId ? `/troy/c/${conversationId}` : '/troy'} replace />;
 }
 
-function CheckoutOverlay() {
+function CheckoutOverlay({ text }: { text: string }) {
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-bg/90 backdrop-blur-sm" role="status">
-      <p className="text-[15px] font-semibold text-fg">Opening checkout</p>
+      <p className="text-[15px] font-semibold text-fg">{text}</p>
     </div>
   );
 }
 
 export default function App() {
-  const { openingCheckout } = useAfterSignIn();
+  const { checkoutOverlay } = useAfterSignIn();
   return (
     <>
       <Routes>
@@ -84,7 +84,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
-      {openingCheckout && <CheckoutOverlay />}
+      {checkoutOverlay && <CheckoutOverlay text={checkoutOverlay} />}
     </>
   );
 }
