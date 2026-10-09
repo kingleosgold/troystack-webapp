@@ -16,6 +16,7 @@ import { parseSpreadsheet } from '../lib/parseSpreadsheet';
 import { holdingsToCSV } from '../services/holdings';
 import type { Holding, HoldingFormData, Metal } from '../types/holding';
 import { cx } from '../lib/cx';
+import { downloadText } from '../lib/download';
 import { formatDate } from '../lib/text';
 import { HoldingEditor } from '../ui/HoldingEditor';
 import { ImportSheet, type ImportRow } from '../ui/ImportSheet';
@@ -164,6 +165,7 @@ export default function Stack() {
   const [importRows, setImportRows] = useState<{ rows: ImportRow[]; source: string } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const totals = useMemo(() => stackTotals(holdings, spot.prices, spot.changePct), [holdings, spot.prices, spot.changePct]);
@@ -200,15 +202,7 @@ export default function Stack() {
     }
   };
 
-  const exportCsv = () => {
-    const blob = new Blob([holdingsToCSV(holdings)], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `troystack-stack-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const exportCsv = () => downloadText(`troystack-stack-${new Date().toISOString().slice(0, 10)}.csv`, holdingsToCSV(holdings), 'text/csv');
 
   const gainTone = totals.gain > 0 ? 'text-up' : totals.gain < 0 ? 'text-down' : 'text-fg-3';
   const dayTone = totals.dayChange > 0 ? 'text-up' : totals.dayChange < 0 ? 'text-down' : 'text-fg-3';
@@ -254,8 +248,11 @@ export default function Stack() {
               disabled={moving}
               onClick={async () => {
                 setMoving(true);
+                setMoveError(null);
                 try {
                   await moveBrowserStackIn();
+                } catch (e) {
+                  setMoveError(e instanceof Error ? e.message : "The holdings in this browser didn't move into your account. Try again.");
                 } finally {
                   setMoving(false);
                 }
@@ -267,6 +264,7 @@ export default function Stack() {
           </div>
         </div>
       )}
+      {moveError && <div className="mb-4"><ErrorNote>{moveError}</ErrorNote></div>}
       {!isGuest && pendingCount > 0 && (
         <div role="status" className="mb-4 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg">
           {pendingCount === 1 ? 'One change is' : `${pendingCount} changes are`} saved in this browser and will reach your account when you're back online.
@@ -435,9 +433,9 @@ export default function Stack() {
           rows={importRows.rows}
           source={importRows.source}
           onClose={() => setImportRows(null)}
-          onConfirm={async (rows) => {
+          onConfirm={async (rows, batchId) => {
             const forms = rows.map(rowToForm).filter((f): f is HoldingFormData => f !== null);
-            await addMany(forms);
+            await addMany(forms, batchId);
           }}
         />
       )}

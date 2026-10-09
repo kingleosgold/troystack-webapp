@@ -229,14 +229,16 @@ export default function Troy() {
   const signedIn = Boolean(user);
 
   // Visitors: is the no-account endpoint live, and how many questions are left?
+  // A status read that failed isn't a no. The question can still go, and the
+  // visitor route says so if it's off.
   const visitorStatus = useQuery({
     queryKey: ['troy-visitor-status'],
     queryFn: ({ signal }) => visitorQuota(signal),
     enabled: !authLoading && !signedIn,
     staleTime: 60_000,
-    retry: false,
+    retry: 2,
   });
-  const visitorAvailable = visitorStatus.data != null;
+  const visitorAvailable = visitorStatus.data != null || visitorStatus.isError;
 
   const conversations = useQuery({
     queryKey: ['troy-conversations', user?.id],
@@ -268,9 +270,33 @@ export default function Troy() {
     if (!conversationId && user) setMessages([]);
   }, [conversationId, user]);
 
+  // Signing out here takes the account's chat off the screen. It's never kept
+  // or sent as the visitor's chat.
+  const wasSignedIn = useRef(signedIn);
+  const skipVisitorSave = useRef(false);
   useEffect(() => {
-    if (!signedIn) saveVisitorChat(messages);
+    if (wasSignedIn.current && !signedIn) {
+      skipVisitorSave.current = true;
+      setMessages(readVisitorChat());
+    }
+    wasSignedIn.current = signedIn;
+  }, [signedIn]);
+
+  useEffect(() => {
+    if (signedIn) return;
+    if (skipVisitorSave.current) {
+      skipVisitorSave.current = false;
+      return;
+    }
+    saveVisitorChat(messages);
   }, [messages, signedIn]);
+
+  // The chat on screen. An answer that arrives after someone moved to another
+  // chat isn't added there. It's saved in the account either way.
+  const openChat = useRef<string | null>(conversationId);
+  useEffect(() => {
+    openChat.current = conversationId;
+  }, [conversationId]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -280,17 +306,38 @@ export default function Troy() {
     async (text: string) => {
       if (!user) return;
       let id = conversationId;
+      let madeForThis = false;
       if (!id) {
         const conv = await createConversation(user.id);
         id = conv.id;
+        madeForThis = true;
         createdHere.current.add(id);
         qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', user.id], (prev) => [conv, ...(prev ?? [])]);
+        openChat.current = id;
         navigate(`/troy/c/${id}`, { replace: true });
       }
       const controller = new AbortController();
       abortRef.current = controller;
-      const res = await sendMessage(id, user.id, text, controller.signal);
-      setMessages((prev) => [...prev, { ...res.message, preview: res.preview ?? null }]);
+      let res: Awaited<ReturnType<typeof sendMessage>>;
+      try {
+        res = await sendMessage(id, user.id, text, controller.signal);
+      } catch (e) {
+        // At the daily limit the question is refused before it's saved, so a
+        // chat made for it is empty. It goes, so empty chats don't push real
+        // ones out of the three a free account sees.
+        if (madeForThis && e instanceof QuotaError) {
+          const emptyId = id;
+          const owner = user.id;
+          deleteConversation(emptyId, owner).catch(() => undefined);
+          qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', owner], (prev) => (prev ?? []).filter((c) => c.id !== emptyId));
+          if (openChat.current === emptyId) {
+            openChat.current = null;
+            navigate('/troy', { replace: true });
+          }
+        }
+        throw e;
+      }
+      if (openChat.current === id) setMessages((prev) => [...prev, { ...res.message, preview: res.preview ?? null }]);
       qc.invalidateQueries({ queryKey: ['troy-conversations', user.id] });
     },
     [user, conversationId, navigate, qc],
@@ -584,7 +631,7 @@ export default function Troy() {
           rows={importRows.rows}
           source={importRows.source}
           onClose={() => setImportRows(null)}
-          onConfirm={async (rows) => {
+          onConfirm={async (rows, batchId) => {
             const forms: HoldingFormData[] = rows
               .filter((r) => r.metal && r.weight)
               .map((r) => ({
@@ -600,7 +647,7 @@ export default function Troy() {
                 shipping: r.shipping,
                 note: r.note,
               }));
-            const n = await addMany(forms);
+            const n = await addMany(forms, batchId);
             setMessages((prev) => [
               ...prev,
               { id: localId('ack'), role: 'assistant', content: `Added ${n} ${n === 1 ? 'item' : 'items'} to your stack from ${importRows.source}.`, created_at: new Date().toISOString() },

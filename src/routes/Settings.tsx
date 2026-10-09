@@ -14,6 +14,7 @@ import { openBillingPortal, verifyCheckout } from '../lib/checkout';
 import { PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL } from '../lib/appStore';
 import { formatDate, todayET } from '../lib/text';
 import { cx } from '../lib/cx';
+import { downloadText } from '../lib/download';
 import { InstallPath } from '../ui/AppStore';
 import { Button, Field, Input, PageHeader, Segmented, Sheet } from '../ui/primitives';
 
@@ -59,20 +60,11 @@ function Row({ title, detail, right, onClick, href, tone }: { title: ReactNode; 
   return <div className={cls}>{body}</div>;
 }
 
-function download(name: string, text: string, type: string) {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 export default function Settings() {
   usePageMeta({ title: 'Settings', canonical: '/settings', noindex: true });
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const { user, session, isConfigured, signOut, linkWithGoogle, linkWithApple, updateEmailPassword, getLinkedProviders, hasEmailPassword } = useAuth();
+  const { user, session, loading: authLoading, isConfigured, signOut, linkWithGoogle, linkWithApple, updateEmailPassword, getLinkedProviders, hasEmailPassword } = useAuth();
   const { tier, isTrial, trialEnd, refetch } = useSubscription();
   const { openTrial } = useTrial();
   const { holdings, isGuest, clearBrowserStack } = useHoldings();
@@ -89,11 +81,13 @@ export default function Settings() {
   const [credsError, setCredsError] = useState<string | null>(null);
   const handledSession = useRef(false);
 
-  // Back from Stripe Checkout.
+  // Back from Stripe Checkout. It waits for the sign-in to load, so the plan
+  // read after verifying is the account's own.
   useEffect(() => {
     const sessionId = params.get('session_id');
     const failed = params.get('checkout') === 'failed';
     if (!sessionId && !failed) return;
+    if (authLoading) return;
     if (handledSession.current) return;
     handledSession.current = true;
     params.delete('session_id');
@@ -117,7 +111,7 @@ export default function Settings() {
         await refetch({ force: true });
         setBanner({ tone: 'neutral', text: confirming });
       });
-  }, [params, setParams, refetch]);
+  }, [params, setParams, refetch, authLoading]);
 
   const providers = user ? getLinkedProviders() : [];
   const hasEmail = user ? hasEmailPassword() : false;
@@ -292,7 +286,7 @@ export default function Settings() {
         <Row
           title="Download as a spreadsheet"
           detail={holdings.length ? `${holdings.length} ${holdings.length === 1 ? 'holding' : 'holdings'}, as CSV` : 'Nothing to download yet'}
-          onClick={holdings.length ? () => download(`troystack-stack-${todayET()}.csv`, holdingsToCSV(holdings), 'text/csv') : undefined}
+          onClick={holdings.length ? () => downloadText(`troystack-stack-${todayET()}.csv`, holdingsToCSV(holdings), 'text/csv') : undefined}
         />
         <Row title="Import a spreadsheet" detail="CSV or Excel, from another tracker or your own sheet" href="/stack?import=1" />
         {isGuest && holdings.length > 0 && (
