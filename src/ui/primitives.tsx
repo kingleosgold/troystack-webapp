@@ -149,12 +149,18 @@ interface SheetProps {
 export function Sheet({ open, onClose, title, children, width = 'md', label }: SheetProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // The latest onClose, so a parent that passes a new function on every
+  // render doesn't rerun the open effect and pull focus out of a field.
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') closeRef.current();
     };
     document.addEventListener('keydown', onKey);
     const overflow = document.body.style.overflow;
@@ -165,7 +171,7 @@ export function Sheet({ open, onClose, title, children, width = 'md', label }: S
       document.body.style.overflow = overflow;
       prev?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   const widths = { sm: 'sm:max-w-sm', md: 'sm:max-w-lg', lg: 'sm:max-w-2xl' };
