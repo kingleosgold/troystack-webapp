@@ -109,19 +109,23 @@ interface ConversationListProps {
   conversations: TroyConversationSummary[];
   activeId: string | null;
   isGold: boolean;
+  /** False while the account's plan is loading or couldn't be read. */
+  planKnown: boolean;
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
 }
 
-function ConversationList({ conversations, activeId, isGold, onSelect, onNew, onDelete }: ConversationListProps) {
+function ConversationList({ conversations, activeId, isGold, planKnown, onSelect, onNew, onDelete }: ConversationListProps) {
   const { openTrial } = useTrial();
   const sorted = useMemo(
     () => [...conversations].sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()),
     [conversations],
   );
-  // Free accounts see their three newest chats, the same as the app.
-  const shown = isGold ? sorted : sorted.slice(0, FREE_HISTORY);
+  // Free accounts see their three newest chats, the same as the app. An
+  // account whose plan isn't known yet may have Gold, so nothing is held back
+  // or sold until it is.
+  const shown = planKnown && !isGold ? sorted.slice(0, FREE_HISTORY) : sorted;
   const hidden = sorted.length - shown.length;
   return (
     <div className="flex h-full flex-col">
@@ -166,7 +170,7 @@ function ConversationList({ conversations, activeId, isGold, onSelect, onNew, on
   );
 }
 
-function LimitCard({ quota, signedIn }: { quota: Quota; signedIn: boolean }) {
+function LimitCard({ quota, signedIn, signUpHref = '/auth?next=/troy' }: { quota: Quota; signedIn: boolean; signUpHref?: string }) {
   const { openTrial } = useTrial();
   return (
     <div className="rounded-2xl border border-line bg-surface p-5 animate-fade-up">
@@ -177,7 +181,7 @@ function LimitCard({ quota, signedIn }: { quota: Quota; signedIn: boolean }) {
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         {!signedIn && (
-          <Link to="/auth?next=/troy" className="inline-flex h-10 items-center rounded-xl bg-btn px-4 text-sm font-semibold text-btn-fg hover:bg-btn-hover">
+          <Link to={signUpHref} className="inline-flex h-10 items-center rounded-xl bg-btn px-4 text-sm font-semibold text-btn-fg hover:bg-btn-hover">
             Create a free account
           </Link>
         )}
@@ -189,12 +193,12 @@ function LimitCard({ quota, signedIn }: { quota: Quota; signedIn: boolean }) {
   );
 }
 
-function SignInCard() {
+function SignInCard({ href }: { href: string }) {
   return (
     <div className="rounded-2xl border border-line bg-surface p-5">
       <p className="text-[15px] font-semibold text-fg">Sign in to ask Troy</p>
       <p className="mt-1 text-[14px] text-fg-2">It's free. Use the same account as the iPhone app and your chats with Troy follow you between the two.</p>
-      <Link to="/auth?next=/troy" className="mt-4 inline-flex h-10 items-center rounded-xl bg-btn px-4 text-sm font-semibold text-btn-fg hover:bg-btn-hover">
+      <Link to={href} className="mt-4 inline-flex h-10 items-center rounded-xl bg-btn px-4 text-sm font-semibold text-btn-fg hover:bg-btn-hover">
         Sign in or sign up
       </Link>
     </div>
@@ -219,6 +223,8 @@ export default function Troy() {
   // A visitor's question that didn't get through, offered to send again.
   const [unsent, setUnsent] = useState<string | null>(null);
   const [quotaHit, setQuotaHit] = useState<Quota | null>(null);
+  // A visitor's question the day's limit turned away, carried through sign-up.
+  const [turnedAway, setTurnedAway] = useState<string | null>(null);
   const [consentOpen, setConsentOpen] = useState(false);
   // A saved chat still loading. Nothing is sent until it's on screen, so the
   // load can't land over a question asked in the meantime.
@@ -246,6 +252,14 @@ export default function Troy() {
     retry: 2,
   });
   const visitorAvailable = visitorStatus.data != null || visitorStatus.isError;
+  const left = visitorStatus.data ? Math.max(0, visitorStatus.data.questionsLimit - visitorStatus.data.questionsUsed) : null;
+  // A visitor already at the day's limit sees it up front. Sending would only
+  // spend the question on a refusal.
+  const visitorLimit = !signedIn && left === 0 ? visitorStatus.data ?? null : null;
+  const limit = quotaHit ?? visitorLimit;
+  // Signing in from here comes back to the question waiting to be asked.
+  const waitingQuestion = search.get('q') ?? turnedAway;
+  const signInHref = waitingQuestion ? `/auth?next=${encodeURIComponent(`/troy?q=${encodeURIComponent(waitingQuestion)}`)}` : '/auth?next=/troy';
 
   const conversations = useQuery({
     queryKey: ['troy-conversations', user?.id],
@@ -399,6 +413,7 @@ export default function Troy() {
       setError(null);
       setUnsent(null);
       setQuotaHit(null);
+      setTurnedAway(null);
       const userMsg: TroyMessage = { id: localId('me'), role: 'user', content: t, created_at: new Date().toISOString() };
       const history = messages;
       setMessages((prev) => [...prev, userMsg]);
@@ -411,6 +426,13 @@ export default function Troy() {
         if (e instanceof QuotaError) {
           setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
           setQuotaHit(e.quota);
+          if (!signedIn) {
+            // The count read earlier can be behind, as when someone else on the
+            // same connection asked. It takes the API's answer, so the count and
+            // the limit card agree, and the question waits for sign-up.
+            qc.setQueryData(['troy-visitor-status'], e.quota);
+            setTurnedAway(t);
+          }
         } else if (e instanceof VisitorChatUnavailable) {
           setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
           qc.setQueryData(['troy-visitor-status'], null);
@@ -438,14 +460,20 @@ export default function Troy() {
     if (!q || autoAsked.current || authLoading || loadingChat) return;
     if (!signedIn && visitorStatus.isLoading) return;
     if (!signedIn && !visitorAvailable && isConfigured) return;
+    // A visitor already at the day's limit keeps the question in the address,
+    // so signing up from the limit card comes back and asks it.
+    if (visitorLimit) return;
     autoAsked.current = true;
     search.delete('q');
     setSearch(search, { replace: true });
     void send(q);
-  }, [search, setSearch, authLoading, loadingChat, signedIn, visitorStatus.isLoading, visitorAvailable, isConfigured, send]);
+  }, [search, setSearch, authLoading, loadingChat, signedIn, visitorStatus.isLoading, visitorAvailable, visitorLimit, isConfigured, send]);
 
   const todaysBrief = useCallback(async () => {
     if (!user) return;
+    // The brief goes in the chat it was asked from. If another chat is opened
+    // while it loads, it stays out of that one.
+    const askedIn = openChat.current;
     setBusy(true);
     try {
       const res = await getJson<{ brief?: { brief_text: string; date: string; is_current?: boolean } | null }>(`/v1/daily-brief?userId=${encodeURIComponent(user.id)}`);
@@ -455,9 +483,11 @@ export default function Troy() {
         : b.is_current === false
           ? `Today's brief isn't out yet. Here's the last one, from ${b.date}.\n\n${b.brief_text}`
           : b.brief_text;
-      setMessages((prev) => [...prev, { id: localId('brief'), role: 'assistant', content: text, created_at: new Date().toISOString() }]);
+      if (openChat.current === askedIn) {
+        setMessages((prev) => [...prev, { id: localId('brief'), role: 'assistant', content: text, created_at: new Date().toISOString() }]);
+      }
     } catch {
-      setError("Today's brief didn't load.");
+      if (openChat.current === askedIn) setError("Today's brief didn't load.");
     } finally {
       setBusy(false);
     }
@@ -469,21 +499,29 @@ export default function Troy() {
     planRef.current = { loading: planLoading, gold: isGold };
   }, [planLoading, isGold]);
 
+  // One receipt at a time. Another picked while the first is being checked
+  // would be counted as a scan of its own.
+  const scanning = useRef(false);
+
   const onPhoto = useCallback(
     async (file: File) => {
-      if (!user) return;
+      if (!user || scanning.current) return;
+      scanning.current = true;
       setError(null);
-      // Gold scans without a limit, so a plan that hasn't loaded isn't
-      // counted as Free. It gets a few seconds to arrive.
-      for (let waited = 0; planRef.current.loading && waited < 5000; waited += 250) {
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      }
-      if (planRef.current.loading) {
-        setError('Your plan is still loading. Try the receipt again in a moment.');
-        return;
-      }
-      const gold = planRef.current.gold;
+      // Busy from the start, so the page shows something is happening while
+      // the plan and the scan count are checked.
+      setBusy(true);
       try {
+        // Gold scans without a limit, so a plan that hasn't loaded isn't
+        // counted as Free. It gets a few seconds to arrive.
+        for (let waited = 0; planRef.current.loading && waited < 5000; waited += 250) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+        if (planRef.current.loading) {
+          setError('Your plan is still loading. Try the receipt again in a moment.');
+          return;
+        }
+        const gold = planRef.current.gold;
         if (!gold) {
           const s = await scanStatus(user.id);
           if (s.scansUsed >= s.scansLimit) {
@@ -499,7 +537,6 @@ export default function Troy() {
             return;
           }
         }
-        setBusy(true);
         const base64 = await new Promise<string>((resolve, reject) => {
           const r = new FileReader();
           r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
@@ -527,6 +564,7 @@ export default function Troy() {
         setError("That receipt didn't scan. Try a clearer photo.");
       } finally {
         setBusy(false);
+        scanning.current = false;
       }
     },
     [user, openTrial],
@@ -543,13 +581,13 @@ export default function Troy() {
   const isEmpty = messages.length === 0 && !busy && !loadingChat;
   const chips = holdings.length > 0 && signedIn ? STACK_CHIPS : MARKET_CHIPS;
   const visitorBlocked = !authLoading && !signedIn && !visitorStatus.isLoading && !visitorAvailable;
-  const left = visitorStatus.data ? Math.max(0, visitorStatus.data.questionsLimit - visitorStatus.data.questionsUsed) : null;
 
   const list = signedIn ? (
     <ConversationList
       conversations={conversations.data ?? []}
       activeId={conversationId}
       isGold={isGold}
+      planKnown={!planLoading}
       onSelect={(id) => {
         setListOpen(false);
         setQuotaHit(null);
@@ -603,13 +641,14 @@ export default function Troy() {
                 {left} of {visitorStatus.data?.questionsLimit} free questions left today
                 <span className="hidden sm:inline">
                   {' · '}
-                  <Link to="/auth?next=/troy" className="font-semibold text-gold hover:text-gold-2">
+                  <Link to={signInHref} className="font-semibold text-gold hover:text-gold-2">
                     Sign in
                   </Link>
                 </span>
               </span>
             )}
-            {signedIn && !isGold && (
+            {/* Until the plan is known it isn't Free, it's unknown. */}
+            {signedIn && !planLoading && !isGold && (
               <button type="button" onClick={() => openTrial({ reason: 'Gold gives you 30 questions a day with Troy.', campaign: 'webapp-troy-limit' })} className="font-semibold text-gold hover:text-gold-2">
                 Free plan, 3 a day
               </button>
@@ -619,7 +658,7 @@ export default function Troy() {
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-3xl px-4 py-6 space-y-6">
-            {isEmpty && !quotaHit && (
+            {isEmpty && !limit && (
               <div className="flex flex-col items-center text-center pt-6 sm:pt-12">
                 <img src="/troy-96.png" alt="" className="h-20 w-20 rounded-full shadow-card" width={80} height={80} />
                 <h1 className="mt-4 text-[24px] sm:text-[28px] font-semibold tracking-tight text-fg">Ask Troy anything</h1>
@@ -632,7 +671,7 @@ export default function Troy() {
                 </p>
                 {visitorBlocked ? (
                   <div className="mt-6 w-full max-w-md text-left">
-                    <SignInCard />
+                    <SignInCard href={signInHref} />
                   </div>
                 ) : (
                   <div className="mt-6 grid w-full max-w-lg gap-2 sm:grid-cols-2">
@@ -659,7 +698,7 @@ export default function Troy() {
               <MessageBubble key={m.id} message={m} userId={user?.id} canListen={isGold && m.role === 'assistant'} />
             ))}
             {busy && <TypingIndicator />}
-            {quotaHit && <LimitCard quota={quotaHit} signedIn={signedIn} />}
+            {limit && <LimitCard quota={limit} signedIn={signedIn} signUpHref={signInHref} />}
             {error && (
               <div className="rounded-xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg-2" role="alert">
                 {error}
@@ -683,7 +722,7 @@ export default function Troy() {
               onSend={(t) => void send(t)}
               onStop={() => abortRef.current?.abort()}
               busy={busy}
-              disabled={visitorBlocked || Boolean(quotaHit) || loadingChat}
+              disabled={visitorBlocked || Boolean(limit) || loadingChat}
               placeholder={visitorBlocked ? 'Sign in to ask Troy' : loadingChat ? 'Loading this chat' : 'Ask Troy anything'}
               maxLength={signedIn ? 2000 : 500}
               onPhoto={signedIn ? (f) => void onPhoto(f) : undefined}

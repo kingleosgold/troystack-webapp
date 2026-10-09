@@ -62,11 +62,16 @@ export default function ToolStackingHistory() {
         <Card className="p-5">
           {history.isError ? (
             <ErrorNote onRetry={() => history.refetch()}>Price history didn't load.</ErrorNote>
-          ) : history.isLoading || !result ? (
+          ) : history.isLoading ? (
             <>
               <Skeleton className="h-10 w-48" />
               <Skeleton className="h-[260px] w-full mt-4" />
             </>
+          ) : !result ? (
+            // Nothing to show isn't the same as still loading.
+            <p className="py-16 text-center text-[14px] text-fg-3">
+              {(parseFloat(amount) || 0) > 0 ? "There's no price history to run this on." : "Enter how much you'd buy each month."}
+            </p>
           ) : (
             <>
               <div className="flex flex-wrap items-end justify-between gap-4">

@@ -67,7 +67,7 @@ export default function Settings() {
   const { user, session, loading: authLoading, isConfigured, signOut, linkWithGoogle, linkWithApple, updateEmailPassword, getLinkedProviders, hasEmailPassword } = useAuth();
   const { tier, isTrial, trialEnd, refetch, loading: planLoading } = useSubscription();
   const { openTrial } = useTrial();
-  const { holdings, isGuest, clearBrowserStack } = useHoldings();
+  const { holdings, isGuest, clearBrowserStack, loading: stackLoading, error: stackError, refresh: reloadStack } = useHoldings();
   const { theme, setTheme } = useTheme();
 
   const [banner, setBanner] = useState<{ tone: 'up' | 'down' | 'neutral'; text: string } | null>(null);
@@ -318,8 +318,22 @@ export default function Settings() {
       <Section title="Your stack">
         <Row
           title="Download as a spreadsheet"
-          detail={holdings.length ? `${holdings.length} ${holdings.length === 1 ? 'holding' : 'holdings'}, as CSV` : 'Nothing to download yet'}
-          onClick={holdings.length ? () => downloadText(`troystack-stack-${todayET()}.csv`, holdingsToCSV(holdings), 'text/csv') : undefined}
+          detail={
+            holdings.length
+              ? `${holdings.length} ${holdings.length === 1 ? 'holding' : 'holdings'}, as CSV`
+              : stackLoading
+                ? 'Loading your stack'
+                : stackError
+                  ? "Your stack didn't load. Tap to try again."
+                  : 'Nothing to download yet'
+          }
+          onClick={
+            holdings.length
+              ? () => downloadText(`troystack-stack-${todayET()}.csv`, holdingsToCSV(holdings), 'text/csv')
+              : stackError && !stackLoading
+                ? () => void reloadStack()
+                : undefined
+          }
         />
         <Row title="Import a spreadsheet" detail="CSV or Excel, from another tracker or your own sheet" href="/stack?import=1" />
         {isGuest && holdings.length > 0 && (

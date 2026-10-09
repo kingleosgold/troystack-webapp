@@ -84,12 +84,13 @@ export default function Prices() {
   if (params.metal && !isMetal(params.metal)) return <Navigate to="/prices" replace />;
 
   const price = spot.data?.prices[metal];
+  const priced = spot.priced(metal);
   // Platinum and palladium history only goes back to early 2025, so their
   // longest ranges are measured from there.
   const historyStart = chart.startsLate
     ? new Date(chart.points[0].t).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
     : null;
-  const ratio = spot.data && spot.data.prices.silver > 0 ? spot.data.prices.gold / spot.data.prices.silver : null;
+  const ratio = spot.priced('gold') && spot.priced('silver') ? spot.prices.gold / spot.prices.silver : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 sm:pt-8">
@@ -124,8 +125,13 @@ export default function Prices() {
           <div className="max-w-md"><ErrorNote onRetry={() => void spot.refetch()}>There's no live {label.toLowerCase()} price right now.</ErrorNote></div>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
-          {spot.data && <ChangeBadge pct={spot.data.changePct[metal]} amount={spot.data.changeAmt[metal]} />}
-          <span className="text-[13px] text-fg-3">since the last close</span>
+          {/* A move needs a price to move from, so a metal with none shows none. */}
+          {priced && spot.data && (
+            <>
+              <ChangeBadge pct={spot.data.changePct[metal]} amount={spot.data.changeAmt[metal]} />
+              <span className="text-[13px] text-fg-3">since the last close</span>
+            </>
+          )}
           <MarketStatus closed={spot.marketsClosed} />
           {spot.data && <span className="text-[12px] text-fg-3">Updated {formatTimeET(spot.data.timestamp)}</span>}
         </div>
@@ -145,8 +151,12 @@ export default function Prices() {
         </div>
         {chart.error ? (
           <ErrorNote onRetry={() => chart.refetch()}>The chart didn't load.</ErrorNote>
-        ) : chart.loading || chart.points.length < 2 ? (
+        ) : chart.loading ? (
           <Skeleton className="h-[280px] w-full" />
+        ) : chart.points.length < 2 ? (
+          <div className="flex h-[280px] items-center justify-center px-6 text-center text-[14px] text-fg-3">
+            There aren't enough {label.toLowerCase()} prices in this range to draw a chart.
+          </div>
         ) : (
           <Suspense fallback={<Skeleton className="h-[280px] w-full" />}>
             <PriceChart data={chart.points} color={METAL_VAR[metal]} height={280} granularity={range === '24H' ? 'intraday' : 'daily'} valueLabel={label} />
@@ -171,10 +181,10 @@ export default function Prices() {
                 </dd>
               </div>
             )}
-            {spot.data && (
+            {priced && (
               <div>
                 <dt className="text-[12px] text-fg-3">Per gram</dt>
-                <dd className="text-[15px] font-semibold text-fg tnum">{money((spot.data.prices[metal] || 0) * 0.0321507466)}</dd>
+                <dd className="text-[15px] font-semibold text-fg tnum">{money(spot.prices[metal] * 0.0321507466)}</dd>
               </div>
             )}
           </dl>

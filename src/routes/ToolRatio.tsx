@@ -4,7 +4,9 @@ import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import type { HistoryRange } from '../lib/marketApi';
 import { formatDate } from '../lib/text';
+import { cx } from '../lib/cx';
 import { Card, ErrorNote, LinkButton, PageHeader, Segmented, Skeleton } from '../ui/primitives';
+import { SpotNotice } from '../ui/SpotNotice';
 import type { ChartPoint } from '../ui/PriceChart';
 
 const PriceChart = lazy(() => import('../ui/PriceChart'));
@@ -16,8 +18,8 @@ export default function ToolRatio() {
   usePageMeta({ ...SEO['/tools/ratio'], canonical: '/tools/ratio' });
   const [range, setRange] = useState<R>('5Y');
   const history = useHistory(range, range === 'ALL' ? 1000 : 400);
-  const { data: spot } = useSpotMap();
-  const now = spot && spot.prices.silver > 0 ? spot.prices.gold / spot.prices.silver : null;
+  const spot = useSpotMap();
+  const now = spot.priced('gold') && spot.priced('silver') ? spot.prices.gold / spot.prices.silver : null;
 
   const { points, stats } = useMemo(() => {
     const pts: ChartPoint[] = (history.data ?? [])
@@ -46,8 +48,11 @@ export default function ToolRatio() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[280px_1fr]">
         <Card className="p-5 h-fit">
           <div className="text-[13px] text-fg-3">Right now</div>
-          <div className="mt-1 text-[40px] font-semibold tracking-tight text-fg tnum">{now ? now.toFixed(1) : '...'}</div>
+          <div className={cx('mt-1 font-semibold tracking-tight tnum', now || spot.isLoading ? 'text-[40px] text-fg' : 'text-[22px] text-fg-3')}>
+            {now ? now.toFixed(1) : spot.isLoading ? '...' : 'No price'}
+          </div>
           <div className="text-[13px] text-fg-3">ounces of silver per ounce of gold</div>
+          <SpotNotice spot={spot} metals={['gold', 'silver']} className="mt-4" />
           {stats && now && (
             <dl className="mt-5 space-y-2 border-t border-line pt-4 text-[13px]">
               <div className="flex justify-between gap-3">
@@ -87,8 +92,12 @@ export default function ToolRatio() {
           />
           {history.isError ? (
             <ErrorNote onRetry={() => history.refetch()}>The history didn't load.</ErrorNote>
-          ) : history.isLoading || points.length < 2 ? (
+          ) : history.isLoading ? (
             <Skeleton className="h-[280px] w-full" />
+          ) : points.length < 2 ? (
+            <div className="flex h-[280px] items-center justify-center px-6 text-center text-[14px] text-fg-3">
+              There isn't enough price history in this range to draw the ratio.
+            </div>
           ) : (
             <Suspense fallback={<Skeleton className="h-[280px] w-full" />}>
               <PriceChart data={points} color="var(--gold)" height={280} granularity={range === 'ALL' ? 'monthly' : 'daily'} formatValue={(v) => v.toFixed(0)} valueLabel="Ratio" />

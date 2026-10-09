@@ -9,7 +9,7 @@ import { lineOz, valueAt, type SpotMap } from '../lib/stackMath';
 import { money, num, signedMoney, signedPercent } from '../lib/format';
 import type { Metal } from '../types/holding';
 import { cx } from '../lib/cx';
-import { Card, Field, Input, PageHeader } from '../ui/primitives';
+import { Card, ErrorNote, Field, Input, PageHeader } from '../ui/primitives';
 import { SpotNotice } from '../ui/SpotNotice';
 import { AppStoreButton } from '../ui/AppStore';
 
@@ -25,13 +25,16 @@ export default function ToolWhatIf() {
   usePageMeta({ ...SEO['/tools/what-if'], canonical: '/tools/what-if' });
   const spotMap = useSpotMap();
   const { prices, data } = spotMap;
-  const { holdings } = useHoldings();
+  const { holdings, error: stackError, refresh: reloadStack } = useHoldings();
   const hasStack = holdings.length > 0;
+  // A stack that didn't load isn't an empty one. The amounts below stand in until it does.
+  const stackFailed = Boolean(stackError) && !hasStack;
   // A metal with no price typed in follows live spot.
   const [targets, setTargets] = useState<Partial<Record<Metal, string>>>({});
   const [manualOz, setManualOz] = useState<Record<Metal, string>>({ gold: '1', silver: '100', platinum: '', palladium: '' });
 
-  const shown = (m: Metal) => targets[m] ?? (data ? String(Math.round(prices[m])) : '');
+  // A metal with no live price leaves its box empty for a price to be typed, rather than showing 0.
+  const shown = (m: Metal) => targets[m] ?? (spotMap.priced(m) ? String(Math.round(prices[m])) : '');
 
   const target: SpotMap = useMemo(() => {
     const t = {} as SpotMap;
@@ -62,7 +65,7 @@ export default function ToolWhatIf() {
       return;
     }
     const next: Partial<Record<Metal, string>> = {};
-    for (const m of METALS) next[m] = String(Math.round((prices[m] || 0) * f));
+    for (const m of METALS) next[m] = spotMap.priced(m) ? String(Math.round(prices[m] * f)) : '';
     setTargets(next);
   };
 
@@ -81,7 +84,7 @@ export default function ToolWhatIf() {
           <div className="space-y-4">
             {METALS.map((m) => (
               <div key={m} className="grid grid-cols-[1fr_1fr] gap-3 items-end">
-                <Field label={`${METAL_LABEL[m]} price`} hint={spotMap.priced(m) ? `Spot ${money(prices[m])}` : data ? 'No live price right now' : 'Spot loading'} htmlFor={`wi-${m}`}>
+                <Field label={`${METAL_LABEL[m]} price`} hint={spotMap.priced(m) ? `Spot ${money(prices[m])}` : spotMap.isLoading ? 'Spot loading' : 'No live price right now'} htmlFor={`wi-${m}`}>
                   <Input id={`wi-${m}`} inputMode="decimal" value={shown(m)} onChange={(e) => setTargets((p) => ({ ...p, [m]: e.target.value }))} />
                 </Field>
                 {hasStack ? (
@@ -109,15 +112,20 @@ export default function ToolWhatIf() {
           <dl className="mt-4 space-y-2 text-[14px]">
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Worth today</dt>
-              <dd className="text-fg tnum">{todayKnown ? money(nowValue) : data ? 'No price' : '...'}</dd>
+              <dd className="text-fg tnum">{todayKnown ? money(nowValue) : spotMap.isLoading ? '...' : 'No price'}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Gold/silver ratio</dt>
-              <dd className="text-fg tnum">{ratio ? ratio.toFixed(1) : '...'}</dd>
+              <dd className="text-fg tnum">{ratio ? ratio.toFixed(1) : spotMap.isLoading ? '...' : 'No price'}</dd>
             </div>
           </dl>
           <SpotNotice spot={spotMap} metals={inPlay} className="mt-4" />
-          {!hasStack && (
+          {stackFailed && (
+            <div className="mt-4">
+              <ErrorNote onRetry={() => void reloadStack()}>Your stack didn't load, so this uses the amounts you type.</ErrorNote>
+            </div>
+          )}
+          {!hasStack && !stackFailed && (
             <Link to="/stack?add=1" className="mt-4 inline-block text-[13px] font-semibold text-gold hover:text-gold-2">
               Add your stack
             </Link>
