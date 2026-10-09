@@ -86,13 +86,18 @@ export default function Settings() {
   useEffect(() => {
     const sessionId = params.get('session_id');
     const failed = params.get('checkout') === 'failed';
-    if (!sessionId && !failed) return;
+    const haveGold = params.get('checkout') === 'have-gold';
+    if (!sessionId && !failed && !haveGold) return;
     if (authLoading) return;
     if (handledSession.current) return;
     handledSession.current = true;
     params.delete('session_id');
     params.delete('checkout');
     setParams(params, { replace: true });
+    if (haveGold) {
+      setBanner({ tone: 'up', text: 'This account already has Gold, so there was nothing to buy. Your plan is below.' });
+      return;
+    }
     if (failed) {
       setBanner({ tone: 'down', text: "Checkout didn't open. You can start it again from Plan below." });
       return;
