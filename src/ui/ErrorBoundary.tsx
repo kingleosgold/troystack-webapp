@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
+import { reloadForStaleChunk } from '../lib/chunkReload';
 
 interface Props {
   children: ReactNode;
@@ -10,8 +11,6 @@ interface Props {
 interface State {
   error: Error | null;
 }
-
-const RELOAD_KEY = 'troystack_chunk_reload';
 
 function isStaleChunk(error: Error): boolean {
   return /dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading chunk/i.test(error.message);
@@ -26,11 +25,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     // After a deploy, an open tab can ask for page code that no longer exists.
-    // One reload picks up the new build.
+    // One reload per build picks up the new one.
     if (isStaleChunk(error)) {
       try {
-        if (!sessionStorage.getItem(RELOAD_KEY)) {
-          sessionStorage.setItem(RELOAD_KEY, '1');
+        if (reloadForStaleChunk(sessionStorage, __BUILD_ID__)) {
           window.location.reload();
           return;
         }
