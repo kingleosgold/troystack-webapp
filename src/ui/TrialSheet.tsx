@@ -79,7 +79,7 @@ function WebCheckout({ campaign, onClose }: { campaign: Campaign; onClose: () =>
       <p className="text-[12px] text-fg-3">
         {lifetime
           ? 'One payment, Gold for good. Checkout is handled by Stripe.'
-          : `Free for ${GOLD.trialDays} days, then ${chosen.price} ${chosen.per}. Cancel before day ${GOLD.trialDays + 1} and you won't be charged. Checkout is handled by Stripe.`}
+          : `Your first ${GOLD.trialDays} days are free if you haven't had Gold before, then ${chosen.price} ${chosen.per}. Cancel before day ${GOLD.trialDays + 1} and you won't be charged. Checkout is handled by Stripe.`}
         {!user && ' You\'ll sign in or make a free account first.'}
       </p>
       {error && (
@@ -93,17 +93,24 @@ function WebCheckout({ campaign, onClose }: { campaign: Campaign; onClose: () =>
 
 export function TrialSheet({ open, onClose, reason, campaign }: Props) {
   const { user } = useAuth();
-  const { isGold } = useSubscription();
+  const { isGold, loading: planLoading } = useSubscription();
+  // A signed-in account whose plan hasn't loaded may already have Gold, so
+  // nothing is sold until it's known.
+  const checking = Boolean(user) && planLoading;
   const iphone = isAppleMobile();
   const android = isAndroid();
   const web = webCheckoutReady();
   const [showWebOnIphone, setShowWebOnIphone] = useState(false);
 
   return (
-    <Sheet open={open} onClose={onClose} title={isGold ? 'You have Gold' : 'Try Gold free for a week'}>
+    <Sheet open={open} onClose={onClose} title={isGold ? 'You have Gold' : checking ? 'Checking your plan' : 'Try Gold free for a week'}>
       {isGold ? (
         <p className="text-[15px] text-fg-2">
           Gold is on for this account, so everything here is open to you. You can see or change your plan in Settings.
+        </p>
+      ) : checking ? (
+        <p className="text-[15px] text-fg-2" role="status">
+          We're still loading this account's plan, so nothing can be bought yet. It keeps trying, and this updates once it's in.
         </p>
       ) : (
         <div className="space-y-5">

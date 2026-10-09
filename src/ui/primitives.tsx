@@ -146,6 +146,11 @@ interface SheetProps {
 }
 
 /** A dialog that docks to the bottom on phones and centers on larger screens. */
+// Sheets open now, newest last. Only the top one answers Escape, and the page
+// stays locked from scrolling until the last one closes.
+const openSheets: symbol[] = [];
+let overflowBeforeSheets = '';
+
 export function Sheet({ open, onClose, title, children, width = 'md', label }: SheetProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -158,17 +163,23 @@ export function Sheet({ open, onClose, title, children, width = 'md', label }: S
 
   useEffect(() => {
     if (!open) return;
+    const me = Symbol('sheet');
     const prev = document.activeElement as HTMLElement | null;
+    if (openSheets.length === 0) {
+      overflowBeforeSheets = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+    openSheets.push(me);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeRef.current();
+      if (e.key === 'Escape' && openSheets[openSheets.length - 1] === me) closeRef.current();
     };
     document.addEventListener('keydown', onKey);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     requestAnimationFrame(() => ref.current?.focus());
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = overflow;
+      const at = openSheets.indexOf(me);
+      if (at >= 0) openSheets.splice(at, 1);
+      if (openSheets.length === 0) document.body.style.overflow = overflowBeforeSheets;
       prev?.focus?.();
     };
   }, [open]);
