@@ -73,6 +73,17 @@ test('home shows live prices and Troy\'s read', async ({ page }) => {
   await expect(page.getByText(/PBOC's record physical buying/).filter({ visible: true }).first()).toBeVisible();
 });
 
+test("platinum's long-run chart starts where its real prices do", async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/prices/platinum');
+  await page.getByRole('tab', { name: 'All' }).click();
+  await expect(page.getByText('Platinum prices on TroyStack go back to March 2025.')).toBeVisible();
+  // The API repeats the first recorded price back to 1915, and none of those repeats is drawn.
+  await expect(page.getByText('over the full history')).toBeVisible();
+  await page.getByRole('tab', { name: '1Y' }).click();
+  await expect(page.getByText(/prices on TroyStack go back to/)).toHaveCount(0);
+});
+
 test('signal hides one-liners that were cut off', async ({ page }) => {
   await mockBackends(page);
   await page.goto('/signal');
