@@ -15,6 +15,9 @@ const coins = JSON.parse(readFileSync(path.join(root, 'src/lib/coins.json'), 'ut
 const template = readFileSync(path.join(dist, 'index.html'), 'utf8');
 
 const escape = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// JSON for a script block. A "<" written as \u003c reads the same to a JSON
+// parser and can't close the block.
+const scriptJson = (value) => JSON.stringify(value).replace(/</g, '\\u003c');
 const fullTitle = (t) => (t.includes('TroyStack') ? t : `${t} | TroyStack`);
 
 function setTag(html, pattern, replacement) {
@@ -22,7 +25,7 @@ function setTag(html, pattern, replacement) {
   return html.replace(pattern, replacement);
 }
 
-function render(route, meta, body) {
+function render(route, meta, body, ld) {
   const url = `${SITE}${route === '/' ? '/' : route}`;
   const title = escape(fullTitle(meta.title));
   const desc = escape(meta.description);
@@ -38,6 +41,8 @@ function render(route, meta, body) {
   // Crawlers that don't run JavaScript, which includes most AI ones, read the
   // page's facts from here. With JavaScript on, browsers ignore it.
   if (body) html = setTag(html, /<noscript>[^<]*<\/noscript>/, `<noscript>${body}</noscript>`);
+  // Structured data search engines read, like the breadcrumb a result shows.
+  if (ld) html = setTag(html, /<\/head>/, `<script type="application/ld+json">${scriptJson(ld)}</script></head>`);
   return html;
 }
 
@@ -68,15 +73,29 @@ function coinsIndexBody() {
   return `<h1>Coin and bar values</h1><ul>${items}</ul>${NEEDS_JS}`;
 }
 
+/** Search results show where a coin page sits, under Coin and bar values. */
+function coinBreadcrumb(c) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Coin and bar values', item: `${SITE}/coins` },
+      { '@type': 'ListItem', position: 2, name: c.name, item: `${SITE}/coins/${c.slug}` },
+    ],
+  };
+}
+
 const pages = { ...seo, '/prices': seo['/prices/gold'] };
 const bodies = { '/coins': coinsIndexBody() };
+const structured = {};
 for (const c of coins) {
   pages[`/coins/${c.slug}`] = { title: c.title, description: c.description };
   bodies[`/coins/${c.slug}`] = coinBody(c);
+  structured[`/coins/${c.slug}`] = coinBreadcrumb(c);
 }
 let count = 0;
 for (const [route, meta] of Object.entries(pages)) {
-  const html = render(route, meta, bodies[route]);
+  const html = render(route, meta, bodies[route], structured[route]);
   const file = route === '/' ? path.join(dist, 'index.html') : path.join(dist, `${route.slice(1)}.html`);
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, html);
