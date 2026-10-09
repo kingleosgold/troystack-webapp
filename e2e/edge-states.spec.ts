@@ -397,6 +397,53 @@ test.describe('signing out', () => {
     expect(await keysFor(page)).toEqual([false, false]);
   });
 
+  test('closing the sheet just as it turns to the question leaves signing out working', async ({ page }) => {
+    await signIn(page);
+    // An Escape lands the moment the wait for the send ends: after the sheet
+    // turns to its question, before it redraws.
+    await page.addInitScript((waitMs) => {
+      const realSetTimeout = window.setTimeout.bind(window);
+      const flag = window as unknown as { escapeAfterSignOutWait?: boolean };
+      window.setTimeout = ((fn: TimerHandler, ms?: number, ...args: unknown[]) => {
+        if (ms === waitMs && flag.escapeAfterSignOutWait && typeof fn === 'function') {
+          flag.escapeAfterSignOutWait = false;
+          return realSetTimeout(() => {
+            const channel = new MessageChannel();
+            channel.port1.onmessage = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            channel.port2.postMessage(null);
+            (fn as (...a: unknown[]) => void)(...args);
+          }, ms);
+        }
+        return realSetTimeout(fn, ms, ...args);
+      }) as typeof window.setTimeout;
+    }, 4000);
+    const mock = await mockBackends(page);
+    await addWhileOffline(page, mock);
+    // The connection comes back but hangs, so the waiting add can't get
+    // through in the few seconds signing out gives it.
+    mock.setConnection(true);
+    mock.holdWrites();
+    await goInApp(page, '/settings');
+    await page.evaluate(() => {
+      (window as unknown as { escapeAfterSignOutWait?: boolean }).escapeAfterSignOutWait = true;
+    });
+    await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
+    await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Signing out' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /^(Signing out|Sign out now\?)$/ })).toHaveCount(0, { timeout: 10_000 });
+    expect(await page.evaluate(() => (window as unknown as { escapeAfterSignOutWait?: boolean }).escapeAfterSignOutWait)).toBe(false);
+    expect(await page.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith('sb-')))).toBe(true);
+
+    // Still signed in, and the next sign-out goes ahead.
+    await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
+    await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
+    const ask = page.getByRole('dialog', { name: 'Sign out now?' });
+    await expect(ask).toBeVisible({ timeout: 10_000 });
+    await ask.getByRole('button', { name: 'Stay signed in' }).click();
+    await expect(ask).toBeHidden();
+    mock.releaseWrites();
+  });
+
   test('asks the same way from the sidebar and the phone menu', async ({ page }) => {
     await signIn(page);
     const mock = await mockBackends(page);

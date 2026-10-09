@@ -64,8 +64,8 @@ export interface MockOptions {
   /** Rows the site saves, edits and deletes are read back that way, as the real table does. */
   liveRows?: boolean;
   /**
-   * Once the site saves rows in one batch, as when it moves a guest stack in,
-   * reading the stack fails until the test calls setReads(true).
+   * The first time the site saves rows in one batch, as when it moves a guest
+   * stack in, reading the stack starts failing until the test calls setReads(true).
    */
   failReadsAfterUpsert?: boolean;
   /** The podcast feed fails. */
@@ -118,6 +118,13 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   const patches: Array<{ query: string; body: Record<string, unknown> }> = [];
   /** The body of every visitor question, in order. */
   const asks: Array<{ message: string; history: Array<{ role: string; content: string }> }> = [];
+  /** The body of every stack snapshot posted, in order. */
+  const snapshots: Array<Record<string, unknown>> = [];
+  // Prices the test has moved since the fixture's.
+  const priceChanges: Partial<Record<'gold' | 'silver' | 'platinum' | 'palladium', number>> = {};
+  // While set, holdings writes aren't answered until the test releases them.
+  let writesHeld: Promise<void> | null = null;
+  let releaseHeldWrites: () => void = () => undefined;
   let failures = opts.failInserts ?? 0;
   let askFailures = opts.failAsks ?? 0;
   let deleteFailures = opts.failDeletesTimes ?? 0;
@@ -132,6 +139,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   let readsUp = true;
   // The holdings table, for liveRows.
   const table: Array<Record<string, unknown>> = (opts.holdings ?? []).map((r) => ({ ...r }));
+  let failReadsOnUpsert = Boolean(opts.failReadsAfterUpsert);
   // The profile row. Verifying a checkout turns it to Gold, as the real route does.
   let profile: Record<string, unknown> = { subscription_tier: opts.tier ?? 'free', subscription_status: null, trial_end: null };
   let checkoutTried = false;
@@ -147,7 +155,8 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
 
     if (p === '/v1/prices') {
       if (opts.failPrices) return fulfillJson(route, { error: 'Prices unavailable' }, 503);
-      const body = JSON.parse(read('prices.json')) as { prices: Record<string, unknown> };
+      const body = JSON.parse(read('prices.json')) as { prices: Record<string, { price: number }> };
+      for (const [m, price] of Object.entries(priceChanges)) body.prices[m].price = price;
       for (const m of opts.missingPrices ?? []) delete body.prices[m];
       return fulfillJson(route, body);
     }
@@ -255,6 +264,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, { id, title: 'Silver ratio', created_at: '', updated_at: '', messages: saved });
     }
     if (p.startsWith('/v1/snapshots/') && opts.failSnapshots) return fulfillJson(route, { error: 'Snapshots unavailable' }, 500);
+    if (p === '/v1/snapshots' && req.method() === 'POST') snapshots.push(req.postDataJSON());
     if (p === '/v1/snapshots' || p.startsWith('/v1/snapshots/')) return fulfillJson(route, { success: true, snapshots: [] });
     if (p === '/v1/sync-subscription') {
       if (opts.failSync) return fulfillJson(route, { error: 'Failed to fetch subscription status' }, 500);
@@ -310,6 +320,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
         return fulfillJson(route, live);
       }
       if (req.method() === 'GET') return fulfillJson(route, opts.holdings ?? []);
+      if (writesHeld) await writesHeld;
       if (req.method() === 'POST') {
         const body = req.postDataJSON();
         inserts.push(body);
@@ -324,7 +335,10 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
             if (!table.some((r) => r.id === row.id)) table.push({ ...row, deleted_at: null });
           }
         }
-        if (opts.failReadsAfterUpsert && url.searchParams.has('on_conflict')) readsUp = false;
+        if (failReadsOnUpsert && url.searchParams.has('on_conflict')) {
+          failReadsOnUpsert = false;
+          readsUp = false;
+        }
         return fulfillJson(route, [], 201);
       }
       if (req.method() === 'PATCH') patches.push({ query: decodeURIComponent(url.search), body: req.postDataJSON() });
@@ -356,8 +370,23 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     inserts,
     patches,
     asks,
+    snapshots,
     setConnection(up: boolean) {
       connectionUp = up;
+    },
+    /** Moves a metal's price in later answers. */
+    setPrice(metal: 'gold' | 'silver' | 'platinum' | 'palladium', price: number) {
+      priceChanges[metal] = price;
+    },
+    /** Holds holdings writes unanswered, as a connection that hangs does, until releaseWrites. */
+    holdWrites() {
+      writesHeld = new Promise((resolve) => {
+        releaseHeldWrites = resolve;
+      });
+    },
+    releaseWrites() {
+      writesHeld = null;
+      releaseHeldWrites();
     },
     setReads(up: boolean) {
       readsUp = up;

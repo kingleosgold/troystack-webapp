@@ -44,6 +44,15 @@ const PAGES: Array<[string, string | RegExp]> = [
 
 
 /** Client-side navigation, the way a link inside the app moves, so cached data stays. */
+/** Puts the page in the background or brings it back, as switching tabs does. */
+async function setVisible(page: Page, visible: boolean) {
+  await page.evaluate((v) => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (v ? 'visible' : 'hidden') });
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => !v });
+    document.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
+  }, visible);
+}
+
 async function goInApp(page: Page, path: string) {
   await page.evaluate((to) => {
     window.history.pushState({}, '', to);
@@ -442,7 +451,7 @@ test.describe('stack', () => {
     await expect(page.getByText('Gold Maple Leaf')).toHaveCount(0);
   });
 
-  test("a guest stack moved into an empty account shows when the read after fails, and stays in the browser until a read finds it", async ({ page }) => {
+  test('a guest stack moved into an empty account shows when the read after fails, and leaves the browser once the account takes it', async ({ page }) => {
     await signIn(page);
     await page.addInitScript(() => {
       if (sessionStorage.getItem('e2e_guest_stack')) return;
@@ -458,25 +467,55 @@ test.describe('stack', () => {
     await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
     await expect(page.getByText(/Your account can't be reached right now/)).toBeVisible();
     await expect(page.getByText(/you added before signing in/)).toHaveCount(0);
-    expect(await guestStack()).toBe(1);
+    expect(await guestStack()).toBe(0);
 
     // Still out of reach, a reload shows it from the stored copy.
     await page.reload();
     await expect(page.getByText(/Your account can't be reached right now/)).toBeVisible();
     await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
-    expect(await guestStack()).toBe(1);
 
-    // A read that finds it in the account lets the browser's copy go.
     mock.setReads(true);
     await page.reload();
     await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
     await expect(page.getByText(/can't be reached right now/)).toHaveCount(0);
-    await expect.poll(guestStack).toBe(0);
     await expect(page.getByText(/you added before signing in/)).toHaveCount(0);
+    expect(await guestStack()).toBe(0);
     expect(mock.inserts, 'moved once').toHaveLength(1);
   });
 
-  test('holdings added from the browser stay in view when the read after the move fails, and leave the browser once a read finds them', async ({ page }) => {
+  test("a moved holding deleted before the account could be read again isn't offered or moved again", async ({ page }) => {
+    await signIn(page);
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem('e2e_guest_stack')) return;
+      sessionStorage.setItem('e2e_guest_stack', '1');
+      localStorage.setItem(
+        'stacktracker_holdings',
+        JSON.stringify([{ id: 'g1', metal: 'gold', type: 'Gold Buffalo', weight: 1, weightUnit: 'oz', quantity: 1, purchasePrice: 4100, purchaseDate: '2026-10-01', createdAt: '2026-10-01T12:00:00Z', updatedAt: '2026-10-01T12:00:00Z' }]),
+      );
+    });
+    const mock = await mockBackends(page, { liveRows: true, failReadsAfterUpsert: true });
+    const guestStack = () => page.evaluate(() => JSON.parse(localStorage.getItem('stacktracker_holdings') || '[]').length);
+    await page.goto('/stack');
+    // The move lands and the read after it fails. Then they delete it, and the delete reaches the account.
+    await expect(page.getByText(/Your account can't be reached right now/)).toBeVisible();
+    await page.getByRole('button', { name: /Gold Buffalo/ }).click();
+    const editor = page.getByRole('dialog', { name: 'Edit holding' });
+    await editor.getByRole('button', { name: 'Delete', exact: true }).click();
+    await editor.getByRole('button', { name: 'Delete it' }).click();
+    await expect(editor).toBeHidden();
+    await expect(page.getByText(/saved in this browser and will reach your account/)).toHaveCount(0);
+
+    mock.setReads(true);
+    for (let i = 0; i < 2; i += 1) {
+      await page.reload();
+      await expect(page.getByText('Nothing in your stack yet')).toBeVisible();
+      await expect(page.getByText(/you added before signing in/)).toHaveCount(0);
+    }
+    expect(await guestStack()).toBe(0);
+    expect(mock.inserts, 'moved once, never again').toHaveLength(1);
+  });
+
+  test('holdings added from the browser stay in view when the read after the move fails, and leave the browser once the account takes them', async ({ page }) => {
     await signIn(page);
     await page.addInitScript(() => {
       if (sessionStorage.getItem('e2e_guest_stack')) return;
@@ -495,7 +534,7 @@ test.describe('stack', () => {
     await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
     await expect(page.getByText('Gold Maple Leaf').first()).toBeVisible();
     await expect(page.getByText(/you added before signing in/)).toHaveCount(0);
-    expect(await guestStack()).toBe(1);
+    expect(await guestStack()).toBe(0);
 
     await page.reload();
     await expect(page.getByText(/Your account can't be reached right now/)).toBeVisible();
@@ -505,8 +544,8 @@ test.describe('stack', () => {
     await page.reload();
     await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
     await expect(page.getByText(/can't be reached right now/)).toHaveCount(0);
-    await expect.poll(guestStack).toBe(0);
     await expect(page.getByText(/you added before signing in/)).toHaveCount(0);
+    expect(mock.inserts, 'moved once').toHaveLength(1);
   });
 
   test('a stack page left open overnight records the new day too', async ({ page }) => {
@@ -528,6 +567,54 @@ test.describe('stack', () => {
     await expect.poll(posts).toBe(2);
     // The day is stored once the post is answered, a moment after it goes.
     await expect.poll(() => page.evaluate((id) => localStorage.getItem(`troystack_snapshot_${id}`), USER_ID)).toBe('2026-10-10');
+  });
+
+  test("a stack left in a background tab overnight waits for fresh prices before the new day's snapshot", async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-10-09T14:00:00Z') });
+    await signIn(page);
+    const mock = await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    await page.goto('/stack');
+    await expect.poll(() => mock.snapshots.length).toBe(1);
+    expect(mock.snapshots[0].goldSpot).toBe(4180.8);
+
+    // The tab goes into the background, where prices aren't read, and gold moves overnight.
+    await setVisible(page, false);
+    mock.setPrice('gold', 4400);
+    await page.clock.fastForward('22:00:00');
+    await page.waitForTimeout(500);
+    expect(mock.snapshots, "nothing goes for the new day on the day before's prices").toHaveLength(1);
+
+    // Back in view, prices are read within the minute and the new day's goes with them.
+    await setVisible(page, true);
+    await page.clock.fastForward('01:05');
+    await expect.poll(() => mock.snapshots.length).toBe(2);
+    expect(mock.snapshots[1].goldSpot).toBe(4400);
+    await expect.poll(() => page.evaluate((id) => localStorage.getItem(`troystack_snapshot_${id}`), USER_ID)).toBe('2026-10-10');
+  });
+
+  test("no snapshot goes from the stored copy while the account can't be read", async ({ page }) => {
+    await signIn(page);
+    const copy = {
+      savedAt: '2026-10-09T12:00:00.000Z',
+      holdings: [
+        { id: 'r1', metal: 'silver', type: 'American Silver Eagle', weight: 1, weightUnit: 'oz', quantity: 60, purchasePrice: 36.5, purchaseDate: '2026-02-11', createdAt: '2026-02-11T00:00:00Z', updatedAt: '2026-02-11T00:00:00Z' },
+        { id: 'r2', metal: 'gold', type: 'Gold Maple Leaf', weight: 1, weightUnit: 'oz', quantity: 1, purchasePrice: 3480, purchaseDate: '2026-01-05', createdAt: '2026-01-05T00:00:00Z', updatedAt: '2026-01-05T00:00:00Z' },
+      ],
+    };
+    await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [`troystack_stack_copy_${USER_ID}`, JSON.stringify(copy)]);
+    const mock = await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    mock.setReads(false);
+    await page.goto('/stack');
+    await expect(page.getByText(/Your account can't be reached right now/)).toBeVisible();
+    await expect(page.getByText('American Silver Eagle').first()).toBeVisible();
+    await page.waitForTimeout(1500);
+    expect(mock.snapshots).toHaveLength(0);
+
+    // Once the account is read, it goes.
+    mock.setReads(true);
+    await page.reload();
+    await expect(page.getByText(/can't be reached right now/)).toHaveCount(0);
+    await expect.poll(() => mock.snapshots.length).toBe(1);
   });
 
   test('a signed-in stack records its daily snapshot even when storage is blocked', async ({ page }) => {
