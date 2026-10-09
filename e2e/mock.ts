@@ -38,6 +38,10 @@ export interface MockOptions {
   verifyStatus?: string;
   /** Counting a receipt scan fails, as when the API is down. */
   failScanCount?: boolean;
+  /** Checkout answers 409, as the API does for an account that already holds a plan. */
+  checkoutConflict?: boolean;
+  /** Reading the profile row fails, so the plan can't be read. */
+  failProfileRead?: boolean;
 }
 
 function fulfillJson(route: Route, body: unknown, status = 200) {
@@ -161,7 +165,10 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (p === '/v1/scan-receipt') {
       return fulfillJson(route, { success: true, data: { dealer: 'APMEX', purchaseDate: '2026-10-01', items: [{ description: '1 oz Silver Eagle', metal: 'silver', ozt: 1, quantity: 10, unitPrice: 62.5 }] } });
     }
-    if (p === '/v1/stripe/create-checkout-session') return fulfillJson(route, { url: 'https://checkout.stripe.com/c/pay/e2e' });
+    if (p === '/v1/stripe/create-checkout-session') {
+      if (opts.checkoutConflict) return fulfillJson(route, { error: 'This account already has Gold' }, 409);
+      return fulfillJson(route, { url: 'https://checkout.stripe.com/c/pay/e2e' });
+    }
 
     return fulfillJson(route, { error: `No fixture for ${p}` }, 404);
   });
@@ -170,7 +177,10 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     const req = route.request();
     const url = new URL(req.url());
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
-    if (url.pathname.startsWith('/rest/v1/profiles')) return fulfillJson(route, profile);
+    if (url.pathname.startsWith('/rest/v1/profiles')) {
+      if (opts.failProfileRead) return fulfillJson(route, { message: 'upstream connect error' }, 503);
+      return fulfillJson(route, profile);
+    }
     if (url.pathname.startsWith('/rest/v1/holdings')) {
       if (req.method() === 'GET') return fulfillJson(route, opts.holdings ?? []);
       if (req.method() === 'POST') {
