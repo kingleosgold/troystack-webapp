@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { Button, Sheet } from './primitives';
 import { InstallPath } from './AppStore';
 import { GOLD, isAndroid, isAppleMobile, type Campaign } from '../lib/appStore';
-import { rememberCheckout, startCheckout, WEB_PLANS, webCheckoutReady, type WebPlan } from '../lib/checkout';
+import { rememberCheckout, startCheckout, webCheckoutReady, webPlans, type WebPlan } from '../lib/checkout';
 import { cx } from '../lib/cx';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
@@ -29,10 +29,13 @@ function WebCheckout({ campaign, onClose }: { campaign: Campaign; onClose: () =>
   const { user, session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [plan, setPlan] = useState<WebPlan>('yearly');
+  // Only plans with a Stripe price set here are offered. Yearly comes first
+  // when it's one of them.
+  const plans = webPlans();
+  const [plan, setPlan] = useState<WebPlan>(() => (plans.some((p) => p.id === 'yearly') ? 'yearly' : plans[0].id));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const chosen = WEB_PLANS.find((p) => p.id === plan)!;
+  const chosen = plans.find((p) => p.id === plan) ?? plans[0];
   const lifetime = plan === 'lifetime';
 
   const go = async () => {
@@ -54,8 +57,8 @@ function WebCheckout({ campaign, onClose }: { campaign: Campaign; onClose: () =>
 
   return (
     <div className="space-y-3">
-      <div role="radiogroup" aria-label="Plan" className="grid grid-cols-3 gap-2">
-        {WEB_PLANS.map((p) => (
+      <div role="radiogroup" aria-label="Plan" className={cx('grid gap-2', plans.length >= 3 ? 'grid-cols-3' : plans.length === 2 ? 'grid-cols-2' : 'grid-cols-1')}>
+        {plans.map((p) => (
           <button
             key={p.id}
             type="button"

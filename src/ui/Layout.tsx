@@ -217,6 +217,8 @@ function Ticker({ className, withStatus = false }: { className?: string; withSta
             <span className="text-fg-2">{METAL_LABEL[m]}</span>
             {isLoading || !data ? (
               <span className="skeleton inline-block h-3.5 w-14 rounded" />
+            ) : !(data.prices[m] > 0) ? (
+              <span className="text-fg-3">no price</span>
             ) : (
               <>
                 <span className="font-semibold text-fg tnum">{money(data.prices[m])}</span>

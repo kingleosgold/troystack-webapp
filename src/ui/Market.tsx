@@ -79,8 +79,11 @@ export function MetalTile({ metal, price, pct = 0, amount, spark = [], loading, 
       </div>
       {loading || price == null ? (
         <Skeleton className="h-7 w-28 mt-2" />
-      ) : (
+      ) : price > 0 ? (
         <div className="mt-1.5 text-[21px] sm:text-[24px] font-semibold tracking-tight text-fg tnum">{money(price)}</div>
+      ) : (
+        // The feed left this metal out. A zero would read as a price.
+        <div className="mt-2.5 text-[14px] text-fg-3">No price right now</div>
       )}
       <div className="mt-0.5 h-4 text-[12px] text-fg-3 tnum">
         {!loading && amount != null && <span className="hidden sm:inline">{`${signedMoney(amount)} today`}</span>}
