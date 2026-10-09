@@ -335,6 +335,10 @@ test.describe('coin values', () => {
     await expect(page.getByTestId('coin-total')).toHaveText('$931.84');
     await page.getByLabel('How many').fill('1,000');
     await expect(page.getByTestId('coin-total')).toHaveText('$46,592.03');
+    // Coins come whole, and a decimal is read down rather than dropped.
+    await page.getByLabel('How many').fill('2.5');
+    await expect(page.getByTestId('coin-total')).toHaveText('$93.18');
+    await expect(page.getByText('Whole coins only, so this counts 2.')).toBeVisible();
     await expect(page.getByText(/Melt is the floor/)).toBeVisible();
     await expect(page).toHaveTitle('Morgan silver dollar melt value today | TroyStack');
     expect(errors).toEqual([]);
@@ -361,6 +365,17 @@ test.describe('coin values', () => {
     await expect(page.getByRole('dialog', { name: 'Add a holding' }).getByLabel('Product')).toHaveValue('');
   });
 
+  test('a coin page fits a 320 pixel screen without scrolling sideways', async ({ page }) => {
+    await mockBackends(page);
+    await page.setViewportSize({ width: 320, height: 700 });
+    for (const path of ['/coins/american-silver-eagle', '/coins', '/prices/gold']) {
+      await page.goto(path);
+      await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      expect(overflow, path).toBeLessThanOrEqual(0);
+    }
+  });
+
   test('coin values lists every piece at spot and finds one by name', async ({ page }) => {
     await mockBackends(page);
     await page.goto('/coins');
@@ -377,7 +392,7 @@ test.describe('coin values', () => {
     await mockBackends(page);
     await page.goto('/tools/melt');
     await page.getByLabel('Coin or bar').selectOption('south-african-krugerrand');
-    await page.getByRole('link', { name: /Weight, purity and history/ }).click();
+    await page.getByRole('link', { name: /Weight, purity and what to know/ }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('South African Krugerrand');
     await goInApp(page, '/tools/junk-silver');
     await page.getByRole('link', { name: 'Mercury dime', exact: true }).click();
@@ -389,10 +404,10 @@ test.describe('coin values', () => {
     await page.goto('/prices/gold');
     const byWeight = page.getByRole('definition').filter({ hasText: '$134.42' });
     await expect(byWeight.first()).toBeVisible();
-    const karat = page.getByLabel('Gold per gram by purity');
-    await expect(karat.getByText('14 karat, per gram')).toBeVisible();
+    const karat = page.getByRole('group', { name: 'By purity, per gram' });
+    await expect(karat.getByText('14 karat', { exact: true })).toBeVisible();
     await expect(karat.getByText('$78.41')).toBeVisible();
-    await expect(page.getByLabel('Gold by weight').getByText('$134,415.84')).toBeVisible();
+    await expect(page.getByRole('group', { name: 'By weight' }).getByText('$134,415.84')).toBeVisible();
     await expect(page).toHaveTitle('Gold price today per ounce, gram and karat | TroyStack');
   });
 
