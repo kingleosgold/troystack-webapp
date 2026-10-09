@@ -8,6 +8,7 @@ import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
 import { SubscriptionProvider } from './hooks/useSubscription';
 import { TrialProvider } from './contexts/TrialContext';
+import { SignOutProvider } from './contexts/SignOutContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,7 +27,9 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <SubscriptionProvider>
             <TrialProvider>
-              <App />
+              <SignOutProvider>
+                <App />
+              </SignOutProvider>
             </TrialProvider>
           </SubscriptionProvider>
         </AuthProvider>
