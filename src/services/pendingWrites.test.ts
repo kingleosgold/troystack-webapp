@@ -4,7 +4,20 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../lib/supabase', () => ({ supabase: {} }));
 
 import { HoldingWriteError, holdingAfter, holdingUpdates, newHoldingRow, fromRow } from './supabaseHoldings';
-import { adoptLegacyPending, canRetry, clearRefused, readPending, readRefused, savePending, sendPending, withPending, type PendingWrite } from './pendingWrites';
+import {
+  addRefused,
+  adoptLegacyPending,
+  canRetry,
+  clearRefused,
+  dropQueuedChanges,
+  readPending,
+  readRefused,
+  savePending,
+  sendBeforeSignOut,
+  sendPending,
+  withPending,
+  type PendingWrite,
+} from './pendingWrites';
 import { stableUuid } from '../lib/stableId';
 import type { HoldingFormData } from '../types/holding';
 
@@ -313,5 +326,60 @@ describe('edits and ids', () => {
     expect(a).toBe(await stableUuid('user-a:guest:h1'));
     expect(a).not.toBe(await stableUuid('user-b:guest:h1'));
     expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+});
+
+describe('signing out', () => {
+  it('drops only that account\'s waiting changes and refused count from the browser', () => {
+    const store = memoryStore();
+    savePending(USER, [addWrite()], store);
+    addRefused(USER, 2, store);
+    savePending('user-b', [addWrite()], store);
+    dropQueuedChanges(USER, store);
+    expect(readPending(USER, store)).toEqual([]);
+    expect(readRefused(USER, store)).toBe(0);
+    expect([...store.data.keys()].filter((k) => k.includes(USER))).toEqual([]);
+    expect(readPending('user-b', store), "another account's changes stay").toHaveLength(1);
+  });
+
+  it("doesn't wait when nothing is waiting", async () => {
+    const store = memoryStore();
+    const send = vi.fn(async () => undefined);
+    expect(await sendBeforeSignOut(USER, send, 50, store)).toEqual({ waiting: 0, stillSending: null });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('sends what is waiting first, and says nothing is left once it has gone', async () => {
+    const store = memoryStore();
+    savePending(USER, [addWrite(), addWrite()], store);
+    const send = vi.fn(async () => {
+      savePending(USER, [], store);
+    });
+    expect(await sendBeforeSignOut(USER, send, 1000, store)).toEqual({ waiting: 0, stillSending: null });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("says how many are still waiting when they can't go", async () => {
+    const store = memoryStore();
+    savePending(USER, [addWrite(), addWrite(), addWrite()], store);
+    // The connection is down: the send gives up and everything stays.
+    const result = await sendBeforeSignOut(USER, async () => ({ sent: 0, refused: 0, waiting: 3 }), 1000, store);
+    expect(result).toEqual({ waiting: 3, stillSending: null });
+  });
+
+  it('stops waiting after a few seconds, and hands back the send still going', async () => {
+    const store = memoryStore();
+    savePending(USER, [addWrite()], store);
+    let finish: () => void = () => undefined;
+    const slow = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const started = Date.now();
+    const result = await sendBeforeSignOut(USER, () => slow, 40, store);
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(result.waiting).toBe(1);
+    expect(result.stillSending).not.toBeNull();
+    finish();
+    await result.stillSending;
   });
 });

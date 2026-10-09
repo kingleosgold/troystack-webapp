@@ -112,6 +112,58 @@ export function clearRefused(userId: string, store: Store | null = defaultStore(
   announce();
 }
 
+/**
+ * Drops an account's waiting changes and its refused count from this browser,
+ * as signing out does, so a shared browser keeps nothing of that stack.
+ */
+export function dropQueuedChanges(userId: string, store: Store | null = defaultStore()): void {
+  if (!store) return;
+  try {
+    store.removeItem(keyFor(userId));
+    store.removeItem(refusedKeyFor(userId));
+  } catch {
+    return;
+  }
+  announce();
+}
+
+/** How long signing out waits for an account's waiting changes to go. */
+export const SIGN_OUT_SEND_WAIT_MS = 4000;
+
+export interface BeforeSignOut {
+  /** Changes still waiting once the wait is over. */
+  waiting: number;
+  /** The send, if it was still going when the wait ran out. */
+  stillSending: Promise<void> | null;
+}
+
+/**
+ * Before an account signs out, its waiting changes get a few seconds to reach
+ * it through `send`. Says how many are still waiting after that, so signing
+ * out can ask before dropping them.
+ */
+export async function sendBeforeSignOut(
+  userId: string,
+  send: () => Promise<unknown>,
+  waitMs = SIGN_OUT_SEND_WAIT_MS,
+  store: Store | null = defaultStore(),
+): Promise<BeforeSignOut> {
+  if (readPending(userId, store).length === 0) return { waiting: 0, stillSending: null };
+  let done = false;
+  const sending = send().then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([sending, new Promise<void>((resolve) => (timer = setTimeout(resolve, waitMs)))]);
+  clearTimeout(timer);
+  return { waiting: readPending(userId, store).length, stillSending: done ? null : sending };
+}
+
 /** The old site's list of changes it couldn't send. It had no account on it. */
 const LEGACY_KEY = 'stacktracker_pending_actions';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
