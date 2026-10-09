@@ -25,8 +25,14 @@ export function isWebPlan(v: unknown): v is WebPlan {
   return v === 'monthly' || v === 'yearly' || v === 'lifetime';
 }
 
-export function webCheckoutReady(plan: WebPlan = 'yearly'): boolean {
-  return Boolean(PRICE_IDS[plan]);
+/** The plans this site can sell, the ones with a Stripe price set for it. */
+export function webPlans(): typeof WEB_PLANS {
+  return WEB_PLANS.filter((p) => Boolean(PRICE_IDS[p.id]));
+}
+
+/** Whether this plan can be bought here, or with no plan named, whether any can. */
+export function webCheckoutReady(plan?: WebPlan): boolean {
+  return plan ? Boolean(PRICE_IDS[plan]) : webPlans().length > 0;
 }
 
 // Signing in with Google or Apple leaves the site and comes back to the home
