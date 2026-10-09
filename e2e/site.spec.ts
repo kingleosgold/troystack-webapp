@@ -209,6 +209,21 @@ test.describe('stack', () => {
     expect(JSON.parse(eagle!.notes).note).toBe('Tube one,\nfrom the show');
   });
 
+  test('a signed-in stack records its daily snapshot even when storage is blocked', async ({ page }) => {
+    await signIn(page);
+    await page.addInitScript(() => {
+      const get = Storage.prototype.getItem;
+      Storage.prototype.getItem = function (key: string) {
+        if (String(key).startsWith('troystack_snapshot_')) throw new DOMException('blocked', 'SecurityError');
+        return get.call(this, key);
+      };
+    });
+    const mock = await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    await page.goto('/stack');
+    await expect(page.getByText('American Silver Eagle').first()).toBeVisible();
+    await expect.poll(() => mock.calls.filter((c) => c === 'POST /v1/snapshots').length).toBe(1);
+  });
+
   test('signed in, it shows the same rows the app saved', async ({ page }) => {
     await signIn(page);
     await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
