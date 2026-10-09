@@ -4,7 +4,7 @@ import { Download, FileSpreadsheet, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useHoldings } from '../hooks/useHoldings';
-import { useSpotMap } from '../hooks/queries';
+import { useSpotMap, type SpotMap } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { useSubscription } from '../hooks/useSubscription';
@@ -108,18 +108,33 @@ function useSnapshotDay(): string {
   return day;
 }
 
-/** Record today's value once a day, the way the app does, so history fills in for web users too. */
-function useDailySnapshot(userId: string | undefined, holdings: Holding[], prices: Record<Metal, number>, ready: boolean) {
+/** How recent prices have to be for a snapshot. In view, they're read every minute. */
+const SNAPSHOT_PRICES_MS = 5 * 60_000;
+
+/**
+ * Record today's value once a day, the way the app does, so history fills in
+ * for web users too. It goes from a live read of the stack, not the copy
+ * shown while the account can't be reached, and from prices read in the last
+ * few minutes of the same day. A tab in the background or a laptop asleep
+ * past midnight still holds the day before's prices, so the new day's waits
+ * for fresh ones.
+ */
+function useDailySnapshot(userId: string | undefined, holdings: Holding[], spot: SpotMap, live: boolean) {
   const day = useSnapshotDay();
   // The account and day the last snapshot went for, so a page left open
   // overnight sends the new day's.
   const sentFor = useRef<string | null>(null);
+  const { prices, dataUpdatedAt, isFetching } = spot;
+  const hasPrices = Boolean(spot.data);
   useEffect(() => {
     // Every metal in the stack needs a price. One missing from the prices
     // read would go into history at zero. Gold and silver also go in as the
     // day's spot.
     const priced = (m: Metal) => prices[m] > 0;
-    if (!userId || !ready || holdings.length === 0 || !priced('gold') || !priced('silver') || holdings.some((h) => !priced(h.metal))) return;
+    if (!userId || !live || holdings.length === 0 || !priced('gold') || !priced('silver') || holdings.some((h) => !priced(h.metal))) return;
+    const now = new Date();
+    const fresh = hasPrices && !isFetching && now.getTime() - dataUpdatedAt < SNAPSHOT_PRICES_MS && snapshotDay(new Date(dataUpdatedAt)) === day && snapshotDay(now) === day;
+    if (!fresh) return;
     const mark = `${userId}:${day}`;
     if (sentFor.current === mark) return;
     const key = `troystack_snapshot_${userId}`;
@@ -157,7 +172,7 @@ function useDailySnapshot(userId: string | undefined, holdings: Holding[], price
       .catch(() => {
         if (sentFor.current === mark) sentFor.current = null;
       });
-  }, [userId, holdings, prices, ready, day]);
+  }, [userId, holdings, prices, live, day, hasPrices, isFetching, dataUpdatedAt]);
 }
 
 function rowToForm(r: ImportRow): HoldingFormData | null {
@@ -204,7 +219,7 @@ export default function Stack() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const totals = useMemo(() => stackTotals(holdings, spot.prices, spot.changePct), [holdings, spot.prices, spot.changePct]);
-  useDailySnapshot(user?.id, holdings, spot.prices, Boolean(spot.data) && !loading);
+  useDailySnapshot(user?.id, holdings, spot, !loading && !offlineSince);
 
   // Links from elsewhere on the site: /stack?add=1 and /stack?import=1
   useEffect(() => {
