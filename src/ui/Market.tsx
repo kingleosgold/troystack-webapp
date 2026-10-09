@@ -65,13 +65,15 @@ interface MetalTileProps {
 
 /** One metal's spot, move and 24-hour line. */
 export function MetalTile({ metal, price, pct = 0, amount, spark = [], loading, to }: MetalTileProps) {
+  // The day's move only means something next to a price.
+  const priced = !loading && price != null && price > 0;
   const body = (
     <>
       <div className="flex items-center gap-2 min-w-0">
         <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: METAL_VAR[metal] }} aria-hidden="true" />
         <span className="text-[13px] font-semibold text-fg">{METAL_LABEL[metal]}</span>
         <span className="hidden text-[11px] font-medium text-fg-3 sm:inline">{METAL_SYMBOL[metal]}</span>
-        {!loading && (
+        {priced && (
           <span className="ml-auto hidden sm:inline-flex">
             <ChangeBadge pct={pct} size="sm" />
           </span>
@@ -86,8 +88,8 @@ export function MetalTile({ metal, price, pct = 0, amount, spark = [], loading, 
         <div className="mt-2.5 text-[14px] text-fg-3">No price right now</div>
       )}
       <div className="mt-0.5 h-4 text-[12px] text-fg-3 tnum">
-        {!loading && amount != null && <span className="hidden sm:inline">{`${signedMoney(amount)} today`}</span>}
-        {!loading && (
+        {priced && amount != null && <span className="hidden sm:inline">{`${signedMoney(amount)} today`}</span>}
+        {priced && (
           <span className="sm:hidden">
             <ChangeBadge pct={pct} amount={amount} size="sm" showIcon={false} />
           </span>
