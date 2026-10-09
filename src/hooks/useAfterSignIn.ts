@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSubscription } from './useSubscription';
+import { ApiError } from '../lib/apiClient';
 import {
   forgetCheckout,
   forgetNextPath,
+  hasCheckoutIntent,
   isWebPlan,
   rememberCheckout,
   rememberNextPath,
@@ -22,13 +25,20 @@ import {
  * It stays out of the way in two places. A password reset link signs the
  * account in, and the new password comes first. A return from Stripe means the
  * checkout is done, so nothing waiting from before it may take the page over.
+ *
+ * Checkout waits for the account's plan, five seconds at most, so someone who
+ * already has Gold, from the app or the web, lands on Settings instead of
+ * being sent to buy it again. If the plan can't be read in time, checkout
+ * opens and the API turns away an account that already has a plan.
  */
 export function useAfterSignIn(): { openingCheckout: boolean } {
   const { user, session, loading } = useAuth();
+  const { tier, loading: planLoading } = useSubscription();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const [openingCheckout, setOpeningCheckout] = useState(false);
   const handledFor = useRef<string | null>(null);
+  const [planWaitOver, setPlanWaitOver] = useState(false);
   // Stripe sends people back with a full page load, so the address the page
   // opened at says whether this visit is a return from checkout.
   const landedFromStripe = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('session_id'));
@@ -46,6 +56,16 @@ export function useAfterSignIn(): { openingCheckout: boolean } {
     rememberNextPath(params.get('next'));
   }, [onAuthPage, search]);
 
+  // The plan usually lands in well under a second. This stops checkout
+  // waiting on it forever when it can't be read.
+  useEffect(() => {
+    if (!user || !planLoading) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPlanWaitOver(false);
+    const id = window.setTimeout(() => setPlanWaitOver(true), 5000);
+    return () => window.clearTimeout(id);
+  }, [user, planLoading]);
+
   useEffect(() => {
     if (loading) {
       handledFor.current = null;
@@ -61,32 +81,41 @@ export function useAfterSignIn(): { openingCheckout: boolean } {
     if (onResetPage) return;
     const key = `${user.id}:${onAuthPage}`;
     if (handledFor.current === key) return;
-    handledFor.current = key;
 
     if (landedFromStripe.current) {
+      handledFor.current = key;
       landedFromStripe.current = false;
       forgetCheckout();
       forgetNextPath();
       return;
     }
 
+    if (planLoading && !planWaitOver && hasCheckoutIntent()) return;
+    handledFor.current = key;
+
     const intent = takeCheckoutIntent();
     if (intent) {
       // Stripe brings them back to Settings, so an older return path is done with.
       forgetNextPath();
+      if (!planLoading && (tier === 'gold' || tier === 'lifetime')) {
+        navigate('/settings?checkout=have-gold', { replace: true });
+        return;
+      }
       // The browser is about to leave for Stripe; the overlay covers the wait.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpeningCheckout(true);
-      startCheckout(user.id, session?.access_token, intent.plan, intent.campaign).catch(() => {
+      startCheckout(user.id, session?.access_token, intent.plan, intent.campaign).catch((err: unknown) => {
         setOpeningCheckout(false);
-        navigate('/settings?checkout=failed', { replace: true });
+        // 409 is the API saying the account already holds a plan.
+        const haveGold = err instanceof ApiError && err.status === 409;
+        navigate(haveGold ? '/settings?checkout=have-gold' : '/settings?checkout=failed', { replace: true });
       });
       return;
     }
     const next = takeNextPath();
     if (next) navigate(next, { replace: true });
     else if (onAuthPage) navigate('/', { replace: true });
-  }, [loading, user, session?.access_token, onAuthPage, onResetPage, navigate]);
+  }, [loading, user, session?.access_token, onAuthPage, onResetPage, navigate, tier, planLoading, planWaitOver]);
 
   return { openingCheckout };
 }
