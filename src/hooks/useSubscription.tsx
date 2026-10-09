@@ -11,8 +11,12 @@ interface SubscriptionState {
   isGold: boolean;
   isTrial: boolean;
   trialEnd: string | null;
-  /** Reads the plan again. `force` skips the ten-second guard, for right after checkout or a refresh someone asked for. */
-  refetch: (options?: { force?: boolean }) => Promise<void>;
+  /**
+   * Reads the plan again. `force` skips the ten-second guard, for right after
+   * checkout or a refresh someone asked for. Resolves false when the read
+   * failed, so the plan on screen may be out of date.
+   */
+  refetch: (options?: { force?: boolean }) => Promise<boolean>;
 }
 
 /** The plan read from one account's profile. */
@@ -68,11 +72,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [retryTick, setRetryTick] = useState(0);
 
   const fetchTier = useCallback(
-    (options?: { force?: boolean }): Promise<void> => {
-      if (!userId) return Promise.resolve();
+    (options?: { force?: boolean }): Promise<boolean> => {
+      if (!userId) return Promise.resolve(true);
       // Skip a read within ten seconds of the last one unless it's forced.
       const now = Date.now();
-      if (!options?.force && now - lastFetchRef.current < 10_000) return Promise.resolve();
+      if (!options?.force && now - lastFetchRef.current < 10_000) return Promise.resolve(true);
       lastFetchRef.current = now;
       const read = ++readRef.current;
       if (retryRef.current != null) {
@@ -80,10 +84,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         retryRef.current = null;
       }
       return readPlan(userId).then((next) => {
-        if (read !== readRef.current) return;
+        if (read !== readRef.current) return next !== null;
         if (next) {
           setPlan(next);
-          return;
+          return true;
         }
         // The read failed, so the plan already shown stays and the read runs
         // again shortly, rather than waiting for the five-minute refresh.
@@ -91,6 +95,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           retryRef.current = null;
           setRetryTick((t) => t + 1);
         }, RETRY_AFTER_FAILURE);
+        return false;
       });
     },
     [userId],
