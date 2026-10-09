@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mockBackends, SAMPLE_HOLDINGS, signIn } from './mock';
+import { mockBackends, SAMPLE_HOLDINGS, signIn, USER_ID } from './mock';
 
 const SHOTS = process.env.E2E_SCREENS === '1';
 
@@ -397,6 +397,136 @@ test.describe('stack', () => {
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await expect(page.getByText(/can't be reached right now/)).toHaveCount(0);
     await expect.poll(() => mock.inserts.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("changes that reach the account go into the stored copy, so a reload that can't read it still shows them", async ({ page }) => {
+    await signIn(page);
+    const mock = await mockBackends(page, { holdings: SAMPLE_HOLDINGS, liveRows: true });
+    await page.goto('/stack');
+    await expect(page.getByText('Gold Maple Leaf').first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Add a holding' }).first().click();
+    const add = page.getByRole('dialog', { name: 'Add a holding' });
+    await add.getByLabel('Product').fill('Gold Buffalo');
+    await add.getByRole('button', { name: 'Add to stack' }).click();
+    await expect(add).toBeHidden();
+
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'bars.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('Product,Metal,Oz per piece,Quantity,Price per piece\nSilver Bar 10 oz,silver,10,2,600\n'),
+    });
+    const sheet = page.getByRole('dialog', { name: 'Add from bars.csv' });
+    await sheet.getByRole('button', { name: 'Add 1 to my stack' }).click();
+    await expect(sheet).toBeHidden();
+
+    await page.getByRole('button', { name: /American Silver Eagle/ }).click();
+    const edit = page.getByRole('dialog', { name: 'Edit holding' });
+    await edit.getByLabel('Quantity').fill('75');
+    await edit.getByRole('button', { name: 'Save' }).click();
+    await expect(edit).toBeHidden();
+
+    await page.getByRole('button', { name: /Gold Maple Leaf/ }).click();
+    const remove = page.getByRole('dialog', { name: 'Edit holding' });
+    await remove.getByRole('button', { name: 'Delete', exact: true }).click();
+    await remove.getByRole('button', { name: 'Delete it' }).click();
+    await expect(remove).toBeHidden();
+    await expect(page.getByText(/saved in this browser and will reach your account/)).toHaveCount(0);
+
+    mock.setReads(false);
+    await page.reload();
+    await expect(page.getByText(/Your account can't be reached right now, so this is your stack as of/)).toBeVisible();
+    await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
+    await expect(page.getByText('Silver Bar 10 oz').first()).toBeVisible();
+    await expect(page.getByText(/^75 × 1 oz/)).toBeVisible();
+    await expect(page.getByText('Gold Maple Leaf')).toHaveCount(0);
+  });
+
+  test("a guest stack moved into an empty account shows when the read after fails, and stays in the browser until a read finds it", async ({ page }) => {
+    await signIn(page);
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem('e2e_guest_stack')) return;
+      sessionStorage.setItem('e2e_guest_stack', '1');
+      localStorage.setItem(
+        'stacktracker_holdings',
+        JSON.stringify([{ id: 'g1', metal: 'gold', type: 'Gold Buffalo', weight: 1, weightUnit: 'oz', quantity: 1, purchasePrice: 4100, purchaseDate: '2026-10-01', createdAt: '2026-10-01T12:00:00Z', updatedAt: '2026-10-01T12:00:00Z' }]),
+      );
+    });
+    const mock = await mockBackends(page, { liveRows: true, failReadsAfterUpsert: true });
+    const guestStack = () => page.evaluate(() => JSON.parse(localStorage.getItem('stacktracker_holdings') || '[]').length);
+    await page.goto('/stack');
+    await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
+    await expect(page.getByText(/Your account can't be reached right now/)).toBeVisible();
+    await expect(page.getByText(/you added before signing in/)).toHaveCount(0);
+    expect(await guestStack()).toBe(1);
+
+    // Still out of reach, a reload shows it from the stored copy.
+    await page.reload();
+    await expect(page.getByText(/Your account can't be reached right now/)).toBeVisible();
+    await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
+    expect(await guestStack()).toBe(1);
+
+    // A read that finds it in the account lets the browser's copy go.
+    mock.setReads(true);
+    await page.reload();
+    await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
+    await expect(page.getByText(/can't be reached right now/)).toHaveCount(0);
+    await expect.poll(guestStack).toBe(0);
+    await expect(page.getByText(/you added before signing in/)).toHaveCount(0);
+    expect(mock.inserts, 'moved once').toHaveLength(1);
+  });
+
+  test('holdings added from the browser stay in view when the read after the move fails, and leave the browser once a read finds them', async ({ page }) => {
+    await signIn(page);
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem('e2e_guest_stack')) return;
+      sessionStorage.setItem('e2e_guest_stack', '1');
+      localStorage.setItem(
+        'stacktracker_holdings',
+        JSON.stringify([{ id: 'g1', metal: 'gold', type: 'Gold Buffalo', weight: 1, weightUnit: 'oz', quantity: 1, purchasePrice: 4100, purchaseDate: '2026-10-01', createdAt: '2026-10-01T12:00:00Z', updatedAt: '2026-10-01T12:00:00Z' }]),
+      );
+    });
+    const mock = await mockBackends(page, { holdings: SAMPLE_HOLDINGS, liveRows: true, failReadsAfterUpsert: true });
+    const guestStack = () => page.evaluate(() => JSON.parse(localStorage.getItem('stacktracker_holdings') || '[]').length);
+    await page.goto('/stack');
+    await expect(page.getByText('This browser still has 1 holding you added before signing in.')).toBeVisible();
+    await page.getByRole('button', { name: 'Add them to my account' }).click();
+    await expect(page.getByText(/Your account can't be reached right now/)).toBeVisible();
+    await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
+    await expect(page.getByText('Gold Maple Leaf').first()).toBeVisible();
+    await expect(page.getByText(/you added before signing in/)).toHaveCount(0);
+    expect(await guestStack()).toBe(1);
+
+    await page.reload();
+    await expect(page.getByText(/Your account can't be reached right now/)).toBeVisible();
+    await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
+
+    mock.setReads(true);
+    await page.reload();
+    await expect(page.getByText('Gold Buffalo').first()).toBeVisible();
+    await expect(page.getByText(/can't be reached right now/)).toHaveCount(0);
+    await expect.poll(guestStack).toBe(0);
+    await expect(page.getByText(/you added before signing in/)).toHaveCount(0);
+  });
+
+  test('a stack page left open overnight records the new day too', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-10-09T14:00:00Z') });
+    await signIn(page);
+    const mock = await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    const posts = () => mock.calls.filter((c) => c === 'POST /v1/snapshots').length;
+    await page.goto('/stack');
+    await expect(page.getByText('American Silver Eagle').first()).toBeVisible();
+    await expect.poll(posts).toBe(1);
+
+    // Later the same day, nothing more goes.
+    await page.clock.fastForward('02:00:00');
+    await page.waitForTimeout(500);
+    expect(posts()).toBe(1);
+
+    // The next morning, with the page still open, the new day's goes.
+    await page.clock.fastForward('22:00:00');
+    await expect.poll(posts).toBe(2);
+    expect(await page.evaluate((id) => localStorage.getItem(`troystack_snapshot_${id}`), USER_ID)).toBe('2026-10-10');
   });
 
   test('a signed-in stack records its daily snapshot even when storage is blocked', async ({ page }) => {

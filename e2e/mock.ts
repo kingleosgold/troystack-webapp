@@ -61,6 +61,13 @@ export interface MockOptions {
   vaultMissing?: Array<'gold' | 'silver' | 'platinum' | 'palladium'>;
   /** Reading the account's holdings fails. */
   failHoldingsRead?: boolean;
+  /** Rows the site saves, edits and deletes are read back that way, as the real table does. */
+  liveRows?: boolean;
+  /**
+   * Once the site saves rows in one batch, as when it moves a guest stack in,
+   * reading the stack fails until the test calls setReads(true).
+   */
+  failReadsAfterUpsert?: boolean;
   /** The podcast feed fails. */
   failPodcast?: boolean;
   /** How long Today's brief takes to answer. */
@@ -123,6 +130,8 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   let connectionUp = true;
   // While false, reading the stack fails the way a dropped connection does.
   let readsUp = true;
+  // The holdings table, for liveRows.
+  const table: Array<Record<string, unknown>> = (opts.holdings ?? []).map((r) => ({ ...r }));
   // The profile row. Verifying a checkout turns it to Gold, as the real route does.
   let profile: Record<string, unknown> = { subscription_tier: opts.tier ?? 'free', subscription_status: null, trial_end: null };
   let checkoutTried = false;
@@ -296,18 +305,40 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (url.pathname.startsWith('/rest/v1/holdings')) {
       if (req.method() === 'GET' && opts.failHoldingsRead) return fulfillJson(route, { message: 'upstream connect error' }, 503);
       if (req.method() === 'GET' && !readsUp) return route.abort('internetdisconnected');
+      if (req.method() === 'GET' && opts.liveRows) {
+        const live = table.filter((r) => !r.deleted_at).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+        return fulfillJson(route, live);
+      }
       if (req.method() === 'GET') return fulfillJson(route, opts.holdings ?? []);
       if (req.method() === 'POST') {
-        inserts.push(req.postDataJSON());
+        const body = req.postDataJSON();
+        inserts.push(body);
         if (!connectionUp) return route.abort('internetdisconnected');
         if (failures > 0) {
           failures -= 1;
           return fulfillJson(route, { code: '57014', message: 'canceling statement due to statement timeout' }, 500);
         }
+        if (opts.liveRows) {
+          // A row whose id is taken is left as it is, as an upsert that ignores duplicates does.
+          for (const row of (Array.isArray(body) ? body : [body]) as Array<Record<string, unknown>>) {
+            if (!table.some((r) => r.id === row.id)) table.push({ ...row, deleted_at: null });
+          }
+        }
+        if (opts.failReadsAfterUpsert && url.searchParams.has('on_conflict')) readsUp = false;
         return fulfillJson(route, [], 201);
       }
       if (req.method() === 'PATCH') patches.push({ query: decodeURIComponent(url.search), body: req.postDataJSON() });
       if (!connectionUp) return route.abort('internetdisconnected');
+      if (req.method() === 'PATCH' && opts.liveRows) {
+        const id = (url.searchParams.get('id') ?? '').replace(/^eq\./, '');
+        const row = table.find((r) => r.id === id);
+        if (row) Object.assign(row, req.postDataJSON());
+        // An edit asks for the one row back, a delete for nothing.
+        if ((req.headers()['accept'] ?? '').includes('vnd.pgrst.object')) {
+          return row ? fulfillJson(route, row) : fulfillJson(route, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' }, 406);
+        }
+        return fulfillJson(route, row ? [row] : [], 200);
+      }
       return fulfillJson(route, [], 200);
     }
     if (url.pathname.startsWith('/auth/v1/user')) return fulfillJson(route, sessionUser());
