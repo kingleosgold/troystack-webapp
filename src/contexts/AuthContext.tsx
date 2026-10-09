@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { clearStackCopies } from '../services/stackCopy';
+import { dropQueuedChanges } from '../services/pendingWrites';
 
 interface AuthContextType {
   user: User | null;
@@ -92,7 +93,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  // Signing out goes through useSignOut, which first gives the account's
+  // waiting changes a few seconds to go and asks before any are dropped.
   const signOut = async () => {
+    const userId = user?.id;
     const { error } = await supabase.auth.signOut();
     try {
       // Clear app data on sign out (keep theme preference)
@@ -109,6 +113,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       queryClient.removeQueries({ queryKey: ['holdings'] });
       // So do the copies kept for reading the stack offline.
       clearStackCopies();
+      // And this account's changes still waiting to be sent, with its count of
+      // refused ones, so a shared browser keeps no holding details and a later
+      // sign-in doesn't send stale changes.
+      if (userId) dropQueuedChanges(userId);
       if (error) {
         // The sign-out didn't reach the server, a dropped connection say, and
         // the client keeps its session when that happens. This browser still
