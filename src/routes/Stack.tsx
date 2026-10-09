@@ -84,24 +84,52 @@ function StackHistory({ userId }: { userId: string }) {
   );
 }
 
+/**
+ * The day a snapshot is filed under. The API files each one under the UTC
+ * date, and the app checks the same date before it sends, so the site does
+ * too and every day the API keeps gets one.
+ */
+function snapshotDay(now = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/** That day, kept current while the page stays open. */
+function useSnapshotDay(): string {
+  const [day, setDay] = useState(() => snapshotDay());
+  useEffect(() => {
+    const check = () => setDay(snapshotDay());
+    const timer = window.setInterval(check, 60_000);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, []);
+  return day;
+}
+
 /** Record today's value once a day, the way the app does, so history fills in for web users too. */
 function useDailySnapshot(userId: string | undefined, holdings: Holding[], prices: Record<Metal, number>, ready: boolean) {
-  const sent = useRef(false);
+  const day = useSnapshotDay();
+  // The account and day the last snapshot went for, so a page left open
+  // overnight sends the new day's.
+  const sentFor = useRef<string | null>(null);
   useEffect(() => {
     // Every metal in the stack needs a price. One missing from the prices
     // read would go into history at zero. Gold and silver also go in as the
     // day's spot.
     const priced = (m: Metal) => prices[m] > 0;
-    if (!userId || !ready || sent.current || holdings.length === 0 || !priced('gold') || !priced('silver') || holdings.some((h) => !priced(h.metal))) return;
+    if (!userId || !ready || holdings.length === 0 || !priced('gold') || !priced('silver') || holdings.some((h) => !priced(h.metal))) return;
+    const mark = `${userId}:${day}`;
+    if (sentFor.current === mark) return;
     const key = `troystack_snapshot_${userId}`;
-    const today = new Date().toISOString().slice(0, 10);
     try {
-      if (localStorage.getItem(key) === today) return;
+      if (localStorage.getItem(key) === day) return;
     } catch {
       // Storage is blocked. The stack lives in the account, so the snapshot
-      // still goes, and the ref keeps it to one post per visit.
+      // still goes, and the ref keeps it to one post a day.
     }
-    sent.current = true;
+    sentFor.current = mark;
     const totals = stackTotals(holdings, prices);
     postJson('/v1/snapshots', {
       userId,
@@ -121,15 +149,15 @@ function useDailySnapshot(userId: string | undefined, holdings: Holding[], price
     })
       .then(() => {
         try {
-          localStorage.setItem(key, today);
+          localStorage.setItem(key, day);
         } catch {
           // fine, it will just send again next visit
         }
       })
       .catch(() => {
-        sent.current = false;
+        if (sentFor.current === mark) sentFor.current = null;
       });
-  }, [userId, holdings, prices, ready]);
+  }, [userId, holdings, prices, ready, day]);
 }
 
 function rowToForm(r: ImportRow): HoldingFormData | null {
