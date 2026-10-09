@@ -17,7 +17,7 @@ import { holdingsToCSV } from '../services/holdings';
 import type { Holding, HoldingFormData, Metal } from '../types/holding';
 import { cx } from '../lib/cx';
 import { downloadText } from '../lib/download';
-import { formatDate } from '../lib/text';
+import { formatDate, formatTimeET, todayET } from '../lib/text';
 import { HoldingEditor } from '../ui/HoldingEditor';
 import { ImportSheet, type ImportRow } from '../ui/ImportSheet';
 import { GoldLock } from '../ui/GoldLock';
@@ -163,7 +163,7 @@ function holdingDetail(h: Holding): string {
 export default function Stack() {
   usePageMeta({ ...SEO['/stack'], canonical: '/stack' });
   const { user, isConfigured } = useAuth();
-  const { holdings, loading, error, isGuest, add, addMany, update, remove, refresh, leftInBrowser, moveBrowserStackIn, clearBrowserStack, pendingCount, refused, dismissRefused } = useHoldings();
+  const { holdings, loading, error, isGuest, add, addMany, update, remove, refresh, leftInBrowser, moveBrowserStackIn, clearBrowserStack, pendingCount, offlineSince, refused, dismissRefused } = useHoldings();
   const spot = useSpotMap();
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState<Holding | null>(null);
@@ -276,6 +276,12 @@ export default function Stack() {
         </div>
       )}
       {moveError && <div className="mb-4"><ErrorNote>{moveError}</ErrorNote></div>}
+      {!isGuest && offlineSince && (
+        <div role="status" className="mb-4 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg">
+          Your account can't be reached right now, so this is your stack as of{' '}
+          {todayET(new Date(offlineSince)) === todayET() ? formatTimeET(offlineSince) : `${formatDate(offlineSince, { month: 'short', year: undefined })}, ${formatTimeET(offlineSince)}`}, with any changes you've made since on top.
+        </div>
+      )}
       {!isGuest && pendingCount > 0 && (
         <div role="status" className="mb-4 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg">
           {pendingCount === 1 ? 'One change is' : `${pendingCount} changes are`} saved in this browser and will reach your account when you're back online.
