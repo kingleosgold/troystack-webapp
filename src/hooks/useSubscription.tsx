@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import type { ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { syncSubscription } from '../services/api';
 
 export type SubscriptionTier = 'free' | 'gold' | 'lifetime';
 
@@ -118,6 +119,22 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     lastFetchRef.current = 0;
     void fetchTier();
   }, [fetchTier]);
+
+  // Once for each account, the API syncs the plan it knows about into the
+  // profile. That can put back a plan the profile lost, as when the iPhone app
+  // wrote Free over Gold bought on the web, and the first read above may have
+  // landed before it. So the plan is read again once the sync answers.
+  const syncedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!userId || syncedFor.current === userId) return;
+    syncedFor.current = userId;
+    syncSubscription(userId).then(
+      () => {
+        if (syncedFor.current === userId) void fetchTier({ force: true });
+      },
+      () => undefined,
+    );
+  }, [userId, fetchTier]);
 
   // Background refresh every 5 minutes
   useEffect(() => {
