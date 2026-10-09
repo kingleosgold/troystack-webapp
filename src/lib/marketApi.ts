@@ -1,6 +1,7 @@
 import type { Metal } from '../types/holding';
 import { getJson } from './apiClient';
 import { METALS } from './metals';
+import { withoutFilledStart } from './history';
 
 export type MetalMap<T> = Record<Metal, T>;
 
@@ -78,7 +79,7 @@ export async function fetchHistory(range: HistoryRange, maxPoints = 240, signal?
     `/v1/prices/history?metal=gold&range=${range}&maxPoints=${maxPoints}`,
     { signal },
   );
-  return (raw.data || [])
+  const points = (raw.data || [])
     .filter((p) => p && p.date)
     .map((p) => ({
       date: p.date,
@@ -88,6 +89,7 @@ export async function fetchHistory(range: HistoryRange, maxPoints = 240, signal?
       palladium: Number(p.palladium) || 0,
     }))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return withoutFilledStart(points);
 }
 
 export interface VaultRow {
