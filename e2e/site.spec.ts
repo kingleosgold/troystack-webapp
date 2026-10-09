@@ -331,6 +331,24 @@ async function openChatList(page: Page) {
   if (await toggle.isVisible()) await toggle.click();
 }
 
+test("a saved chat can't be written to until it has loaded", async ({ page }) => {
+  await signIn(page);
+  const api = await mockBackends(page, { conversations: 2, holdChatLoads: true });
+  await page.goto('/troy/c/conv-0');
+  await expect(page.getByText('Loading this chat', { exact: true })).toBeVisible();
+  const box = page.getByRole('textbox', { name: 'Message Troy' });
+  await expect(box).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Gold/silver ratio', exact: true })).toHaveCount(0);
+  api.releaseChatLoads();
+  await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+  await expect(box).toBeEnabled();
+  await box.fill('And platinum?');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(page.getByText('Your stack is worth')).toBeVisible();
+  await expect(page.getByText('And platinum?')).toBeVisible();
+  await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+});
+
 test('a chat started here is loaded again after visiting another one', async ({ page }) => {
   await signIn(page);
   await mockBackends(page, { conversations: 2 });

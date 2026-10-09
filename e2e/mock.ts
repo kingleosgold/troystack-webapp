@@ -26,6 +26,8 @@ export interface MockOptions {
   chatLimitReached?: boolean;
   /** Deleting a Troy chat fails, as when the connection drops. */
   failDeletes?: boolean;
+  /** Saved chats don't finish loading until the test calls releaseChatLoads. */
+  holdChatLoads?: boolean;
 }
 
 function fulfillJson(route: Route, body: unknown, status = 200) {
@@ -48,6 +50,8 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   let connectionUp = true;
   // The profile row. Verifying a checkout turns it to Gold, as the real route does.
   let profile: Record<string, unknown> = { subscription_tier: opts.tier ?? 'free', subscription_status: null, trial_end: null };
+  let releaseChatLoads: () => void = () => undefined;
+  const chatLoads = opts.holdChatLoads ? new Promise<void>((resolve) => { releaseChatLoads = resolve; }) : Promise.resolve();
 
   await page.route('https://api.troystack.ai/**', async (route) => {
     const req = route.request();
@@ -114,6 +118,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     }
     if (/^\/v1\/troy\/conversations\/[^/]+$/.test(p)) {
       const id = p.split('/').pop() as string;
+      if (req.method() === 'GET') await chatLoads;
       if (req.method() === 'DELETE') {
         if (opts.failDeletes) return fulfillJson(route, { error: 'Could not delete' }, 500);
         const at = started.findIndex((c) => c.id === id);
@@ -165,6 +170,9 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     inserts,
     setConnection(up: boolean) {
       connectionUp = up;
+    },
+    releaseChatLoads() {
+      releaseChatLoads();
     },
   };
 }
