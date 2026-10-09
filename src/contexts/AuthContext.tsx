@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { syncSubscription } from '../services/api';
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Without Supabase there's no session to wait for.
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const syncedUserRef = useRef<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -108,6 +110,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('stg_checkout_redirect');
       localStorage.removeItem('stg_checkout_campaign');
       localStorage.removeItem('stg_auth_next');
+      // The cached stacks go with the stored ones. A guest stack left cached
+      // after it was cleared here would keep showing, and the next guest add
+      // would write it back.
+      queryClient.removeQueries({ queryKey: ['holdings'] });
       if (error) {
         // The sign-out didn't reach the server, a dropped connection say, and
         // the client keeps its session when that happens. This browser still
