@@ -57,37 +57,57 @@ function rowToImport(obj: Record<string, unknown>): ImportRow {
     dealer: firstString(n.dealer, n.source, n.seller),
     taxes: toNumber(n.taxes ?? n.tax),
     shipping: toNumber(n.shipping),
+    note: firstString(n.note, n.notes, n.comment, n.comments, n.memo),
   };
 }
 
-function splitCsvLine(line: string): string[] {
-  const out: string[] = [];
-  let cur = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        cur += '"';
+/**
+ * The cells of each record. A quoted cell can hold commas, doubled quotes and
+ * line breaks, which is how the stack export writes a note with a new line.
+ */
+function csvRecords(text: string): string[][] {
+  const src = text.replace(/^\uFEFF/, '');
+  const records: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  const endCell = () => {
+    row.push(cell.trim());
+    cell = '';
+  };
+  const endRow = () => {
+    endCell();
+    if (row.some((v) => v !== '')) records.push(row);
+    row = [];
+  };
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (quoted) {
+      if (c !== '"') cell += c;
+      else if (src[i + 1] === '"') {
+        cell += '"';
         i++;
-      } else inQuotes = !inQuotes;
-    } else if (c === ',' && !inQuotes) {
-      out.push(cur.trim());
-      cur = '';
+      } else quoted = false;
+    } else if (c === '"' && cell.trim() === '') {
+      quoted = true;
+      cell = '';
+    } else if (c === ',') {
+      endCell();
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && src[i + 1] === '\n') i++;
+      endRow();
     } else {
-      cur += c;
+      cell += c;
     }
   }
-  out.push(cur.trim());
-  return out;
+  endRow();
+  return records;
 }
 
 function parseCSV(text: string): ImportRow[] {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length < 2) return [];
-  const headers = splitCsvLine(lines[0]);
-  return lines.slice(1).map((line) => {
-    const cells = splitCsvLine(line);
+  const [headers, ...records] = csvRecords(text);
+  if (!headers || records.length === 0) return [];
+  return records.map((cells) => {
     const obj: Record<string, unknown> = {};
     headers.forEach((h, i) => {
       obj[h] = cells[i];

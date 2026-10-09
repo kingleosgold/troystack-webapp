@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildNotes, parseNotes } from './holdingNotes';
 import { lineCostBasis, premiumPerPiece, stackTotals, valueAt } from './stackMath';
 import { parseCsvText } from './parseSpreadsheet';
+import { holdingsToCSV } from '../services/holdings';
 import type { Holding } from '../types/holding';
 
 function holding(over: Partial<Holding>): Holding {
@@ -108,5 +109,35 @@ describe('spreadsheet import', () => {
     const [row] = parseCsvText('name,metal,weight\nMystery bar,copper,1\n');
     expect(row.quantity).toBe(1);
     expect(row.metal).toBeUndefined();
+  });
+
+  it('reads back its own export, notes included', () => {
+    const csv = holdingsToCSV([
+      holding({ type: 'Buffalo "BU", tube of 20', quantity: 20, dealer: 'JM Bullion', taxes: 4.5, shipping: 9, note: 'From the coin show,\nsecond table on the left' }),
+      holding({ metal: 'gold', type: '1 g bar', weight: 0.03215, weightUnit: 'g', quantity: 3, purchasePrice: 140, purchaseDate: '' }),
+    ]);
+    const rows = parseCsvText(csv);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      description: 'Buffalo "BU", tube of 20',
+      metal: 'silver',
+      weight: 1,
+      quantity: 20,
+      purchasePrice: 35,
+      purchaseDate: '2026-01-15',
+      dealer: 'JM Bullion',
+      taxes: 4.5,
+      shipping: 9,
+      note: 'From the coin show,\nsecond table on the left',
+    });
+    expect(rows[1]).toMatchObject({ description: '1 g bar', metal: 'gold', weight: 0.03215, quantity: 3, purchasePrice: 140 });
+    expect(rows[1].note).toBeUndefined();
+    expect(rows[1].purchaseDate).toBeUndefined();
+  });
+
+  it('handles Windows line endings, a byte order mark and quotes inside a cell', () => {
+    const rows = parseCsvText('\uFEFFProduct,Metal,Oz,Notes\r\n5" round,silver,5,\r\n\r\n');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ description: '5" round', metal: 'silver', weight: 5 });
   });
 });
