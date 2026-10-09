@@ -9,6 +9,7 @@ import {
   deleteLocalHolding,
   getLocalHoldings,
   guestStackSnapshot,
+  removeLocalHoldings,
   updateLocalHolding,
 } from '../services/holdings';
 import {
@@ -16,6 +17,7 @@ import {
   applyHoldingUpdates,
   fetchSupabaseHoldings,
   fromRow,
+  guestHoldingsInAccount,
   holdingAfter,
   holdingUpdates,
   insertHoldingRow,
@@ -35,7 +37,7 @@ import {
   withPending,
   type PendingWrite,
 } from '../services/pendingWrites';
-import { copyShownSince, markCopyShown, readStackCopy, saveStackCopy, subscribeStackCopy } from '../services/stackCopy';
+import { copyShownSince, markCopyShown, readStackCopy, saveStackCopy, subscribeStackCopy, updateStackCopy } from '../services/stackCopy';
 
 const GUEST_KEY = ['holdings', 'guest'];
 
@@ -68,7 +70,8 @@ export function sendQueuedChanges(userId: string) {
  * The stack. Signed in, it's the account's rows in Supabase, the same rows
  * the iPhone app reads. Signed out, it's saved in this browser. The first
  * time someone signs in to an account with no holdings, what they added as a
- * guest moves into the account, the rule the app uses too.
+ * guest moves into the account, the rule the app uses too. It leaves the
+ * browser once a read of the account finds it there.
  *
  * Signed in, a change that can't reach the account because the connection or
  * the server is down waits in this browser and shows as saved. It goes out
@@ -105,6 +108,26 @@ export function useHoldings() {
     setLocalVersion((v) => v + 1);
   }, [qc]);
 
+  // Guest holdings stay in the browser until a read of the account finds
+  // them there, so a move that landed but couldn't be read back loses
+  // nothing. Once found, they go.
+  const letMovedGo = useCallback(
+    async (accountId: string, remote: Holding[]) => {
+      const local = getLocalHoldings();
+      if (local.length === 0 || remote.length === 0) return;
+      try {
+        const moved = await guestHoldingsInAccount(local, remote, accountId);
+        if (moved.size === 0) return;
+        removeLocalHoldings(moved);
+        qc.setQueryData<Holding[]>(GUEST_KEY, getLocalHoldings());
+        setLocalVersion((v) => v + 1);
+      } catch (e) {
+        console.error('checking the browser stack against the account failed', e);
+      }
+    },
+    [qc],
+  );
+
   const query = useQuery({
     queryKey: key,
     queryFn: async (): Promise<Holding[]> => {
@@ -125,20 +148,32 @@ export function useHoldings() {
         markCopyShown(user.id, copy.savedAt);
         return withPending(copy.holdings, readPending(user.id));
       }
-      if (remote.length === 0) {
-        const local = getLocalHoldings();
-        if (local.length > 0) {
-          // If the move fails, the account's stack still loads and the stack
-          // page offers to move them again.
+      const local = getLocalHoldings();
+      if (remote.length === 0 && local.length > 0) {
+        // If the move fails, the account's stack still loads and the stack
+        // page offers to move them again.
+        let moved: Holding[] | null = null;
+        try {
+          moved = await uploadLocalHoldings(local, user.id);
+        } catch (e) {
+          console.error('moving the browser stack failed', e);
+        }
+        if (moved) {
           try {
-            await uploadLocalHoldings(local, user.id);
-            emptyGuestStack();
             remote = await fetchSupabaseHoldings(user.id);
           } catch (e) {
-            console.error('moving the browser stack failed', e);
+            // The account took them but couldn't be read back. They show,
+            // and the stored copy keeps them, until a read works. The
+            // browser keeps its own until a read finds them in the account.
+            console.error('reading the account after the move failed', e);
+            const at = new Date();
+            saveStackCopy(user.id, moved, undefined, at);
+            markCopyShown(user.id, at.toISOString());
+            return withPending(moved, readPending(user.id));
           }
         }
       }
+      await letMovedGo(user.id, remote);
       saveStackCopy(user.id, remote);
       markCopyShown(user.id, null);
       return withPending(remote, readPending(user.id));
@@ -149,6 +184,17 @@ export function useHoldings() {
   const setData = useCallback(
     (fn: (prev: Holding[]) => Holding[]) => qc.setQueryData<Holding[]>(key, (prev) => fn(prev ?? [])),
     [qc, key],
+  );
+
+  // Shows a change. One the account has taken goes into the stored copy too,
+  // so a reload that can't read the account still shows it. One that's
+  // waiting shows from the list of waiting changes instead.
+  const show = useCallback(
+    (change: (prev: Holding[]) => Holding[], reached: boolean) => {
+      setData(change);
+      if (reached && userId) updateStackCopy(userId, change);
+    },
+    [setData, userId],
   );
 
   // After a send the stack is read again. A refusal is kept for the notice.
@@ -198,19 +244,21 @@ export function useHoldings() {
   );
 
   // Sends a change now, or puts it in line when the account can't be reached
-  // or something older is still waiting.
+  // or something older is still waiting. True when it reached the account.
   const write = useCallback(
-    async (send: () => Promise<unknown>, pending: PendingWrite): Promise<void> => {
-      if (!userId) return;
+    async (send: () => Promise<unknown>, pending: PendingWrite): Promise<boolean> => {
+      if (!userId) return false;
       if (readPending(userId).length > 0) {
         if (!wait(pending)) throw new Error("That didn't save. Try again.");
         flush();
-        return;
+        return false;
       }
       try {
         await send();
+        return true;
       } catch (e) {
         if (!canRetry(e) || !wait(pending)) throw e;
+        return false;
       }
     },
     [userId, wait, flush],
@@ -224,12 +272,12 @@ export function useHoldings() {
         return h;
       }
       const row = newHoldingRow(form, user.id);
-      await write(() => insertHoldingRow(row), { wid: crypto.randomUUID(), kind: 'add', row });
+      const reached = await write(() => insertHoldingRow(row), { wid: crypto.randomUUID(), kind: 'add', row });
       const h = fromRow(row);
-      setData((prev) => [h, ...prev.filter((x) => x.id !== h.id)]);
+      show((prev) => [h, ...prev.filter((x) => x.id !== h.id)], reached);
       return h;
     },
-    [user, setData, write],
+    [user, setData, show, write],
   );
 
   // An import is one write, so a failure leaves nothing behind. Trying the
@@ -240,10 +288,10 @@ export function useHoldings() {
       if (forms.length === 0) return 0;
       const added = user ? await addSupabaseHoldings(forms, user.id, batchId) : addLocalHoldings(forms);
       const ids = new Set(added.map((h) => h.id));
-      setData((prev) => [...added, ...prev.filter((h) => !ids.has(h.id))]);
+      show((prev) => [...added, ...prev.filter((h) => !ids.has(h.id))], Boolean(user));
       return added.length;
     },
-    [user, setData],
+    [user, show],
   );
 
   const update = useCallback(
@@ -255,29 +303,31 @@ export function useHoldings() {
       }
       const updates = holdingUpdates(existing, form);
       let h = holdingAfter(existing, updates, user.id);
-      await write(
+      const reached = await write(
         async () => {
           h = await applyHoldingUpdates(existing.id, updates, user.id);
         },
         { wid: crypto.randomUUID(), kind: 'update', id: existing.id, updates, holding: h },
       );
-      setData((prev) => prev.map((x) => (x.id === existing.id ? h : x)));
-      return h;
+      const saved = h;
+      show((prev) => prev.map((x) => (x.id === existing.id ? saved : x)), reached);
+      return saved;
     },
-    [user, setData, write],
+    [user, setData, show, write],
   );
 
   const remove = useCallback(
     async (id: string): Promise<void> => {
+      let reached = false;
       if (!user) {
         deleteLocalHolding(id);
       } else {
         const deletedAt = new Date().toISOString();
-        await write(() => softDeleteHolding(id, deletedAt, user.id), { wid: crypto.randomUUID(), kind: 'delete', id, deletedAt });
+        reached = await write(() => softDeleteHolding(id, deletedAt, user.id), { wid: crypto.randomUUID(), kind: 'delete', id, deletedAt });
       }
-      setData((prev) => prev.filter((x) => x.id !== id));
+      show((prev) => prev.filter((x) => x.id !== id), reached);
     },
-    [user, setData, write],
+    [user, show, write],
   );
 
   // A signed-in account that already had holdings leaves a guest stack in
@@ -291,17 +341,19 @@ export function useHoldings() {
     return user ? getLocalHoldings() : [];
   }, [user, localVersion, guestStored]);
   // While the account's stack is loading, the automatic move may be running,
-  // so the offer to move them waits until it's done.
-  const offerToMove = query.isFetching ? [] : leftInBrowser;
+  // and while it can't be read, they may already be in it, so the offer to
+  // move them waits for a read.
+  const offerToMove = query.isFetching || offlineSince ? [] : leftInBrowser;
 
   const moveBrowserStackIn = useCallback(async () => {
     if (!user) return;
-    const local = getLocalHoldings();
-    await uploadLocalHoldings(local, user.id);
-    emptyGuestStack();
-    setLocalVersion((v) => v + 1);
+    const moved = await uploadLocalHoldings(getLocalHoldings(), user.id);
+    // The account has them, so they show and go into the stored copy before
+    // it's read again, and a read that fails can't hide them.
+    const ids = new Set(moved.map((h) => h.id));
+    show((prev) => [...moved, ...prev.filter((h) => !ids.has(h.id))], true);
     await qc.invalidateQueries({ queryKey: key });
-  }, [user, qc, key, emptyGuestStack]);
+  }, [user, qc, key, show]);
 
   const clearBrowserStack = useCallback(() => {
     emptyGuestStack();
