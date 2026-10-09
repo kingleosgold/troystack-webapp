@@ -24,6 +24,8 @@ export interface MockOptions {
   failInserts?: number;
   /** A signed-in free account that has used today's questions. */
   chatLimitReached?: boolean;
+  /** Deleting a Troy chat fails, as when the connection drops. */
+  failDeletes?: boolean;
 }
 
 function fulfillJson(route: Route, body: unknown, status = 200) {
@@ -38,6 +40,10 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   /** The body of every holdings insert, in order. */
   const inserts: unknown[] = [];
   let failures = opts.failInserts ?? 0;
+  /** Messages saved in each Troy chat during the test, by conversation id. */
+  const chats: Record<string, Array<Record<string, unknown>>> = {};
+  /** Chats started during the test, newest first in the list. */
+  const started: Array<Record<string, unknown>> = [];
   // While false, holdings writes fail the way a dropped connection does.
   let connectionUp = true;
   // The profile row. Verifying a checkout turns it to Gold, as the real route does.
@@ -82,28 +88,39 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (p === '/v1/troy/conversations' && req.method() === 'GET') {
       const n = opts.conversations ?? 0;
       return fulfillJson(route, {
-        conversations: Array.from({ length: n }, (_, i) => ({
+        conversations: [...started, ...Array.from({ length: n }, (_, i) => ({
           id: `conv-${i}`,
           title: ['Silver ratio', 'Junk silver value', 'Maple vs Eagle', 'COMEX drain', 'Stack check'][i % 5],
-          created_at: new Date(Date.now() - i * 86400000).toISOString(),
-          updated_at: new Date(Date.now() - i * 86400000).toISOString(),
-        })),
+          created_at: new Date(Date.now() - (i + 1) * 86400000).toISOString(),
+          updated_at: new Date(Date.now() - (i + 1) * 86400000).toISOString(),
+        }))],
       });
     }
     if (p === '/v1/troy/conversations' && req.method() === 'POST') {
-      return fulfillJson(route, { id: 'conv-new', title: 'New chat', created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+      const conv = { id: 'conv-new', title: 'New chat', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      started.push(conv);
+      return fulfillJson(route, conv);
     }
     if (/^\/v1\/troy\/conversations\/[^/]+\/messages$/.test(p)) {
       if (opts.chatLimitReached) {
         return fulfillJson(route, { error: 'Daily question limit reached', questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' }, 403);
       }
-      return fulfillJson(route, {
-        message: { id: 'm-reply', role: 'assistant', content: 'Your stack is worth **$6,024** at spot, up **$84** today.', created_at: new Date().toISOString() },
-        preview: null,
-      });
+      const id = p.split('/')[4];
+      const now = new Date().toISOString();
+      const reply = { id: 'm-reply', role: 'assistant', content: 'Your stack is worth **$6,024** at spot, up **$84** today.', created_at: now };
+      const asked = (req.postDataJSON() as { message?: string; content?: string } | null) ?? {};
+      chats[id] = [...(chats[id] ?? []), { id: `m-q-${Date.now()}`, role: 'user', content: asked.message ?? asked.content ?? '', created_at: now }, reply];
+      return fulfillJson(route, { message: reply, preview: null });
     }
     if (/^\/v1\/troy\/conversations\/[^/]+$/.test(p)) {
-      return fulfillJson(route, { id: p.split('/').pop(), title: 'Silver ratio', created_at: '', updated_at: '', messages: [] });
+      const id = p.split('/').pop() as string;
+      if (req.method() === 'DELETE') {
+        if (opts.failDeletes) return fulfillJson(route, { error: 'Could not delete' }, 500);
+        const at = started.findIndex((c) => c.id === id);
+        if (at >= 0) started.splice(at, 1);
+      }
+      const saved = chats[id] ?? (id.startsWith('conv-') && id !== 'conv-new' ? [{ id: `m-${id}`, role: 'assistant', content: `Saved answer for ${id}.`, created_at: '2026-10-08T12:00:00Z' }] : []);
+      return fulfillJson(route, { id, title: 'Silver ratio', created_at: '', updated_at: '', messages: saved });
     }
     if (p === '/v1/snapshots' || p.startsWith('/v1/snapshots/')) return fulfillJson(route, { success: true, snapshots: [] });
     if (p === '/v1/sync-subscription') return fulfillJson(route, { user_id: USER_ID, subscription_tier: profile.subscription_tier, subscription_status: profile.subscription_status });

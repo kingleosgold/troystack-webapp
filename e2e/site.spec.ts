@@ -325,6 +325,47 @@ test('a free account at its daily limit is told so, and no empty chat is left be
   await expect(page).toHaveURL(/\/troy$/);
 });
 
+/** Opens the chat list, which sits behind a button on a phone. */
+async function openChatList(page: Page) {
+  const toggle = page.getByRole('button', { name: 'Your chats' });
+  if (await toggle.isVisible()) await toggle.click();
+}
+
+test('a chat started here is loaded again after visiting another one', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { conversations: 2 });
+  await page.goto('/troy');
+  await page.getByRole('textbox').fill('How is my stack doing?');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(page.getByText(/Your stack is worth/).first()).toBeVisible();
+  await expect(page).toHaveURL(/\/troy\/c\/conv-new$/);
+
+  await openChatList(page);
+  await page.locator('li').getByRole('button', { name: 'Silver ratio', exact: true }).filter({ visible: true }).click();
+  await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+  await expect(page.getByText('How is my stack doing?')).toHaveCount(0);
+
+  await openChatList(page);
+  await page.locator('li').getByRole('button', { name: 'New chat', exact: true }).filter({ visible: true }).click();
+  await expect(page).toHaveURL(/\/troy\/c\/conv-new$/);
+  await expect(page.getByText('How is my stack doing?')).toBeVisible();
+  await expect(page.getByText('Saved answer for conv-0.')).toHaveCount(0);
+});
+
+test("a chat whose delete doesn't go through stays put and says so", async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { conversations: 2, tier: 'gold', failDeletes: true });
+  await page.goto('/troy/c/conv-0');
+  await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+  await openChatList(page);
+  await page.getByRole('button', { name: 'Delete Silver ratio' }).filter({ visible: true }).click();
+  await expect(page.getByText("That chat couldn't be deleted. Check your connection and try again.")).toBeVisible();
+  await expect(page).toHaveURL(/\/troy\/c\/conv-0$/);
+  await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+  // The list is still open on a phone and always shown on a computer.
+  await expect(page.locator('li').getByRole('button', { name: 'Silver ratio', exact: true }).filter({ visible: true })).toBeVisible();
+});
+
 test('signed-in free accounts see their three newest chats', async ({ page }) => {
   await signIn(page);
   await mockBackends(page, { conversations: 5 });
