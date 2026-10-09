@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Calculator,
   ChevronsLeft,
@@ -19,6 +19,7 @@ import {
   Warehouse,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSignOut } from '../contexts/SignOutContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { useSpotMap } from '../hooks/queries';
 import { useTheme } from '../hooks/useTheme';
@@ -91,9 +92,9 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
 }
 
 function AccountRow({ collapsed }: { collapsed: boolean }) {
-  const { user, isConfigured, signOut } = useAuth();
+  const { user, isConfigured } = useAuth();
+  const { requestSignOut, signingOut } = useSignOut();
   const { tier, loading: planLoading } = useSubscription();
-  const navigate = useNavigate();
   if (!isConfigured) return null;
   if (!user) {
     return (
@@ -124,11 +125,9 @@ function AccountRow({ collapsed }: { collapsed: boolean }) {
       </Link>
       <button
         type="button"
-        onClick={async () => {
-          await signOut();
-          navigate('/');
-        }}
-        className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg text-fg-3 hover:text-fg hover:bg-surface-2"
+        onClick={requestSignOut}
+        disabled={signingOut}
+        className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg text-fg-3 hover:text-fg hover:bg-surface-2 disabled:opacity-40"
         title="Sign out"
         aria-label="Sign out"
       >
@@ -318,9 +317,9 @@ function BottomTabs() {
 }
 
 function MenuSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, isConfigured, signOut } = useAuth();
+  const { user, isConfigured } = useAuth();
+  const { requestSignOut, signingOut } = useSignOut();
   const { resolvedTheme, setTheme } = useTheme();
-  const navigate = useNavigate();
   return (
     <Sheet open={open} onClose={onClose} title="TroyStack">
       <ul className="grid grid-cols-2 gap-2">
@@ -359,12 +358,12 @@ function MenuSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           (user ? (
             <button
               type="button"
-              onClick={async () => {
-                await signOut();
+              onClick={() => {
                 onClose();
-                navigate('/');
+                requestSignOut();
               }}
-              className="h-10 px-3 rounded-xl text-[14px] font-medium text-fg-2 hover:text-fg"
+              disabled={signingOut}
+              className="h-10 px-3 rounded-xl text-[14px] font-medium text-fg-2 hover:text-fg disabled:opacity-40"
             >
               Sign out
             </button>
