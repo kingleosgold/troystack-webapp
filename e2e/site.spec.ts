@@ -33,6 +33,9 @@ const PAGES: Array<[string, string | RegExp]> = [
   ['/tools/what-if', /What if/i],
   ['/tools/stacking-history', /Stacking history/i],
   ['/tools/ratio', /ratio/i],
+  ['/coins', /Coin and bar values/],
+  ['/coins/morgan-silver-dollar', /Morgan silver dollar/],
+  ['/coins/not-a-coin', /That coin isn't here/],
   ['/dealers', /Buying gold and silver online/],
   ['/app', /Your stack and Troy/],
   ['/stack', /stack/i],
@@ -319,4 +322,74 @@ test('light theme holds up', async ({ page }) => {
   await expect(page.getByText('$4,180.80').filter({ visible: true }).first()).toBeVisible();
   await page.waitForLoadState('networkidle');
   await shot(page, 'home-light');
+});
+
+test.describe('coin values', () => {
+  test('a coin page values one coin and a pile of them at live spot', async ({ page }) => {
+    const errors = watchErrors(page);
+    await mockBackends(page);
+    await page.goto('/coins/morgan-silver-dollar');
+    // 0.77344 oz of silver at $60.24
+    await expect(page.getByTestId('coin-melt')).toHaveText('$46.59');
+    await page.getByRole('button', { name: '20', exact: true }).click();
+    await expect(page.getByTestId('coin-total')).toHaveText('$931.84');
+    await page.getByLabel('How many').fill('1,000');
+    await expect(page.getByTestId('coin-total')).toHaveText('$46,592.03');
+    await expect(page.getByText(/Melt is the floor/)).toBeVisible();
+    await expect(page).toHaveTitle('Morgan silver dollar melt value today | TroyStack');
+    expect(errors).toEqual([]);
+    await shot(page, 'coin-morgan');
+  });
+
+  test('adding from a coin page starts the form filled in for that coin', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/coins/american-gold-eagle');
+    await page.getByRole('link', { name: 'Add to my stack' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Add a holding' });
+    await expect(dialog).toBeVisible();
+    await expect(page).toHaveURL(/\/stack$/);
+    await expect(dialog.getByRole('tab', { name: 'Gold' })).toHaveAttribute('aria-selected', 'true');
+    await expect(dialog.getByLabel('Product')).toHaveValue('American Gold Eagle (1 oz)');
+    await expect(dialog.getByLabel('Weight of one piece')).toHaveValue('1');
+    await dialog.getByRole('button', { name: 'Add to stack' }).click();
+    await expect(dialog).toBeHidden();
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('stacktracker_holdings') || '[]'));
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ metal: 'gold', type: 'American Gold Eagle (1 oz)', weight: 1 });
+    // The next add starts blank again.
+    await page.getByRole('button', { name: 'Add a holding' }).first().click();
+    await expect(page.getByRole('dialog', { name: 'Add a holding' }).getByLabel('Product')).toHaveValue('');
+  });
+
+  test('coin values lists every piece at spot and finds one by name', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/coins');
+    await expect(page.getByRole('link', { name: /Morgan silver dollar/ })).toContainText('$46.59');
+    const search = page.getByLabel('Find a coin or bar');
+    await search.fill('krugerrand');
+    await expect(page.getByRole('link', { name: /South African Krugerrand/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Morgan silver dollar/ })).toHaveCount(0);
+    await search.fill('zzz');
+    await expect(page.getByText('Nothing by that name')).toBeVisible();
+  });
+
+  test('the melt calculator and junk silver tool lead to each coin', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/tools/melt');
+    await page.getByLabel('Coin or bar').selectOption('south-african-krugerrand');
+    await page.getByRole('link', { name: /Weight, purity and history/ }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('South African Krugerrand');
+    await goInApp(page, '/tools/junk-silver');
+    await page.getByRole('link', { name: 'Mercury dime', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mercury dime');
+  });
+
+  test('a coin page arrives with its own title and facts before any script runs', async ({ request }) => {
+    const html = await (await request.get('/coins/mercury-dime.html')).text();
+    expect(html).toContain('<title>Mercury dime melt value today | TroyStack</title>');
+    expect(html).toContain('<link rel="canonical" href="https://troystack.ai/coins/mercury-dime" />');
+    expect(html).toContain('<noscript><h1>Mercury dime</h1>');
+    const sitemap = await (await request.get('/sitemap.xml')).text();
+    expect(sitemap).toContain('<loc>https://troystack.ai/coins/mercury-dime</loc>');
+  });
 });
