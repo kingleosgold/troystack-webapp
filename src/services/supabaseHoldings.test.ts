@@ -13,7 +13,7 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
-import { guestHoldingsInAccount, uploadLocalHoldings, type HoldingRow } from './supabaseHoldings';
+import { uploadLocalHoldings, type HoldingRow } from './supabaseHoldings';
 import { parseNotes } from '../lib/holdingNotes';
 import { stackTotals } from '../lib/stackMath';
 import type { Holding } from '../types/holding';
@@ -68,14 +68,5 @@ describe('moving a guest stack into an account', () => {
     const [row] = sent.rows as HoldingRow[];
     expect(row).toMatchObject({ quantity: 10, weight: 1, purchase_price: 55 });
     expect(parseNotes(row.notes).premium).toBe(6);
-  });
-
-  it("knows which guest holdings a read shows in the account, and only that account's", async () => {
-    const eagle = guest({ id: 'g1' });
-    const buffalo = guest({ id: 'g2', type: 'Gold Buffalo' });
-    const moved = await uploadLocalHoldings([eagle], USER);
-    expect(await guestHoldingsInAccount([eagle, buffalo], moved, USER)).toEqual(new Set(['g1']));
-    expect(await guestHoldingsInAccount([eagle, buffalo], moved, 'user-b')).toEqual(new Set());
-    expect(await guestHoldingsInAccount([eagle, buffalo], [], USER)).toEqual(new Set());
   });
 });

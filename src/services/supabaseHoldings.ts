@@ -299,10 +299,3 @@ export async function uploadLocalHoldings(local: Holding[], userId: string): Pro
   if (error) throw writeFailed(error, status, "The holdings in this browser didn't move into your account. Try again.");
   return rows.map(fromRow);
 }
-
-/** Which of this browser's guest holdings a read of the account shows there, by their ids in the browser. */
-export async function guestHoldingsInAccount(local: Holding[], remote: Holding[], userId: string): Promise<Set<string>> {
-  const held = new Set(remote.map((h) => h.id));
-  const ids = await Promise.all(local.map((h) => guestRowId(userId, h.id)));
-  return new Set(local.filter((_, i) => held.has(ids[i])).map((h) => h.id));
-}
