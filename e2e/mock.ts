@@ -44,8 +44,35 @@ export interface MockOptions {
   checkoutConflict?: boolean;
   /** Reading the profile row fails, so the plan can't be read. */
   failProfileRead?: boolean;
-  /** Metals the prices answer leaves out, as when a feed is down for one. */
+  /**
+   * Metals the prices answer leaves out, as when a feed is down for one. Their
+   * change figures stay in the answer, as they can when only the price is gone.
+   */
   missingPrices?: Array<'gold' | 'silver' | 'platinum' | 'palladium'>;
+  /** Metals with no points in the 24-hour series. */
+  emptySparklines?: Array<'gold' | 'silver' | 'platinum' | 'palladium'>;
+  /** The price history answers with no points at all. */
+  emptyHistory?: boolean;
+  /** Metals the latest vault report leaves out, as the API does when it can't read one. */
+  vaultMissing?: Array<'gold' | 'silver' | 'platinum' | 'palladium'>;
+  /** Reading the account's holdings fails. */
+  failHoldingsRead?: boolean;
+  /** The podcast feed fails. */
+  failPodcast?: boolean;
+  /** How long Today's brief takes to answer. */
+  briefDelayMs?: number;
+  /** How long the receipt scan count takes to answer. */
+  scanStatusDelayMs?: number;
+  /**
+   * The visitor count says questions are left, but they were used on another
+   * device on the same connection, so the next question is refused.
+   */
+  visitorUsedElsewhere?: boolean;
+  /**
+   * The profile reads Free until the sync at sign-in puts back the Gold the
+   * API knows about, as when the iPhone app wrote Free over a web plan.
+   */
+  syncRestoresGoldAtSignIn?: boolean;
   /** The prices request fails, as when the API is down. */
   failPrices?: boolean;
   /** The stack history request fails. */
@@ -63,6 +90,11 @@ export interface MockOptions {
 function fulfillJson(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, headers: { ...CORS, 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 }
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** What Today's brief says in the browser checks. */
+export const BRIEF_TEXT = 'Gold held near $4,180 overnight and silver firmed. Your stack is up a little on the day.';
 
 /** Answers every TroyStack API and Supabase request the site makes. */
 export async function mockBackends(page: Page, opts: MockOptions = {}) {
@@ -103,20 +135,36 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       for (const m of opts.missingPrices ?? []) delete body.prices[m];
       return fulfillJson(route, body);
     }
-    if (p === '/v1/sparkline-24h') return fulfillJson(route, read('sparkline.json'));
-    if (p === '/v1/prices/history') return fulfillJson(route, read(url.searchParams.get('range') === 'ALL' || url.searchParams.get('range') === '5Y' ? 'history-all.json' : 'history-1y.json'));
+    if (p === '/v1/sparkline-24h') {
+      const body = JSON.parse(read('sparkline.json')) as { sparklines: Record<string, number[]> };
+      for (const m of opts.emptySparklines ?? []) body.sparklines[m] = [];
+      return fulfillJson(route, body);
+    }
+    if (p === '/v1/prices/history') {
+      if (opts.emptyHistory) return fulfillJson(route, { success: true, data: [] });
+      return fulfillJson(route, read(url.searchParams.get('range') === 'ALL' || url.searchParams.get('range') === '5Y' ? 'history-all.json' : 'history-1y.json'));
+    }
     if (p === '/v1/historical-spot') return fulfillJson(route, { gold: 3980.1, silver: 47.2, platinum: 1500, palladium: 1050 });
     if (p === '/v1/vault-watch') {
       if (url.searchParams.get('days')) {
         if (opts.failVaultHistory) return fulfillJson(route, { error: 'Vault history unavailable' }, 500);
         return fulfillJson(route, read('vault-history.json'));
       }
-      return fulfillJson(route, read('vault.json'));
+      const body = JSON.parse(read('vault.json')) as Record<string, unknown>;
+      for (const m of opts.vaultMissing ?? []) delete body[m];
+      return fulfillJson(route, body);
     }
     if (p === '/v1/stack-signal/latest') return fulfillJson(route, read('latest.json'));
     if (p === '/v1/stack-signal') return fulfillJson(route, read('signal.json'));
     if (p.startsWith('/v1/stack-signal/')) return fulfillJson(route, read('article.json'));
-    if (p === '/v1/podcast/feed.xml') return route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/rss+xml' }, body: read('podcast.xml') });
+    if (p === '/v1/podcast/feed.xml') {
+      if (opts.failPodcast) return fulfillJson(route, { error: 'Feed unavailable' }, 500);
+      return route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/rss+xml' }, body: read('podcast.xml') });
+    }
+    if (p === '/v1/daily-brief') {
+      if (opts.briefDelayMs) await wait(opts.briefDelayMs);
+      return fulfillJson(route, { brief: { brief_text: BRIEF_TEXT, date: '2026-10-09', is_current: true } });
+    }
     if (p === '/v1/dealer-prices/click') return fulfillJson(route, { success: true });
 
     if (p === '/v1/troy/ask/status') {
@@ -126,6 +174,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (p === '/v1/troy/ask') {
       if (!quota) return fulfillJson(route, { error: 'Not found' }, 404);
       asks.push(req.postDataJSON());
+      if (opts.visitorUsedElsewhere) asked = quota.questionsLimit;
       if (askFailures > 0) {
         askFailures -= 1;
         return fulfillJson(route, { error: 'Upstream timed out' }, 502);
@@ -190,6 +239,12 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (p === '/v1/sync-subscription') {
       if (opts.failSync) return fulfillJson(route, { error: 'Failed to fetch subscription status' }, 500);
       if (opts.syncRestoresGold && checkoutTried) profile = { ...profile, subscription_tier: 'gold', subscription_status: 'active' };
+      if (opts.syncRestoresGoldAtSignIn) {
+        // Answers after the site's first plan read, the way the real sync,
+        // which asks Stripe, usually does.
+        await wait(300);
+        profile = { ...profile, subscription_tier: 'gold', subscription_status: 'active' };
+      }
       return fulfillJson(route, { user_id: USER_ID, subscription_tier: profile.subscription_tier, subscription_status: profile.subscription_status });
     }
     if (p === '/v1/stripe/verify-session') {
@@ -197,7 +252,10 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       profile = { subscription_tier: 'gold', subscription_status: status, trial_end: status === 'trialing' ? new Date(Date.now() + 7 * 86400000).toISOString() : null };
       return fulfillJson(route, opts.verifyStatus ? { success: true, tier: 'gold', status } : { success: true, tier: 'gold' });
     }
-    if (p === '/v1/scan-status') return fulfillJson(route, { scansUsed: 0, scansLimit: 5, resetsAt: '2026-11-01T00:00:00Z' });
+    if (p === '/v1/scan-status') {
+      if (opts.scanStatusDelayMs) await wait(opts.scanStatusDelayMs);
+      return fulfillJson(route, { scansUsed: 0, scansLimit: 5, resetsAt: '2026-11-01T00:00:00Z' });
+    }
     if (p === '/v1/increment-scan') {
       if (opts.failScanCount) return fulfillJson(route, { error: 'Failed to increment scan count' }, 500);
       return fulfillJson(route, { success: true, scansUsed: 1, scansLimit: 5, resetsAt: '2026-11-01T00:00:00Z' });
@@ -223,6 +281,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, profile);
     }
     if (url.pathname.startsWith('/rest/v1/holdings')) {
+      if (req.method() === 'GET' && opts.failHoldingsRead) return fulfillJson(route, { message: 'upstream connect error' }, 503);
       if (req.method() === 'GET') return fulfillJson(route, opts.holdings ?? []);
       if (req.method() === 'POST') {
         inserts.push(req.postDataJSON());

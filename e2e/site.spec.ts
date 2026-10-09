@@ -114,10 +114,11 @@ test.describe('Troy for visitors', () => {
     await expect(page.getByText(/The move came after the Fed minutes/)).toBeVisible();
     await shot(page, 'troy-answer');
 
-    await page.getByRole('textbox').fill('And platinum?');
-    await page.getByRole('button', { name: 'Send' }).click();
+    // That was the third. The limit shows right away, so a fourth question
+    // isn't typed only to be turned away.
     await expect(page.getByText(/That's today's 3 free questions/)).toBeVisible();
     await expect(page.getByRole('link', { name: 'Create a free account' })).toBeVisible();
+    await expect(page.getByRole('textbox')).toBeDisabled();
     await expectNoLongDashes(page);
     await shot(page, 'troy-limit');
   });
@@ -637,7 +638,7 @@ test('going back to a chat while another one loads shows it again', async ({ pag
 
 test("a Gold account whose plan didn't load isn't sold Gold again", async ({ page }) => {
   await signIn(page);
-  const api = await mockBackends(page, { tier: 'gold' });
+  const api = await mockBackends(page, { tier: 'gold', chatLimitReached: true });
   await page.route(/e2e\.supabase\.co\/rest\/v1\/profiles/, (route) =>
     route.request().method() === 'OPTIONS'
       ? route.fallback()
@@ -647,7 +648,13 @@ test("a Gold account whose plan didn't load isn't sold Gold again", async ({ pag
   await expect(page.getByText('Checking your plan')).toBeVisible();
   await expect(page.getByText('Try Gold free for a week')).toHaveCount(0);
   await page.goto('/troy');
-  await page.getByRole('button', { name: 'Free plan, 3 a day' }).click();
+  // A plan that isn't known isn't Free, so Troy shows no Free label to sell from.
+  await expect(page.getByRole('heading', { name: 'Ask Troy anything' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Free plan, 3 a day' })).toHaveCount(0);
+  // If the API turns a question away at the free limit, the Gold sheet still waits for the plan.
+  await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('button', { name: 'Try Gold free for a week' }).click();
   await expect(page.getByRole('dialog', { name: 'Checking your plan' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Start my free week' })).toHaveCount(0);
   expect(api.calls).not.toContain('POST /v1/stripe/create-checkout-session');
