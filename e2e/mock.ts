@@ -26,6 +26,10 @@ export interface MockOptions {
   chatLimitReached?: boolean;
   /** Deleting a Troy chat fails, as when the connection drops. */
   failDeletes?: boolean;
+  /** How many chat deletes fail before they start working. */
+  failDeletesTimes?: number;
+  /** Deletes answer 404, as for a chat already deleted in the app. */
+  deletesGone?: boolean;
   /** Saved chats don't finish loading until the test calls releaseChatLoads. */
   holdChatLoads?: boolean;
   /** GET /v1/sync-subscription fails, as when the API is down. */
@@ -48,6 +52,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   /** The body of every holdings insert, in order. */
   const inserts: unknown[] = [];
   let failures = opts.failInserts ?? 0;
+  let deleteFailures = opts.failDeletesTimes ?? 0;
   /** Messages saved in each Troy chat during the test, by conversation id. */
   const chats: Record<string, Array<Record<string, unknown>>> = {};
   /** Chats started during the test, newest first in the list. */
@@ -127,6 +132,11 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       if (req.method() === 'GET') await chatLoads;
       if (req.method() === 'DELETE') {
         if (opts.failDeletes) return fulfillJson(route, { error: 'Could not delete' }, 500);
+        if (deleteFailures > 0) {
+          deleteFailures -= 1;
+          return fulfillJson(route, { error: 'Could not delete' }, 500);
+        }
+        if (opts.deletesGone) return fulfillJson(route, { error: 'Conversation not found' }, 404);
         const at = started.findIndex((c) => c.id === id);
         if (at >= 0) started.splice(at, 1);
       }
@@ -207,8 +217,12 @@ function sessionUser() {
   };
 }
 
-/** Puts a signed-in session where supabase-js looks for it, before the page loads. */
-export async function signIn(page: Page) {
+/**
+ * Puts a signed-in session where supabase-js looks for it, before the page
+ * loads. With `once`, only the first page load of the test gets it, so a
+ * sign-out that reloads the page stays signed out.
+ */
+export async function signIn(page: Page, { once = false }: { once?: boolean } = {}) {
   const session = {
     access_token: 'e2e-access-token',
     token_type: 'bearer',
@@ -217,10 +231,17 @@ export async function signIn(page: Page) {
     refresh_token: 'e2e-refresh-token',
     user: sessionUser(),
   };
-  await page.addInitScript((value) => {
-    localStorage.setItem('sb-e2e-auth-token', value);
-    localStorage.setItem('troy_ai_consent_v1', '{"version":1}');
-  }, JSON.stringify(session));
+  await page.addInitScript(
+    ({ value, once }) => {
+      if (once) {
+        if (sessionStorage.getItem('e2e_signed_in')) return;
+        sessionStorage.setItem('e2e_signed_in', '1');
+      }
+      localStorage.setItem('sb-e2e-auth-token', value);
+      localStorage.setItem('troy_ai_consent_v1', '{"version":1}');
+    },
+    { value: JSON.stringify(session), once },
+  );
 }
 
 export const SAMPLE_HOLDINGS = [

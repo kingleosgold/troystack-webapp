@@ -495,3 +495,116 @@ test('a lifetime account can still reach billing and receipts', async ({ page })
   await expect(page.getByRole('button', { name: /Billing and receipts/ })).toBeVisible();
   await expect(page.getByText('Change plan or cancel')).toHaveCount(0);
 });
+
+async function pickChat(page: Page, title: string) {
+  await openChatList(page);
+  await page.locator('li').getByRole('button', { name: title, exact: true }).filter({ visible: true }).click();
+}
+
+test('going back to a chat while another one loads shows it again', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { conversations: 2 });
+  await page.route(/\/v1\/troy\/conversations\/conv-1(\?|$)/, (route) => (route.request().method() === 'OPTIONS' ? route.fallback() : new Promise(() => undefined)));
+  await page.goto('/troy/c/conv-0');
+  await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+  await pickChat(page, 'Junk silver value');
+  await expect(page.getByText('Loading this chat', { exact: true })).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/troy\/c\/conv-0$/);
+  await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+});
+
+test("a Gold account whose plan didn't load isn't sold Gold again", async ({ page }) => {
+  await signIn(page);
+  const api = await mockBackends(page, { tier: 'gold' });
+  await page.route(/e2e\.supabase\.co\/rest\/v1\/profiles/, (route) =>
+    route.request().method() === 'OPTIONS'
+      ? route.fallback()
+      : route.fulfill({ status: 503, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: JSON.stringify({ code: 'PGRST000', message: 'upstream unavailable' }) }),
+  );
+  await page.goto('/settings');
+  await expect(page.getByText('Checking your plan')).toBeVisible();
+  await expect(page.getByText('Try Gold free for a week')).toHaveCount(0);
+  await page.goto('/troy');
+  await page.getByRole('button', { name: 'Free plan, 3 a day' }).click();
+  await expect(page.getByRole('dialog', { name: 'Checking your plan' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start my free week' })).toHaveCount(0);
+  expect(api.calls).not.toContain('POST /v1/stripe/create-checkout-session');
+});
+
+test('an empty chat left by the daily limit goes once its delete goes through', async ({ page }) => {
+  await signIn(page);
+  const api = await mockBackends(page, { conversations: 3, chatLimitReached: true, failDeletesTimes: 1 });
+  await page.goto('/troy');
+  await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(page.getByText(/today's 3 free questions/)).toBeVisible();
+  await expect.poll(() => api.calls.filter((c) => c === 'DELETE /v1/troy/conversations/conv-new').length).toBe(2);
+  await openChatList(page);
+  await expect(page.locator('li').getByRole('button', { name: 'New chat', exact: true }).filter({ visible: true })).toHaveCount(0);
+});
+
+test("a sign-out that can't reach the server still signs this browser out", async ({ page }) => {
+  await signIn(page, { once: true });
+  await mockBackends(page);
+  await page.route(/e2e\.supabase\.co\/auth\/v1\/logout/, (route) => (route.request().method() === 'OPTIONS' ? route.fallback() : route.abort('internetdisconnected')));
+  await page.goto('/settings');
+  await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
+  // The page starts over once the stored session is gone.
+  await Promise.all([page.waitForEvent('load'), page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click()]);
+  await expect(page).toHaveURL(/\/$/);
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('sb-')).length)).toBe(0);
+  await page.goto('/settings');
+  await expect(page.getByText('Sign in or make a free account')).toBeVisible();
+});
+
+test('opening another chat while a new one is being made keeps you there', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { conversations: 2 });
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  await page.route(/\/v1\/troy\/conversations$/, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    await gate;
+    return route.fallback();
+  });
+  await page.goto('/troy');
+  await page.getByRole('textbox', { name: 'Message Troy' }).fill('How is my stack doing?');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await pickChat(page, 'Silver ratio');
+  await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+  release();
+  await openChatList(page);
+  await expect(page.locator('li').getByRole('button', { name: 'New chat', exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/troy\/c\/conv-0$/);
+  await expect(page.getByText(/Your stack is worth/)).toHaveCount(0);
+});
+
+test('Escape closes only the top sheet, and the page scrolls again after the last', async ({ page }) => {
+  await page.setViewportSize({ width: 700, height: 800 });
+  await signIn(page);
+  await mockBackends(page, { conversations: 5 });
+  await page.goto('/troy');
+  await page.getByRole('button', { name: 'Your chats' }).click();
+  await page.getByRole('dialog', { name: 'Your chats' }).getByRole('button', { name: 'See Gold' }).click();
+  await expect(page.getByRole('dialog', { name: /Try Gold free for a week/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: /Try Gold free for a week/ })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Your chats' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe('');
+});
+
+test('a chat already deleted in the app leaves the list without an error', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { conversations: 2, tier: 'gold', deletesGone: true });
+  await page.goto('/troy/c/conv-0');
+  await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+  await openChatList(page);
+  await page.getByRole('button', { name: 'Delete Silver ratio' }).filter({ visible: true }).click();
+  await expect(page).toHaveURL(/\/troy$/);
+  await expect(page.getByText("That chat couldn't be deleted.", { exact: false })).toHaveCount(0);
+});
