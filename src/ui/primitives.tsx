@@ -83,7 +83,7 @@ interface SegmentedProps<T extends string> {
 
 export function Segmented<T extends string>({ value, options, onChange, label, className, size = 'md' }: SegmentedProps<T>) {
   return (
-    <div role="tablist" aria-label={label} className={cx('inline-flex rounded-xl bg-surface-2 p-1 border border-line', className)}>
+    <div role="tablist" aria-label={label} className={cx('inline-flex max-w-full overflow-x-auto scrollbar-none rounded-xl bg-surface-2 p-1 border border-line', className)}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -94,7 +94,7 @@ export function Segmented<T extends string>({ value, options, onChange, label, c
             aria-selected={active}
             onClick={() => onChange(o.value)}
             className={cx(
-              'rounded-lg font-semibold transition-colors',
+              'shrink-0 rounded-lg font-semibold transition-colors',
               size === 'sm' ? 'px-2.5 py-1 text-[12px]' : 'px-3 py-1.5 text-[13px]',
               active ? 'bg-surface text-fg shadow-sm' : 'text-fg-3 hover:text-fg',
             )}

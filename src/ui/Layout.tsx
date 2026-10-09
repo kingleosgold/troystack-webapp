@@ -408,7 +408,7 @@ function PageLoading() {
     <div className="mx-auto max-w-6xl space-y-4 px-4 py-8 sm:px-6" aria-busy="true" aria-label="Loading">
       <div className="skeleton h-8 w-56 rounded-lg" />
       <div className="skeleton h-4 w-80 max-w-full rounded" />
-      <div className="grid gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="skeleton h-28 rounded-2xl" />
         ))}
