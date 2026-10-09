@@ -1,101 +1,105 @@
 import { supabase } from '../lib/supabase';
-import type { Holding, HoldingFormData } from '../types/holding';
-import { WEIGHT_CONVERSIONS } from '../types/holding';
+import { buildNotes, parseNotes } from '../lib/holdingNotes';
+import { isMetal } from '../lib/metals';
+import type { Holding, HoldingFormData, WeightUnit } from '../types/holding';
+import { WEIGHT_TO_OZT } from '../types/holding';
 
-// Convert local holding to Supabase format
-function toSupabaseHolding(holding: Holding, userId: string) {
-  return {
-    id: holding.id,
-    user_id: userId,
-    metal: holding.metal,
-    type: holding.type,
-    weight: holding.weight,
-    weight_unit: holding.weightUnit,
-    quantity: holding.quantity,
-    purchase_price: holding.purchasePrice,
-    purchase_date: holding.purchaseDate,
-    notes: holding.notes || null,
-    created_at: holding.createdAt,
-    updated_at: holding.updatedAt,
-  };
+/**
+ * The Supabase `holdings` table, shared with the iPhone app. Reads and writes
+ * follow the app's mapping (see src/services/supabaseHoldings.ts in the
+ * mobile repo): `type` is the product name, `weight` is troy ounces per piece,
+ * `purchase_price` is per piece, and dealer, taxes, shipping, spot and
+ * premium live in the `notes` JSON. Deletes are soft, by `deleted_at`.
+ */
+
+interface HoldingRow {
+  id: string;
+  user_id: string;
+  metal: string;
+  type: unknown;
+  weight: number | string | null;
+  weight_unit: string | null;
+  quantity: number | string | null;
+  purchase_price: number | string | null;
+  purchase_date: string | null;
+  notes: unknown;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
-// Extract a clean product name from the type field.
-// The Supabase column may contain a plain string, a JSON string, or a JSON
-// object with metadata (local_id, source, cost_basis, etc.).
-function cleanType(raw: unknown): string {
+/** The product name, from a plain string or the JSON some old rows carry. */
+export function cleanType(raw: unknown): string {
   if (raw == null) return 'Other';
-
-  // Already a plain string – check if it's a JSON string
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim();
-    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (typeof parsed === 'object' && parsed !== null) {
-          return parsed.name || parsed.type || parsed.label || 'Other';
-        }
-      } catch {
-        // Not valid JSON – use as-is
-      }
-    }
-    // Return only the first line (in case metadata is appended after newlines)
-    return trimmed.split('\n')[0];
-  }
-
-  // If Supabase returned a JSONB object directly
   if (typeof raw === 'object') {
     const obj = raw as Record<string, unknown>;
     return String(obj.name || obj.type || obj.label || 'Other');
   }
-
-  return String(raw);
-}
-
-// Strip raw metadata / JSON from the notes field.
-// The mobile app sometimes stores JSON metadata in notes (local_id, cost_basis, etc.).
-function cleanNotes(raw: unknown): string | undefined {
-  if (raw == null) return undefined;
-  const str = typeof raw === 'string' ? raw.trim() : String(raw).trim();
-  if (!str) return undefined;
-
-  // If the entire notes field looks like JSON metadata, discard it
-  if (str.startsWith('{') || str.startsWith('[')) {
+  const trimmed = String(raw).trim();
+  if (trimmed.startsWith('{')) {
     try {
-      const parsed = JSON.parse(str);
-      if (typeof parsed === 'object' && parsed !== null) {
-        // Check for common metadata keys — if present, it's not a real note
-        if ('local_id' in parsed || 'source' in parsed || 'cost_basis' in parsed || 'created_at' in parsed) {
-          return undefined;
-        }
-      }
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object') return String(parsed.name || parsed.type || parsed.label || 'Other');
     } catch {
-      // Not valid JSON — might be user-written text starting with { — keep it
+      // not JSON, fall through
     }
   }
-
-  // Also strip if it contains telltale metadata substrings
-  if (/\blocal_id\b/.test(str) || /\bcost_basis\b/.test(str)) {
-    return undefined;
-  }
-
-  return str;
+  return trimmed.split('\n')[0] || 'Other';
 }
 
-// Convert Supabase holding to local format
-function fromSupabaseHolding(row: any): Holding {
+function dateOnly(value: unknown): string {
+  if (typeof value !== 'string' || !value) return '';
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(value);
+  return m ? m[1] : '';
+}
+
+function unitOf(value: unknown): WeightUnit {
+  return value === 'g' || value === 'kg' ? value : 'oz';
+}
+
+export function fromRow(row: HoldingRow): Holding {
+  const notes = parseNotes(row.notes);
+  const quantity = Number(row.quantity);
   return {
     id: row.id,
-    metal: row.metal,
+    metal: isMetal(row.metal) ? row.metal : 'silver',
     type: cleanType(row.type),
-    weight: row.weight,
-    weightUnit: row.weight_unit || 'oz',
-    quantity: row.quantity,
-    purchasePrice: row.purchase_price,
-    purchaseDate: row.purchase_date,
-    notes: cleanNotes(row.notes),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    weight: Number(row.weight) || 0,
+    weightUnit: unitOf(row.weight_unit),
+    quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+    purchasePrice: Number(row.purchase_price) || 0,
+    purchaseDate: dateOnly(row.purchase_date),
+    dealer: notes.dealer,
+    taxes: notes.taxes,
+    shipping: notes.shipping,
+    spotAtPurchase: notes.spotAtPurchase,
+    premium: notes.premium,
+    costBasisOverride: notes.costBasisOverride,
+    timePurchased: notes.timePurchased,
+    note: notes.note,
+    notesMeta: notes.meta,
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || row.created_at || new Date().toISOString(),
+  };
+}
+
+/** Column values for an insert or update, keeping the row's existing notes keys. */
+export function toColumns(form: HoldingFormData, previousMeta?: Record<string, unknown>) {
+  return {
+    metal: form.metal,
+    type: form.type.trim() || 'Other',
+    weight: form.weight * WEIGHT_TO_OZT[form.weightUnit],
+    weight_unit: form.weightUnit,
+    quantity: form.quantity,
+    purchase_price: form.purchasePrice,
+    purchase_date: form.purchaseDate || null,
+    notes: buildNotes(previousMeta, {
+      dealer: form.dealer,
+      taxes: form.taxes,
+      shipping: form.shipping,
+      spotAtPurchase: form.spotAtPurchase,
+      premium: form.premium,
+      note: form.note,
+    }),
   };
 }
 
@@ -106,117 +110,52 @@ export async function fetchSupabaseHoldings(userId: string): Promise<Holding[]> 
     .eq('user_id', userId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching holdings:', error);
-    throw error;
-  }
-
-  return (data || []).map(fromSupabaseHolding);
+  if (error) throw error;
+  return ((data || []) as HoldingRow[]).map(fromRow);
 }
 
-export async function addSupabaseHolding(
-  formData: HoldingFormData,
-  userId: string
-): Promise<Holding> {
+export async function addSupabaseHolding(form: HoldingFormData, userId: string): Promise<Holding> {
   const now = new Date().toISOString();
-  const id = crypto.randomUUID();
-
-  // Convert weight to troy oz for storage
-  const weightInOz = formData.weight * WEIGHT_CONVERSIONS[formData.weightUnit];
-
-  const holding: Holding = {
-    id,
-    metal: formData.metal,
-    type: formData.type,
-    weight: weightInOz,
-    weightUnit: formData.weightUnit,
-    quantity: formData.quantity,
-    purchasePrice: formData.purchasePrice,
-    purchaseDate: formData.purchaseDate,
-    notes: formData.notes,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  const { error } = await supabase
-    .from('holdings')
-    .insert(toSupabaseHolding(holding, userId));
-
-  if (error) {
-    console.error('Error adding holding:', error);
-    throw error;
-  }
-
-  return holding;
-}
-
-export async function updateSupabaseHolding(
-  id: string,
-  formData: HoldingFormData,
-  userId: string
-): Promise<Holding> {
-  const now = new Date().toISOString();
-
-  // Convert weight to troy oz for storage
-  const weightInOz = formData.weight * WEIGHT_CONVERSIONS[formData.weightUnit];
-
-  const updates = {
-    metal: formData.metal,
-    type: formData.type,
-    weight: weightInOz,
-    weight_unit: formData.weightUnit,
-    quantity: formData.quantity,
-    purchase_price: formData.purchasePrice,
-    purchase_date: formData.purchaseDate,
-    notes: formData.notes || null,
+  const row = {
+    id: crypto.randomUUID(),
+    user_id: userId,
+    ...toColumns(form),
+    created_at: now,
     updated_at: now,
   };
+  const { error } = await supabase.from('holdings').insert(row);
+  if (error) throw error;
+  return fromRow(row as HoldingRow);
+}
 
+export async function updateSupabaseHolding(existing: Holding, form: HoldingFormData, userId: string): Promise<Holding> {
+  const updates = { ...toColumns(form, existing.notesMeta), updated_at: new Date().toISOString() };
   const { data, error } = await supabase
     .from('holdings')
     .update(updates)
-    .eq('id', id)
+    .eq('id', existing.id)
     .eq('user_id', userId)
     .select()
     .single();
-
-  if (error) {
-    console.error('Error updating holding:', error);
-    throw error;
-  }
-
-  return fromSupabaseHolding(data);
+  if (error) throw error;
+  return fromRow(data as HoldingRow);
 }
 
-export async function deleteSupabaseHolding(
-  id: string,
-  userId: string
-): Promise<void> {
-  // Soft delete by setting deleted_at
+export async function deleteSupabaseHolding(id: string, userId: string): Promise<void> {
   const { error } = await supabase
     .from('holdings')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id)
     .eq('user_id', userId);
-
-  if (error) {
-    console.error('Error deleting holding:', error);
-    throw error;
-  }
+  if (error) throw error;
 }
 
-// Sync local holdings to Supabase (for initial migration)
-// Generates new UUIDs since local IDs are not valid UUIDs
-export async function syncLocalToSupabase(
-  localHoldings: Holding[],
-  userId: string
-): Promise<void> {
-  if (localHoldings.length === 0) return;
-
-  // Convert local holdings to Supabase format with new UUIDs
-  const supabaseHoldings = localHoldings.map((h) => ({
-    id: crypto.randomUUID(), // Generate new UUID for Supabase
+/** Copy holdings saved in this browser into a new account. */
+export async function uploadLocalHoldings(local: Holding[], userId: string): Promise<void> {
+  if (local.length === 0) return;
+  const now = new Date().toISOString();
+  const rows = local.map((h) => ({
+    id: crypto.randomUUID(),
     user_id: userId,
     metal: h.metal,
     type: h.type,
@@ -224,18 +163,18 @@ export async function syncLocalToSupabase(
     weight_unit: h.weightUnit,
     quantity: h.quantity,
     purchase_price: h.purchasePrice,
-    purchase_date: h.purchaseDate,
-    notes: h.notes || null,
-    created_at: h.createdAt,
-    updated_at: h.updatedAt,
+    purchase_date: h.purchaseDate || null,
+    notes: buildNotes(h.notesMeta, {
+      dealer: h.dealer,
+      taxes: h.taxes,
+      shipping: h.shipping,
+      spotAtPurchase: h.spotAtPurchase,
+      premium: h.premium,
+      note: h.note,
+    }),
+    created_at: h.createdAt || now,
+    updated_at: now,
   }));
-
-  const { error } = await supabase
-    .from('holdings')
-    .insert(supabaseHoldings);
-
-  if (error) {
-    console.error('Error syncing holdings:', error);
-    throw error;
-  }
+  const { error } = await supabase.from('holdings').insert(rows);
+  if (error) throw error;
 }
