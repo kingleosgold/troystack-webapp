@@ -30,13 +30,31 @@ function toNumber(v: unknown): number | undefined {
   return undefined;
 }
 
-function toDate(v: unknown): string | undefined {
+const DAY_MS = 86_400_000;
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * Excel keeps a date as a count of days from Dec 30, 1899, or from Jan 1, 1904
+ * in workbooks saved with the 1904 date system, and SheetJS hands over that
+ * count. Anything outside 1950 to 2100 isn't taken for a purchase date.
+ */
+export function excelSerialDate(serial: number, date1904 = false): string | undefined {
+  if (!Number.isFinite(serial)) return undefined;
+  const base = date1904 ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30);
+  const iso = new Date(base + Math.floor(serial) * DAY_MS).toISOString().slice(0, 10);
+  return iso >= '1950-01-01' && iso <= '2100-12-31' ? iso : undefined;
+}
+
+function toDate(v: unknown, date1904 = false): string | undefined {
+  if (typeof v === 'number') return excelSerialDate(v, date1904);
   if (!v) return undefined;
   const s = String(v).trim();
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return undefined;
-  return d.toISOString().slice(0, 10);
+  // A date written without a time reads as local midnight, so its local parts
+  // are the day that was written, wherever the browser is.
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
 function firstString(...values: unknown[]): string | undefined {
@@ -44,16 +62,17 @@ function firstString(...values: unknown[]): string | undefined {
   return undefined;
 }
 
-function rowToImport(obj: Record<string, unknown>): ImportRow {
+// Weight (oz) is the header the earlier TroyStack web export wrote.
+function rowToImport(obj: Record<string, unknown>, { date1904 = false } = {}): ImportRow {
   const n: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) n[normalizeHeader(k)] = v;
   return {
     description: firstString(n.product, n.description, n.name, n.item, n.type),
     metal: toMetal(n.metal),
-    weight: toNumber(n.ozperpiece ?? n.weight ?? n.ozt ?? n.oz ?? n.troyoz),
+    weight: toNumber(n.ozperpiece ?? n.weight ?? n.weightoz ?? n.weightozt ?? n.ozt ?? n.oz ?? n.troyoz),
     quantity: toNumber(n.quantity ?? n.qty) ?? 1,
     purchasePrice: toNumber(n.priceperpiece ?? n.purchaseprice ?? n.unitprice ?? n.price ?? n.cost),
-    purchaseDate: toDate(n.purchasedate ?? n.date),
+    purchaseDate: toDate(n.purchasedate ?? n.date, date1904),
     dealer: firstString(n.dealer, n.source, n.seller),
     taxes: toNumber(n.taxes ?? n.tax),
     shipping: toNumber(n.shipping),
@@ -123,7 +142,8 @@ export async function parseSpreadsheet(file: File): Promise<ImportRow[]> {
   const XLSX = await import('xlsx');
   const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
   const sheet = wb.Sheets[wb.SheetNames[0]];
-  return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' }).map(rowToImport);
+  const date1904 = Boolean(wb.Workbook?.WBProps?.date1904);
+  return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' }).map((row) => rowToImport(row, { date1904 }));
 }
 
 export { parseCSV as parseCsvText };

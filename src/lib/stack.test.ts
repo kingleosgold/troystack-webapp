@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildNotes, parseNotes } from './holdingNotes';
 import { lineCostBasis, premiumPerPiece, stackTotals, valueAt } from './stackMath';
-import { parseCsvText } from './parseSpreadsheet';
+import * as XLSX from 'xlsx';
+import { excelSerialDate, parseCsvText, parseSpreadsheet } from './parseSpreadsheet';
 import { holdingsToCSV } from '../services/holdings';
 import type { Holding } from '../types/holding';
 
@@ -102,7 +103,7 @@ describe('spreadsheet import', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({ description: 'Maple Leaf, 2024', metal: 'gold', weight: 1, quantity: 2, purchasePrice: 4050, purchaseDate: '2026-03-01', dealer: 'APMEX', shipping: 12 });
     expect(rows[1]).toMatchObject({ metal: 'silver', weight: 0.0723, quantity: 50, purchasePrice: 3.1 });
-    expect(rows[1].purchaseDate).toMatch(/^2026-03-0[34]$/);
+    expect(rows[1].purchaseDate).toBe('2026-03-04');
   });
 
   it('defaults quantity to one and leaves unknown metals unset', () => {
@@ -133,6 +134,32 @@ describe('spreadsheet import', () => {
     expect(rows[1]).toMatchObject({ description: '1 g bar', metal: 'gold', weight: 0.03215, quantity: 3, purchasePrice: 140 });
     expect(rows[1].note).toBeUndefined();
     expect(rows[1].purchaseDate).toBeUndefined();
+  });
+
+  it('reads the earlier web export, Weight (oz) header and all', () => {
+    const rows = parseCsvText(
+      'Metal,Type,Weight (oz),Quantity,Total Oz,Purchase Price,Purchase Date,Notes,Created At\n' +
+        '"silver","American Silver Eagle","1.0000","20","20.0000","35.50","2025-06-01","Tube from the show","2025-06-02T10:00:00.000Z"\n',
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ description: 'American Silver Eagle', metal: 'silver', weight: 1, quantity: 20, purchasePrice: 35.5, purchaseDate: '2025-06-01', note: 'Tube from the show' });
+  });
+
+  it('turns Excel date cells into dates, in either date system', async () => {
+    const book = (serial: number, date1904: boolean) => {
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Product', 'Metal', 'Oz', 'Purchase Date'], ['Gold Eagle', 'gold', 1, serial]]), 'Stack');
+      if (date1904) wb.Workbook = { WBProps: { date1904: true } };
+      return new File([XLSX.write(wb, { type: 'array', bookType: 'xlsx' })], 'stack.xlsx');
+    };
+    expect((await parseSpreadsheet(book(45200, false)))[0]).toMatchObject({ description: 'Gold Eagle', weight: 1, purchaseDate: '2023-10-01' });
+    expect((await parseSpreadsheet(book(43738, true)))[0].purchaseDate).toBe('2023-10-01');
+  });
+
+  it('keeps only Excel serials that make a believable purchase date', () => {
+    expect(excelSerialDate(45200.75)).toBe('2023-10-01');
+    expect(excelSerialDate(2024)).toBeUndefined();
+    expect(excelSerialDate(Number.NaN)).toBeUndefined();
   });
 
   it('handles Windows line endings, a byte order mark and quotes inside a cell', () => {
