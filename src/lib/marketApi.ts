@@ -89,7 +89,8 @@ export async function fetchHistory(range: HistoryRange, maxPoints = 240, signal?
       palladium: Number(p.palladium) || 0,
     }))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  return withoutFilledStart(points);
+  // Only the long ranges reach back past the first platinum and palladium prices.
+  return range === '5Y' || range === 'ALL' ? withoutFilledStart(points) : points;
 }
 
 export interface VaultRow {
