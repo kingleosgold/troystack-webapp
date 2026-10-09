@@ -30,9 +30,12 @@ export function webCheckoutReady(plan: WebPlan = 'yearly'): boolean {
 }
 
 // Signing in with Google or Apple leaves the site and comes back to the home
-// page, so the plan someone picked waits here, for half an hour at most.
+// page, so the plan someone picked waits here, for half an hour at most, with
+// the surface it was picked on.
 const INTENT_KEY = 'stg_checkout_redirect';
-const CAMPAIGN_KEY = 'stg_checkout_campaign';
+// Where an earlier build of this site kept the campaign. Cleared with the plan.
+const OLD_CAMPAIGN_KEY = 'stg_checkout_campaign';
+const INTENT_TTL_MS = 30 * 60 * 1000;
 
 /**
  * Where a checkout started, stored on the Stripe session. A surface of this
@@ -44,13 +47,39 @@ export type CheckoutCampaign = Campaign | `site-${string}`;
 export function siteCampaign(value: string | null | undefined): CheckoutCampaign | undefined {
   return typeof value === 'string' && /^site-[a-z0-9-]{1,35}$/.test(value) ? (value as CheckoutCampaign) : undefined;
 }
-const INTENT_TTL_MS = 30 * 60 * 1000;
 
+interface StoredIntent {
+  plan: WebPlan;
+  at: number;
+  campaign?: CheckoutCampaign;
+}
+
+function readIntent(now: number): StoredIntent | null {
+  const raw = localStorage.getItem(INTENT_KEY);
+  // A bare plan name is from the old site, which never cleared it after a
+  // Google or Apple sign-in. Those are stale, so only timed entries count.
+  if (!raw || !raw.startsWith('{')) return null;
+  const parsed = JSON.parse(raw) as { plan?: unknown; at?: unknown; campaign?: unknown };
+  const at = typeof parsed.at === 'number' ? parsed.at : 0;
+  if (!isWebPlan(parsed.plan) || now - at > INTENT_TTL_MS || at > now + 60_000) return null;
+  const campaign = typeof parsed.campaign === 'string' && parsed.campaign ? (parsed.campaign as CheckoutCampaign) : undefined;
+  return { plan: parsed.plan, at, campaign };
+}
+
+/**
+ * Keeps the plan picked before signing in. The sign-in link may not repeat
+ * the campaign, so a campaign already kept for the same plan stays with it.
+ */
 export function rememberCheckout(plan: WebPlan, campaign?: CheckoutCampaign, now = Date.now()): void {
   try {
-    localStorage.setItem(INTENT_KEY, JSON.stringify({ plan, at: now }));
-    if (campaign) localStorage.setItem(CAMPAIGN_KEY, campaign);
-    else localStorage.removeItem(CAMPAIGN_KEY);
+    let kept = campaign;
+    if (!kept) {
+      const existing = readIntent(now);
+      if (existing?.plan === plan) kept = existing.campaign;
+    }
+    const intent: StoredIntent = kept ? { plan, at: now, campaign: kept } : { plan, at: now };
+    localStorage.setItem(INTENT_KEY, JSON.stringify(intent));
+    localStorage.removeItem(OLD_CAMPAIGN_KEY);
   } catch {
     // storage blocked; they can pick the plan again after signing in
   }
@@ -59,7 +88,7 @@ export function rememberCheckout(plan: WebPlan, campaign?: CheckoutCampaign, now
 export function forgetCheckout(): void {
   try {
     localStorage.removeItem(INTENT_KEY);
-    localStorage.removeItem(CAMPAIGN_KEY);
+    localStorage.removeItem(OLD_CAMPAIGN_KEY);
   } catch {
     // nothing to clear
   }
@@ -68,27 +97,18 @@ export function forgetCheckout(): void {
 /** The plan picked before signing in, if it was picked in the last half hour. Reading it clears it. */
 export function takeCheckoutIntent(now = Date.now()): { plan: WebPlan; campaign?: CheckoutCampaign } | null {
   try {
-    const raw = localStorage.getItem(INTENT_KEY);
-    const campaign = localStorage.getItem(CAMPAIGN_KEY) || undefined;
+    const intent = readIntent(now);
     forgetCheckout();
-    if (!raw) return null;
-    // A bare plan name is from the old site, which never cleared it after a
-    // Google or Apple sign-in. Those are stale, so only timed entries count.
-    let plan: unknown = raw;
-    let at = 0;
-    if (raw.startsWith('{')) {
-      const parsed = JSON.parse(raw) as { plan?: unknown; at?: unknown };
-      plan = parsed.plan;
-      at = typeof parsed.at === 'number' ? parsed.at : 0;
-    }
-    if (!isWebPlan(plan) || now - at > INTENT_TTL_MS || at > now + 60_000) return null;
-    return { plan, campaign: campaign as CheckoutCampaign | undefined };
+    if (!intent) return null;
+    return intent.campaign ? { plan: intent.plan, campaign: intent.campaign } : { plan: intent.plan };
   } catch {
+    forgetCheckout();
     return null;
   }
 }
 
-// Where to land after signing in. Only paths on this site count.
+// Where to land after signing in, for half an hour at most. Only paths on
+// this site count.
 const NEXT_KEY = 'stg_auth_next';
 
 export function safeNextPath(next: string | null | undefined): string | null {
@@ -96,20 +116,32 @@ export function safeNextPath(next: string | null | undefined): string | null {
   return next;
 }
 
-export function rememberNextPath(next: string | null | undefined): void {
+export function rememberNextPath(next: string | null | undefined, now = Date.now()): void {
   const safe = safeNextPath(next);
   try {
-    if (safe) localStorage.setItem(NEXT_KEY, safe);
+    if (safe) localStorage.setItem(NEXT_KEY, JSON.stringify({ path: safe, at: now }));
   } catch {
     // fine, they land on the home page
   }
 }
 
-export function takeNextPath(): string | null {
+export function forgetNextPath(): void {
   try {
-    const next = localStorage.getItem(NEXT_KEY);
     localStorage.removeItem(NEXT_KEY);
-    return safeNextPath(next);
+  } catch {
+    // nothing to clear
+  }
+}
+
+export function takeNextPath(now = Date.now()): string | null {
+  try {
+    const raw = localStorage.getItem(NEXT_KEY);
+    localStorage.removeItem(NEXT_KEY);
+    if (!raw || !raw.startsWith('{')) return null;
+    const parsed = JSON.parse(raw) as { path?: unknown; at?: unknown };
+    const at = typeof parsed.at === 'number' ? parsed.at : 0;
+    if (now - at > INTENT_TTL_MS || at > now + 60_000) return null;
+    return safeNextPath(typeof parsed.path === 'string' ? parsed.path : null);
   } catch {
     return null;
   }

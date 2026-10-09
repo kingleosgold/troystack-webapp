@@ -85,6 +85,27 @@ describe('sign-in hand-offs', () => {
     expect(takeCheckoutIntent(now + 60_000)).toEqual({ plan: 'monthly', campaign: 'site-pricing' });
   });
 
+  it('keeps the campaign when the sign-in link repeats the plan without one', () => {
+    const now = Date.parse('2026-10-08T20:00:00Z');
+    rememberCheckout('yearly', 'webapp-troy-limit', now);
+    rememberCheckout('yearly', undefined, now + 1000);
+    expect(takeCheckoutIntent(now + 2000)).toEqual({ plan: 'yearly', campaign: 'webapp-troy-limit' });
+
+    rememberCheckout('yearly', 'webapp-troy-limit', now);
+    rememberCheckout('monthly', undefined, now + 1000);
+    expect(takeCheckoutIntent(now + 2000)).toEqual({ plan: 'monthly' });
+  });
+
+  it('forgets a return path after half an hour, and one saved without a time', () => {
+    const now = Date.parse('2026-10-08T20:00:00Z');
+    rememberNextPath('/troy', now);
+    expect(takeNextPath(now + 31 * 60_000)).toBeNull();
+    rememberNextPath('/troy', now);
+    expect(takeNextPath(now + 60_000)).toBe('/troy');
+    localStorage.setItem('stg_auth_next', '/troy');
+    expect(takeNextPath(now)).toBeNull();
+  });
+
   it('ignores the bare plan names the old site left behind', () => {
     localStorage.setItem('stg_checkout_redirect', 'monthly');
     expect(takeCheckoutIntent()).toBeNull();
