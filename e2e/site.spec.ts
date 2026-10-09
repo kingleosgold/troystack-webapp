@@ -42,6 +42,15 @@ const PAGES: Array<[string, string | RegExp]> = [
   ['/nope', /That page isn't here/],
 ];
 
+
+/** Client-side navigation, the way a link inside the app moves, so cached data stays. */
+async function goInApp(page: Page, path: string) {
+  await page.evaluate((to) => {
+    window.history.pushState({}, '', to);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, path);
+}
+
 test.describe('every page', () => {
   for (const [path, heading] of PAGES) {
     test(`renders ${path}`, async ({ page }) => {
@@ -143,6 +152,63 @@ test.describe('stack', () => {
     await shot(page, 'stack-guest');
   });
 
+  test("clearing a visitor's stack empties it on every page", async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/stack?add=1');
+    const dialog = page.getByRole('dialog', { name: 'Add a holding' });
+    await dialog.getByLabel('Product').fill('American Silver Eagle');
+    await dialog.getByRole('button', { name: 'Add to stack' }).click();
+    await expect(dialog).toBeHidden();
+    // Moving inside the app keeps the cached stack, which is what has to go.
+    await goInApp(page, '/settings');
+    await expect(page.getByText('1 holding, as CSV')).toBeVisible();
+    await page.getByText("Clear this browser's stack").click();
+    await page.getByRole('dialog', { name: "Clear this browser's stack?" }).getByRole('button', { name: 'Clear' }).click();
+    await expect(page.getByText('Nothing to download yet')).toBeVisible();
+    await goInApp(page, '/stack');
+    await expect(page.getByText('American Silver Eagle')).toHaveCount(0);
+  });
+
+  test('clearing the purchase date drops the spot looked up for it', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/stack?add=1');
+    const dialog = page.getByRole('dialog', { name: 'Add a holding' });
+    await dialog.getByLabel('Product').fill('American Silver Eagle');
+    await dialog.getByLabel('Price per piece').fill('50');
+    await expect(dialog.getByText(/spot that day was \$47\.20/)).toBeVisible();
+    await dialog.getByLabel('Purchase date').fill('');
+    await expect(dialog.getByText(/spot that day was/)).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Add to stack' }).click();
+    await expect(dialog).toBeHidden();
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('stacktracker_holdings') || '[]'));
+    expect(saved).toHaveLength(1);
+    expect(saved[0].purchaseDate).toBe('');
+    expect(saved[0].spotAtPurchase).toBeUndefined();
+    expect(saved[0].premium).toBeUndefined();
+  });
+
+  test('a spreadsheet import that fails adds nothing, and trying again adds each row once', async ({ page }) => {
+    await signIn(page);
+    const mock = await mockBackends(page, { failInserts: 1 });
+    await page.goto('/stack');
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'my-stack.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('Product,Metal,Oz per piece,Quantity,Price per piece,Note\nAmerican Silver Eagle,silver,1,20,38,"Tube one,\nfrom the show"\nGold Maple Leaf,gold,1,1,4050,\n'),
+    });
+    const sheet = page.getByRole('dialog', { name: 'Add from my-stack.csv' });
+    await sheet.getByRole('button', { name: 'Add 2 to my stack' }).click();
+    await expect(sheet.getByText("That didn't save, so nothing was added. Try again.")).toBeVisible();
+    await sheet.getByRole('button', { name: 'Add 2 to my stack' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(page.getByText('Gold Maple Leaf').first()).toBeVisible();
+    // One insert per attempt, each carrying both rows, so the retry can't double anything.
+    expect(mock.inserts).toHaveLength(2);
+    for (const body of mock.inserts) expect(Array.isArray(body) ? body.length : 0).toBe(2);
+    const eagle = (mock.inserts[1] as Array<{ type: string; notes: string }>).find((r) => r.type === 'American Silver Eagle');
+    expect(JSON.parse(eagle!.notes).note).toBe('Tube one,\nfrom the show');
+  });
+
   test('signed in, it shows the same rows the app saved', async ({ page }) => {
     await signIn(page);
     await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
@@ -153,6 +219,15 @@ test.describe('stack', () => {
     await expect(page.getByText('$7,795.20').filter({ visible: true }).first()).toBeVisible();
     await shot(page, 'stack-signed-in');
   });
+});
+
+test('back from checkout, Gold shows right away', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page);
+  await page.goto('/settings?session_id=cs_test_e2e');
+  await expect(page.getByText(/Gold is on/)).toBeVisible();
+  await expect(page.getByText('Gold, free week')).toBeVisible();
+  await expect(page).not.toHaveURL(/session_id/);
 });
 
 test('signed-in free accounts see their three newest chats', async ({ page }) => {

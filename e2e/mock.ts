@@ -20,6 +20,8 @@ export interface MockOptions {
   conversations?: number;
   holdings?: Array<Record<string, unknown>>;
   tier?: 'free' | 'gold';
+  /** How many holdings inserts fail before they start working. */
+  failInserts?: number;
 }
 
 function fulfillJson(route: Route, body: unknown, status = 200) {
@@ -31,6 +33,11 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   const quota = opts.visitorQuota === undefined ? { questionsUsed: 0, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' } : opts.visitorQuota;
   let asked = quota?.questionsUsed ?? 0;
   const calls: string[] = [];
+  /** The body of every holdings insert, in order. */
+  const inserts: unknown[] = [];
+  let failures = opts.failInserts ?? 0;
+  // The profile row. Verifying a checkout turns it to Gold, as the real route does.
+  let profile: Record<string, unknown> = { subscription_tier: opts.tier ?? 'free', subscription_status: null, trial_end: null };
 
   await page.route('https://api.troystack.ai/**', async (route) => {
     const req = route.request();
@@ -92,7 +99,11 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, { id: p.split('/').pop(), title: 'Silver ratio', created_at: '', updated_at: '', messages: [] });
     }
     if (p === '/v1/snapshots' || p.startsWith('/v1/snapshots/')) return fulfillJson(route, { success: true, snapshots: [] });
-    if (p === '/v1/sync-subscription') return fulfillJson(route, { user_id: USER_ID, subscription_tier: opts.tier ?? 'free', subscription_status: null });
+    if (p === '/v1/sync-subscription') return fulfillJson(route, { user_id: USER_ID, subscription_tier: profile.subscription_tier, subscription_status: profile.subscription_status });
+    if (p === '/v1/stripe/verify-session') {
+      profile = { subscription_tier: 'gold', subscription_status: 'trialing', trial_end: new Date(Date.now() + 7 * 86400000).toISOString() };
+      return fulfillJson(route, { success: true, tier: 'gold' });
+    }
     if (p === '/v1/scan-status') return fulfillJson(route, { scansUsed: 0, scansLimit: 5, resetsAt: '2026-11-01T00:00:00Z' });
     if (p === '/v1/stripe/create-checkout-session') return fulfillJson(route, { url: 'https://checkout.stripe.com/c/pay/e2e' });
 
@@ -103,12 +114,18 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     const req = route.request();
     const url = new URL(req.url());
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
-    if (url.pathname.startsWith('/rest/v1/profiles')) {
-      return fulfillJson(route, { subscription_tier: opts.tier ?? 'free', subscription_status: null, trial_end: null });
-    }
+    if (url.pathname.startsWith('/rest/v1/profiles')) return fulfillJson(route, profile);
     if (url.pathname.startsWith('/rest/v1/holdings')) {
       if (req.method() === 'GET') return fulfillJson(route, opts.holdings ?? []);
-      return fulfillJson(route, [], 201);
+      if (req.method() === 'POST') {
+        inserts.push(req.postDataJSON());
+        if (failures > 0) {
+          failures -= 1;
+          return fulfillJson(route, { code: '57014', message: 'canceling statement due to statement timeout' }, 500);
+        }
+        return fulfillJson(route, [], 201);
+      }
+      return fulfillJson(route, [], 200);
     }
     if (url.pathname.startsWith('/auth/v1/user')) return fulfillJson(route, sessionUser());
     return fulfillJson(route, {});
@@ -117,7 +134,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   // Anything else outside the site (images, Stripe, Apple) stays offline.
   await page.route(/^https:\/\/(?!api\.troystack\.ai|e2e\.supabase\.co)/, (route) => route.abort());
 
-  return { calls };
+  return { calls, inserts };
 }
 
 function sessionUser() {
