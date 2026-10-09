@@ -21,17 +21,21 @@ interface Props {
   rows: ImportRow[];
   source: string;
   onClose: () => void;
-  onConfirm: (rows: ImportRow[]) => Promise<void>;
+  /** `batchId` stays the same for every try from this sheet, so a retry can't add rows twice. */
+  onConfirm: (rows: ImportRow[], batchId: string) => Promise<void>;
 }
 
+// The account keeps whole pieces, the same as the app.
 function usable(r: ImportRow): boolean {
-  return Boolean(r.metal && r.weight && r.weight > 0);
+  const countOk = r.quantity == null || (Number.isInteger(r.quantity) && r.quantity > 0);
+  return Boolean(r.metal && r.weight && r.weight > 0 && countOk);
 }
 
 /** Review rows from a receipt scan or a spreadsheet before they join the stack. */
 export function ImportSheet({ rows, source, onClose, onConfirm }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [batchId] = useState(() => crypto.randomUUID());
   const good = rows.filter(usable);
   const skipped = rows.length - good.length;
 
@@ -39,7 +43,7 @@ export function ImportSheet({ rows, source, onClose, onConfirm }: Props) {
     <Sheet open onClose={onClose} title={`Add from ${source}`} width="lg">
       <p className="text-[14px] text-fg-2">
         {good.length} {good.length === 1 ? 'item' : 'items'} ready to add.
-        {skipped > 0 && ` ${skipped} ${skipped === 1 ? 'row is' : 'rows are'} missing a metal or weight and will be skipped.`}
+        {skipped > 0 && ` ${skipped} ${skipped === 1 ? "row is missing a metal or weight, or its count isn't a whole number, so it" : "rows are missing a metal or weight, or their count isn't a whole number, so they"} will be skipped.`}
       </p>
       <div className="mt-3 max-h-[50vh] overflow-auto rounded-xl border border-line">
         <table className="w-full text-[13px]">
@@ -74,7 +78,7 @@ export function ImportSheet({ rows, source, onClose, onConfirm }: Props) {
             setBusy(true);
             setError(null);
             try {
-              await onConfirm(good);
+              await onConfirm(good, batchId);
               onClose();
             } catch (e) {
               setError(e instanceof Error ? e.message : "That didn't save, so nothing was added. Try again.");

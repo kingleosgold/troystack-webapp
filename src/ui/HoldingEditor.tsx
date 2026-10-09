@@ -104,7 +104,7 @@ export function HoldingEditor({ open, onClose, holding, onSave, onDelete }: Prop
     const quantity = num(f.quantity);
     const purchasePrice = f.purchasePrice.trim() ? num(f.purchasePrice) : 0;
     if (!(weight > 0)) return setError('Enter the weight of one piece.');
-    if (!(quantity > 0)) return setError('Enter how many you have.');
+    if (!(quantity > 0) || !Number.isInteger(quantity)) return setError('Enter how many pieces you have, as a whole number.');
     if (!(purchasePrice >= 0)) return setError('Enter the price you paid per piece, or leave it blank.');
     if (f.purchaseDate && f.purchaseDate > todayISO()) return setError("The purchase date can't be in the future.");
     const form: HoldingFormData = {
@@ -171,7 +171,7 @@ export function HoldingEditor({ open, onClose, holding, onSave, onDelete }: Prop
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Quantity" htmlFor="h-qty">
-            <Input id="h-qty" inputMode="decimal" value={f.quantity} onChange={(e) => set('quantity', e.target.value)} />
+            <Input id="h-qty" inputMode="numeric" value={f.quantity} onChange={(e) => set('quantity', e.target.value)} />
           </Field>
           <Field label="Price per piece" htmlFor="h-price">
             <Input id="h-price" inputMode="decimal" placeholder="$0.00" value={f.purchasePrice} onChange={(e) => set('purchasePrice', e.target.value)} />
