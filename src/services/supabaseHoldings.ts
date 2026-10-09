@@ -187,7 +187,11 @@ export async function addSupabaseHoldings(forms: HoldingFormData[], userId: stri
   return rows.map(fromRow);
 }
 
-export type HoldingUpdates = ReturnType<typeof toColumns> & { updated_at: string };
+/**
+ * The columns an edit sets. `notes` is left out by an edit that shouldn't
+ * touch them, as one the old site queued with no note of its own.
+ */
+export type HoldingUpdates = Omit<ReturnType<typeof toColumns>, 'notes'> & { notes?: string; updated_at: string };
 
 /**
  * The columns an edit changes, the row's other notes keys kept. The app's
@@ -210,7 +214,7 @@ export function holdingUpdates(existing: Holding, form: HoldingFormData): Holdin
 
 /** The holding as it reads once an edit is saved, for showing before it is. */
 export function holdingAfter(existing: Holding, updates: HoldingUpdates, userId: string): Holding {
-  return fromRow({ id: existing.id, user_id: userId, created_at: existing.createdAt, ...updates });
+  return fromRow({ id: existing.id, user_id: userId, created_at: existing.createdAt, notes: null, ...updates });
 }
 
 export async function applyHoldingUpdates(id: string, updates: HoldingUpdates, userId: string): Promise<Holding> {

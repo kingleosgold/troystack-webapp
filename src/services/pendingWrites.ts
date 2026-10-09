@@ -127,9 +127,10 @@ interface LegacyAction {
 }
 
 /**
- * The old site's form, read the way the new one reads a row. Its free-text
- * notes may be the app's JSON, which it showed as text and sent back as it
- * was, so the keys in it are kept.
+ * The old site's form, read the way the new one reads a row. The old site hid
+ * notes that held the app's JSON, so its form carries at most a note someone
+ * typed, and none of the app's keys. An edit with no note leaves the row's
+ * notes alone (see adoptLegacyPending).
  */
 function legacyForm(data: unknown): { form: HoldingFormData; meta: Record<string, unknown> } | null {
   if (!data || typeof data !== 'object') return null;
@@ -233,8 +234,12 @@ export function adoptLegacyPending(userId: string, store: Store | null = default
       }
       const f = legacyForm(a.data);
       if (!f) return;
-      const updates: HoldingUpdates = { ...toColumns(f.form, f.meta), updated_at: when };
-      out.push({ wid, kind: 'update', id: target, updates, holding: fromRow({ id: target, user_id: userId, created_at: null, ...updates }) });
+      // An edit with no note of its own leaves the notes column out, so the
+      // app's keys there (its id for the row, the dealer, cost basis and the
+      // rest) stay as they are.
+      const { notes, ...columns } = toColumns(f.form, f.meta);
+      const updates: HoldingUpdates = f.form.note ? { ...columns, notes, updated_at: when } : { ...columns, updated_at: when };
+      out.push({ wid, kind: 'update', id: target, updates, holding: fromRow({ id: target, user_id: userId, created_at: null, notes: null, ...updates }) });
     } else if ((a.type === 'update' || a.type === 'delete') && addForCopy.has(target)) {
       const at2 = addForCopy.get(target)!;
       const add = out[at2];
@@ -288,7 +293,24 @@ export function withPending(remote: Holding[], pending: PendingWrite[]): Holding
       if (!list.some((h) => h.id === w.row.id)) list = [fromRow(w.row), ...list];
     } else if (w.kind === 'update') {
       // The holding keeps the date it was added, which an edit doesn't change.
-      list = list.map((h) => (h.id === w.id ? { ...w.holding, createdAt: h.createdAt } : h));
+      // An edit that leaves the notes column alone keeps what's read from it.
+      list = list.map((h) => {
+        if (h.id !== w.id) return h;
+        const next: Holding = { ...w.holding, createdAt: h.createdAt };
+        if (w.updates.notes !== undefined) return next;
+        return {
+          ...next,
+          dealer: h.dealer,
+          taxes: h.taxes,
+          shipping: h.shipping,
+          spotAtPurchase: h.spotAtPurchase,
+          premium: h.premium,
+          costBasisOverride: h.costBasisOverride,
+          timePurchased: h.timePurchased,
+          note: h.note,
+          notesMeta: h.notesMeta,
+        };
+      });
     } else {
       list = list.filter((h) => h.id !== w.id);
     }

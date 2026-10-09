@@ -206,13 +206,37 @@ describe('changes the old site left in the browser', () => {
     expect(left.map((h) => h.type), "the guest's own holding stays to be offered").toEqual(['Added as a guest']);
   });
 
-  it("keep the app's notes keys the old site showed as text and sent back", () => {
+  // The old site hid notes holding the app's JSON, so an edit it queued
+  // carries at most a typed note and never the app's keys.
+  it("leave the row's notes alone for an edit with no note of its own", () => {
     const store = memoryStore();
-    store.setItem(LEGACY, JSON.stringify([{ id: 'c1', type: 'update', holdingId: U1, data: oldForm({ notes: '{"local_id":1700000000001,"source":"APMEX","shipping":9.95}' }), timestamp: T }]));
+    store.setItem(LEGACY, JSON.stringify([{ id: 'c1', type: 'update', holdingId: U1, data: oldForm({ notes: '' }), timestamp: T }]));
     adoptLegacyPending(USER, store);
     const [edit] = readPending(USER, store) as Array<PendingWrite & { kind: 'update' }>;
-    expect(JSON.parse(edit.updates.notes)).toMatchObject({ local_id: 1700000000001, source: 'APMEX', shipping: 9.95 });
-    expect(edit.holding.dealer).toBe('APMEX');
+    expect('notes' in edit.updates, 'the update would replace the app keys in the column').toBe(false);
+    expect(edit.updates.purchase_price).toBe(38);
+  });
+
+  it('send a note typed on the old site', () => {
+    const store = memoryStore();
+    store.setItem(LEGACY, JSON.stringify([{ id: 'c2', type: 'update', holdingId: U1, data: oldForm({ notes: 'Tube of 20 from the show' }), timestamp: T }]));
+    adoptLegacyPending(USER, store);
+    const [edit] = readPending(USER, store) as Array<PendingWrite & { kind: 'update' }>;
+    expect(JSON.parse(String(edit.updates.notes)).note).toBe('Tube of 20 from the show');
+  });
+
+  it("keep what the row's notes hold while an edit that leaves them alone waits", () => {
+    const existing = fromRow({
+      ...newHoldingRow(FORM, USER),
+      notes: JSON.stringify({ local_id: 1700000000001, source: 'APMEX', taxes: 3.5, shipping: 9.95, spot_price: 31.2, premium: 4.5, cost_basis: 500, time_purchased: '10:15', note: 'Tube of 20' }),
+    });
+    const store = memoryStore();
+    store.setItem(LEGACY, JSON.stringify([{ id: 'c3', type: 'update', holdingId: existing.id, data: oldForm({ quantity: 25, notes: '' }), timestamp: T }]));
+    adoptLegacyPending(USER, store);
+    const [shown] = withPending([existing], readPending(USER, store));
+    expect(shown.quantity).toBe(25);
+    expect(shown).toMatchObject({ dealer: 'APMEX', taxes: 3.5, shipping: 9.95, spotAtPurchase: 31.2, premium: 4.5, costBasisOverride: 500, timePurchased: '10:15', note: 'Tube of 20' });
+    expect(shown.notesMeta?.local_id).toBe(1700000000001);
   });
 
   it('move nothing twice, even if the old list comes back', () => {
@@ -277,9 +301,9 @@ describe('edits and ids', () => {
   });
 
   it("drop the app's cost-basis override once the cost of the line changes", () => {
-    const kept = JSON.parse(holdingUpdates(existing, { ...FORM, quantity: 10, note: 'Second tube' }).notes);
+    const kept = JSON.parse(String(holdingUpdates(existing, { ...FORM, quantity: 10, note: 'Second tube' }).notes));
     expect(kept.cost_basis, 'only the note changed').toBe(500);
-    const changed = JSON.parse(holdingUpdates(existing, { ...FORM, quantity: 20 }).notes);
+    const changed = JSON.parse(String(holdingUpdates(existing, { ...FORM, quantity: 20 }).notes));
     expect(changed.cost_basis).toBeUndefined();
     expect(changed.local_id, 'the app keeps tracking the row').toBe(1700000000001);
   });
