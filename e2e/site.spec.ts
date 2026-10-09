@@ -282,6 +282,26 @@ test('back from checkout, Gold shows right away', async ({ page }) => {
   await expect(page).not.toHaveURL(/session_id/);
 });
 
+test("a page saved before checkout doesn't take over the return from Stripe", async ({ page }) => {
+  await signIn(page);
+  await page.addInitScript(() => localStorage.setItem('stg_auth_next', JSON.stringify({ path: '/troy', at: Date.now() })));
+  await mockBackends(page);
+  await page.goto('/settings?session_id=cs_test_e2e');
+  await expect(page.getByText(/Gold is on/)).toBeVisible();
+  await expect(page).toHaveURL(/\/settings$/);
+});
+
+test('a free account at its daily limit is told so, and no empty chat is left behind', async ({ page }) => {
+  await signIn(page);
+  const mock = await mockBackends(page, { chatLimitReached: true });
+  await page.goto('/troy');
+  await page.getByRole('textbox').fill('What moved silver today?');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(page.getByText(/That's today's 3 free questions/)).toBeVisible();
+  await expect.poll(() => mock.calls.filter((c) => c === 'DELETE /v1/troy/conversations/conv-new').length).toBe(1);
+  await expect(page).toHaveURL(/\/troy$/);
+});
+
 test('signed-in free accounts see their three newest chats', async ({ page }) => {
   await signIn(page);
   await mockBackends(page, { conversations: 5 });

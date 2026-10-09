@@ -22,6 +22,8 @@ export interface MockOptions {
   tier?: 'free' | 'gold';
   /** How many holdings inserts fail before they start working. */
   failInserts?: number;
+  /** A signed-in free account that has used today's questions. */
+  chatLimitReached?: boolean;
 }
 
 function fulfillJson(route: Route, body: unknown, status = 200) {
@@ -92,6 +94,9 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, { id: 'conv-new', title: 'New chat', created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     }
     if (/^\/v1\/troy\/conversations\/[^/]+\/messages$/.test(p)) {
+      if (opts.chatLimitReached) {
+        return fulfillJson(route, { error: 'Daily question limit reached', questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' }, 403);
+      }
       return fulfillJson(route, {
         message: { id: 'm-reply', role: 'assistant', content: 'Your stack is worth **$6,024** at spot, up **$84** today.', created_at: new Date().toISOString() },
         preview: null,
