@@ -19,7 +19,7 @@ export interface MockOptions {
   visitorQuota?: { questionsUsed: number; questionsLimit: number; resetsAt: string } | null;
   conversations?: number;
   holdings?: Array<Record<string, unknown>>;
-  tier?: 'free' | 'gold';
+  tier?: 'free' | 'gold' | 'lifetime';
   /** How many holdings inserts fail before they start working. */
   failInserts?: number;
   /** A signed-in free account that has used today's questions. */
@@ -32,6 +32,8 @@ export interface MockOptions {
   failSync?: boolean;
   /** The subscription status verify-session reports, 'active' for someone who had Gold before. */
   verifyStatus?: string;
+  /** Counting a receipt scan fails, as when the API is down. */
+  failScanCount?: boolean;
 }
 
 function fulfillJson(route: Route, body: unknown, status = 200) {
@@ -142,6 +144,13 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, opts.verifyStatus ? { success: true, tier: 'gold', status } : { success: true, tier: 'gold' });
     }
     if (p === '/v1/scan-status') return fulfillJson(route, { scansUsed: 0, scansLimit: 5, resetsAt: '2026-11-01T00:00:00Z' });
+    if (p === '/v1/increment-scan') {
+      if (opts.failScanCount) return fulfillJson(route, { error: 'Failed to increment scan count' }, 500);
+      return fulfillJson(route, { success: true, scansUsed: 1, scansLimit: 5, resetsAt: '2026-11-01T00:00:00Z' });
+    }
+    if (p === '/v1/scan-receipt') {
+      return fulfillJson(route, { success: true, data: { dealer: 'APMEX', purchaseDate: '2026-10-01', items: [{ description: '1 oz Silver Eagle', metal: 'silver', ozt: 1, quantity: 10, unitPrice: 62.5 }] } });
+    }
     if (p === '/v1/stripe/create-checkout-session') return fulfillJson(route, { url: 'https://checkout.stripe.com/c/pay/e2e' });
 
     return fulfillJson(route, { error: `No fixture for ${p}` }, 404);

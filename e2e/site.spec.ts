@@ -463,3 +463,35 @@ test('starting one copy of an episode stops the other copy on the page', async (
   await expect(page.getByRole('button', { name: /^Pause / })).toHaveCount(1);
   await expect(page.getByRole('button', { name: /^Play / })).toHaveCount(1);
 });
+
+// A tiny PNG, enough for the photo picker.
+const PHOTO = { name: 'receipt.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') };
+
+test('a free account\'s receipt scan is counted before it runs', async ({ page }) => {
+  await signIn(page);
+  const api = await mockBackends(page);
+  await page.goto('/troy');
+  await page.locator('input[type="file"][accept="image/*"]').setInputFiles(PHOTO);
+  await expect(page.getByText('1 oz Silver Eagle')).toBeVisible();
+  const count = api.calls.indexOf('POST /v1/increment-scan');
+  const scan = api.calls.indexOf('POST /v1/scan-receipt');
+  expect(count).toBeGreaterThanOrEqual(0);
+  expect(scan).toBeGreaterThan(count);
+});
+
+test("a receipt scan that can't be counted doesn't run", async ({ page }) => {
+  await signIn(page);
+  const api = await mockBackends(page, { failScanCount: true });
+  await page.goto('/troy');
+  await page.locator('input[type="file"][accept="image/*"]').setInputFiles(PHOTO);
+  await expect(page.getByText("Receipt scans aren't available right now. Try again in a moment.")).toBeVisible();
+  expect(api.calls).not.toContain('POST /v1/scan-receipt');
+});
+
+test('a lifetime account can still reach billing and receipts', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { tier: 'lifetime' });
+  await page.goto('/settings');
+  await expect(page.getByRole('button', { name: /Billing and receipts/ })).toBeVisible();
+  await expect(page.getByText('Change plan or cancel')).toHaveCount(0);
+});
