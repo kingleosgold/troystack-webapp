@@ -36,7 +36,10 @@ export default function CoinPage() {
       : { title: "That coin isn't here", noindex: true },
   );
   const spot = useSpotMap();
-  const [qty, setQty] = useState('1');
+  // The count belongs to this coin, so moving to another one starts at one.
+  const [count, setCount] = useState<{ slug?: string; qty: string }>({ slug, qty: '1' });
+  const qty = count.slug === slug ? count.qty : '1';
+  const setQty = (value: string) => setCount({ slug, qty: value });
 
   if (!coin) {
     return (
