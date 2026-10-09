@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
-    if (!error) {
+    try {
       // Clear app data on sign out (keep theme preference)
       localStorage.removeItem('stacktracker_holdings');
       localStorage.removeItem('stacktracker_pending_actions');
@@ -108,6 +108,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('stg_checkout_redirect');
       localStorage.removeItem('stg_checkout_campaign');
       localStorage.removeItem('stg_auth_next');
+      if (error) {
+        // The sign-out didn't reach the server, a dropped connection say, and
+        // the client keeps its session when that happens. This browser still
+        // signs out: the stored session goes and the page starts over, signed
+        // out. Other devices stay signed in until their session ends.
+        for (const key of Object.keys(localStorage)) {
+          if (/^sb-.+-auth-token/.test(key)) localStorage.removeItem(key);
+        }
+        window.location.assign('/');
+      }
+    } catch {
+      // storage blocked, nothing kept here to clear
     }
     return { error };
   };
