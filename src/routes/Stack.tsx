@@ -23,6 +23,7 @@ import { ImportSheet, type ImportRow } from '../ui/ImportSheet';
 import { GoldLock } from '../ui/GoldLock';
 import { AppStoreButton } from '../ui/AppStore';
 import { Button, Card, EmptyState, ErrorNote, PageHeader, Segmented, Skeleton } from '../ui/primitives';
+import { SpotNotice } from '../ui/SpotNotice';
 import type { ChartPoint } from '../ui/PriceChart';
 
 const PriceChart = lazy(() => import('../ui/PriceChart'));
@@ -69,6 +70,8 @@ function StackHistory({ userId }: { userId: string }) {
       <GoldLock title="Your stack's value history" reason="Your stack's value over time is part of Gold." campaign="webapp-stack" teaser={<div className="h-[220px] rounded-xl bg-surface-2" />}>
         {q.isLoading ? (
           <Skeleton className="h-[220px] w-full" />
+        ) : q.isError ? (
+          <ErrorNote onRetry={() => void q.refetch()}>Your stack's history didn't load.</ErrorNote>
         ) : points.length < 2 ? (
           <p className="py-10 text-center text-[14px] text-fg-3">Your history fills in a day at a time from when you start tracking.</p>
         ) : (
@@ -195,6 +198,10 @@ export default function Stack() {
   }, [holdings, filter, spot.prices]);
 
   const metalsHeld = METALS.filter((m) => totals.byMetal[m].count > 0);
+  // A metal with no live price would count at zero and read as a loss of
+  // everything paid for it, so totals wait until every metal held has one.
+  const valuesReady = Boolean(spot.data) && metalsHeld.every((m) => spot.priced(m));
+  const waiting = <span className="text-[14px] text-fg-3">Waiting for prices</span>;
 
   const onFile = async (file: File) => {
     setImportError(null);
@@ -282,6 +289,7 @@ export default function Stack() {
       )}
       {importError && <div className="mb-4"><ErrorNote>{importError}</ErrorNote></div>}
       {error && <div className="mb-4"><ErrorNote onRetry={() => refresh()}>Your stack didn't load.</ErrorNote></div>}
+      {!loading && <SpotNotice spot={spot} metals={metalsHeld} className="mb-4" />}
 
       {loading ? (
         <div className="grid gap-4 lg:grid-cols-3">
@@ -307,10 +315,14 @@ export default function Stack() {
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="p-5 sm:p-6 lg:col-span-2">
               <div className="text-[13px] text-fg-3">Total value</div>
-              <div className="mt-1 text-[36px] sm:text-[42px] font-semibold tracking-tight text-fg tnum leading-tight">{spot.data ? money(totals.value) : <Skeleton className="h-11 w-56" />}</div>
-              <div className={cx('mt-1 text-[14px] font-semibold tnum', dayTone)}>
-                {signedMoney(totals.dayChange)} ({signedPercent(totals.dayChangePct)}) today
+              <div className="mt-1 text-[36px] sm:text-[42px] font-semibold tracking-tight text-fg tnum leading-tight">
+                {valuesReady ? money(totals.value) : spot.isLoading ? <Skeleton className="h-11 w-56" /> : <span className="text-[20px] text-fg-3">Waiting for prices</span>}
               </div>
+              {valuesReady && (
+                <div className={cx('mt-1 text-[14px] font-semibold tnum', dayTone)}>
+                  {signedMoney(totals.dayChange)} ({signedPercent(totals.dayChangePct)}) today
+                </div>
+              )}
               <dl className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-line pt-4">
                 <div>
                   <dt className="text-[12px] text-fg-3">Paid</dt>
@@ -318,8 +330,14 @@ export default function Stack() {
                 </div>
                 <div>
                   <dt className="text-[12px] text-fg-3">Gain</dt>
-                  <dd className={cx('text-[16px] font-semibold tnum', gainTone)}>{signedMoney(totals.gain)}</dd>
-                  <dd className={cx('text-[12px] tnum', gainTone)}>{signedPercent(totals.gainPct)}</dd>
+                  {valuesReady ? (
+                    <>
+                      <dd className={cx('text-[16px] font-semibold tnum', gainTone)}>{signedMoney(totals.gain)}</dd>
+                      <dd className={cx('text-[12px] tnum', gainTone)}>{signedPercent(totals.gainPct)}</dd>
+                    </>
+                  ) : (
+                    <dd className="pt-0.5">{waiting}</dd>
+                  )}
                 </div>
                 <div>
                   <dt className="text-[12px] text-fg-3">Premiums paid</dt>
@@ -341,7 +359,7 @@ export default function Stack() {
             <Card className="p-5">
               <h2 className="text-[15px] font-semibold text-fg">By metal</h2>
               <div className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
-                {metalsHeld.map((m) => (
+                {valuesReady && metalsHeld.map((m) => (
                   <div key={m} style={{ width: `${totals.value > 0 ? (totals.byMetal[m].value / totals.value) * 100 : 0}%`, background: METAL_VAR[m] }} />
                 ))}
               </div>
@@ -358,8 +376,16 @@ export default function Stack() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-[14px] font-semibold text-fg tnum">{money(t.value)}</div>
-                        <div className={cx('text-[12px] tnum', t.gain > 0 ? 'text-up' : t.gain < 0 ? 'text-down' : 'text-fg-3')}>{signedPercent(t.gainPct, 1)}</div>
+                        {spot.priced(m) ? (
+                          <>
+                            <div className="text-[14px] font-semibold text-fg tnum">{money(t.value)}</div>
+                            <div className={cx('text-[12px] tnum', t.gain > 0 ? 'text-up' : t.gain < 0 ? 'text-down' : 'text-fg-3')}>{signedPercent(t.gainPct, 1)}</div>
+                          </>
+                        ) : spot.isLoading ? (
+                          <Skeleton className="h-4 w-16" />
+                        ) : (
+                          <div className="text-[13px] text-fg-3">No price</div>
+                        )}
                       </div>
                     </li>
                   );
@@ -393,8 +419,16 @@ export default function Stack() {
                         <span className="block text-[12px] text-fg-3 truncate tnum">{holdingDetail(h)}</span>
                       </span>
                       <span className="text-right shrink-0">
-                        <span className="block text-[14px] font-semibold text-fg tnum">{money(value)}</span>
-                        {cost > 0 && <span className={cx('block text-[12px] tnum', gain > 0 ? 'text-up' : gain < 0 ? 'text-down' : 'text-fg-3')}>{signedMoney(gain)}</span>}
+                        {spot.priced(h.metal) ? (
+                          <>
+                            <span className="block text-[14px] font-semibold text-fg tnum">{money(value)}</span>
+                            {cost > 0 && <span className={cx('block text-[12px] tnum', gain > 0 ? 'text-up' : gain < 0 ? 'text-down' : 'text-fg-3')}>{signedMoney(gain)}</span>}
+                          </>
+                        ) : spot.isLoading ? (
+                          <Skeleton className="h-4 w-16" />
+                        ) : (
+                          <span className="block text-[13px] text-fg-3">No price</span>
+                        )}
                       </span>
                     </button>
                   </li>

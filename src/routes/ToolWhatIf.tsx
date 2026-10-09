@@ -10,6 +10,7 @@ import { money, num, signedMoney, signedPercent } from '../lib/format';
 import type { Metal } from '../types/holding';
 import { cx } from '../lib/cx';
 import { Card, Field, Input, PageHeader } from '../ui/primitives';
+import { SpotNotice } from '../ui/SpotNotice';
 import { AppStoreButton } from '../ui/AppStore';
 
 const MOVES = [
@@ -22,7 +23,8 @@ const MOVES = [
 
 export default function ToolWhatIf() {
   usePageMeta({ ...SEO['/tools/what-if'], canonical: '/tools/what-if' });
-  const { prices, data } = useSpotMap();
+  const spotMap = useSpotMap();
+  const { prices, data } = spotMap;
   const { holdings } = useHoldings();
   const hasStack = holdings.length > 0;
   // A metal with no price typed in follows live spot.
@@ -46,6 +48,11 @@ export default function ToolWhatIf() {
 
   const nowValue = METALS.reduce((s, m) => s + ounces[m] * (prices[m] || 0), 0);
   const thenValue = hasStack ? valueAt(holdings, target) : METALS.reduce((s, m) => s + ounces[m] * target[m], 0);
+  // A metal in play with no live price would count at zero today, and with
+  // no price typed in, at zero in the what-if too.
+  const inPlay = METALS.filter((m) => ounces[m] > 0);
+  const todayKnown = Boolean(data) && inPlay.every((m) => spotMap.priced(m));
+  const thenKnown = inPlay.every((m) => target[m] > 0);
   const diff = thenValue - nowValue;
   const ratio = target.silver > 0 ? target.gold / target.silver : 0;
 
@@ -74,7 +81,7 @@ export default function ToolWhatIf() {
           <div className="space-y-4">
             {METALS.map((m) => (
               <div key={m} className="grid grid-cols-[1fr_1fr] gap-3 items-end">
-                <Field label={`${METAL_LABEL[m]} price`} hint={`Spot ${money(prices[m] || 0)}`} htmlFor={`wi-${m}`}>
+                <Field label={`${METAL_LABEL[m]} price`} hint={spotMap.priced(m) ? `Spot ${money(prices[m])}` : data ? 'No live price right now' : 'Spot loading'} htmlFor={`wi-${m}`}>
                   <Input id={`wi-${m}`} inputMode="decimal" value={shown(m)} onChange={(e) => setTargets((p) => ({ ...p, [m]: e.target.value }))} />
                 </Field>
                 {hasStack ? (
@@ -93,20 +100,23 @@ export default function ToolWhatIf() {
         </Card>
         <Card className="p-5 h-fit">
           <div className="text-[13px] text-fg-3">{hasStack ? 'Your stack at these prices' : 'Worth at these prices'}</div>
-          <div className="mt-1 text-[32px] font-semibold tracking-tight text-fg tnum">{money(thenValue)}</div>
-          <div className={cx('text-[14px] font-semibold tnum', diff > 0 ? 'text-up' : diff < 0 ? 'text-down' : 'text-fg-3')}>
-            {signedMoney(diff)} ({signedPercent(nowValue > 0 ? (diff / nowValue) * 100 : 0)}) from today
-          </div>
+          <div className={cx('mt-1 font-semibold tracking-tight tnum', thenKnown ? 'text-[32px] text-fg' : 'text-[20px] text-fg-3')}>{thenKnown ? money(thenValue) : 'Type a price for each metal'}</div>
+          {thenKnown && todayKnown && (
+            <div className={cx('text-[14px] font-semibold tnum', diff > 0 ? 'text-up' : diff < 0 ? 'text-down' : 'text-fg-3')}>
+              {signedMoney(diff)} ({signedPercent(nowValue > 0 ? (diff / nowValue) * 100 : 0)}) from today
+            </div>
+          )}
           <dl className="mt-4 space-y-2 text-[14px]">
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Worth today</dt>
-              <dd className="text-fg tnum">{money(nowValue)}</dd>
+              <dd className="text-fg tnum">{todayKnown ? money(nowValue) : data ? 'No price' : '...'}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Gold/silver ratio</dt>
               <dd className="text-fg tnum">{ratio ? ratio.toFixed(1) : '...'}</dd>
             </div>
           </dl>
+          <SpotNotice spot={spotMap} metals={inPlay} className="mt-4" />
           {!hasStack && (
             <Link to="/stack?add=1" className="mt-4 inline-block text-[13px] font-semibold text-gold hover:text-gold-2">
               Add your stack

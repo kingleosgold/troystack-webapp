@@ -114,10 +114,14 @@ export default function Prices() {
         <h1 className="text-[15px] font-semibold text-fg-2">
           {label} spot price <span className="text-fg-3 font-medium">· {METAL_SYMBOL[metal]} · USD per troy ounce</span>
         </h1>
-        {price == null ? (
+        {spot.isError && !spot.data ? (
+          <div className="max-w-md"><ErrorNote onRetry={() => void spot.refetch()}>Live prices didn't load.</ErrorNote></div>
+        ) : price == null && !spot.data ? (
           <Skeleton className="h-11 w-56" />
-        ) : (
+        ) : price != null && price > 0 ? (
           <div className="text-[40px] sm:text-[48px] font-semibold tracking-tight text-fg tnum leading-none">{money(price)}</div>
+        ) : (
+          <div className="max-w-md"><ErrorNote onRetry={() => void spot.refetch()}>There's no live {label.toLowerCase()} price right now.</ErrorNote></div>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
           {spot.data && <ChangeBadge pct={spot.data.changePct[metal]} amount={spot.data.changeAmt[metal]} />}

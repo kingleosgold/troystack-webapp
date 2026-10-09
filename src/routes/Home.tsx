@@ -146,8 +146,11 @@ function AskTroyCard({ hasStack }: { hasStack: boolean }) {
 
 function StackCard() {
   const { holdings, loading, isGuest } = useHoldings();
-  const { prices, changePct, data } = useSpotMap();
+  const spot = useSpotMap();
+  const { prices, changePct, data } = spot;
   const totals = useMemo(() => stackTotals(holdings, prices, changePct), [holdings, prices, changePct]);
+  // A metal held with no live price would count at zero, so the totals wait.
+  const ready = Boolean(data) && METALS.every((m) => !holdings.some((h) => h.metal === m) || spot.priced(m));
 
   if (loading) {
     return (
@@ -177,15 +180,19 @@ function StackCard() {
         <h2 className="text-[15px] font-semibold text-fg">Your stack</h2>
         <Link to="/stack" className="text-[13px] font-semibold text-gold hover:text-gold-2">Open</Link>
       </div>
-      <div className="mt-2 text-[28px] font-semibold tracking-tight text-fg tnum">{data ? money(totals.value) : <Skeleton className="h-8 w-40" />}</div>
-      <div className="mt-1 space-y-0.5 text-[13px]">
-        <div className={cx('tnum font-semibold', dayTone)}>
-          {signedMoney(totals.dayChange)} ({signedPercent(totals.dayChangePct)}) today
-        </div>
-        <div className="text-fg-3">
-          <span className={cx('tnum font-semibold', gainTone)}>{signedMoney(totals.gain)}</span> on what you paid
-        </div>
+      <div className="mt-2 text-[28px] font-semibold tracking-tight text-fg tnum">
+        {ready ? money(totals.value) : spot.isLoading ? <Skeleton className="h-8 w-40" /> : <span className="text-[17px] text-fg-3">Waiting for prices</span>}
       </div>
+      {ready && (
+        <div className="mt-1 space-y-0.5 text-[13px]">
+          <div className={cx('tnum font-semibold', dayTone)}>
+            {signedMoney(totals.dayChange)} ({signedPercent(totals.dayChangePct)}) today
+          </div>
+          <div className="text-fg-3">
+            <span className={cx('tnum font-semibold', gainTone)}>{signedMoney(totals.gain)}</span> on what you paid
+          </div>
+        </div>
+      )}
       {isGuest && <p className="mt-3 text-[12px] text-fg-3">Saved in this browser. <Link to="/auth" className="font-semibold text-gold">Sign in</Link> to keep it with your account and the app.</p>}
     </Card>
   );
