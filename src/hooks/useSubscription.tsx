@@ -93,6 +93,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- the hook belongs with its provider
 export function useSubscription(): SubscriptionState {
   const ctx = useContext(SubscriptionContext);
   if (ctx === undefined) {
