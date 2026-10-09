@@ -92,7 +92,7 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
 
 function AccountRow({ collapsed }: { collapsed: boolean }) {
   const { user, isConfigured, signOut } = useAuth();
-  const { tier } = useSubscription();
+  const { tier, loading: planLoading } = useSubscription();
   const navigate = useNavigate();
   if (!isConfigured) return null;
   if (!user) {
@@ -117,7 +117,8 @@ function AccountRow({ collapsed }: { collapsed: boolean }) {
         {!collapsed && (
           <span className="min-w-0">
             <span className="block text-[13px] text-fg truncate">{user.email}</span>
-            <span className="block text-[11px] text-fg-3">{tier === 'lifetime' ? 'Lifetime' : tier === 'gold' ? 'Gold' : 'Free'}</span>
+            {/* No plan is named until it's known, so a Gold account is never shown as Free. */}
+            <span className="block text-[11px] text-fg-3">{planLoading ? '\u00a0' : tier === 'lifetime' ? 'Lifetime' : tier === 'gold' ? 'Gold' : 'Free'}</span>
           </span>
         )}
       </Link>
@@ -138,7 +139,9 @@ function AccountRow({ collapsed }: { collapsed: boolean }) {
 }
 
 function SidebarAppCard() {
-  const { isGold } = useSubscription();
+  const { isGold, loading: planLoading } = useSubscription();
+  // The free week is only mentioned once the plan is known to be Free.
+  const offerWeek = !planLoading && !isGold;
   return (
     <div className="rounded-2xl border border-line bg-surface p-3.5">
       <div className="flex items-start gap-3">
@@ -146,7 +149,7 @@ function SidebarAppCard() {
         <div className="min-w-0">
           <p className="text-[13px] font-semibold text-fg leading-snug">TroyStack for iPhone</p>
           <p className="text-[12px] text-fg-3 mt-0.5 leading-snug">
-            {isGold ? 'Alerts, widgets and Troy on your lock screen.' : 'Alerts, widgets, and a free week of Gold.'}
+            {offerWeek ? 'Alerts, widgets, and a free week of Gold.' : 'Alerts, widgets and Troy on your lock screen.'}
           </p>
         </div>
       </div>
