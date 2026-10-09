@@ -1,8 +1,7 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { syncSubscription } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -29,7 +28,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   // Without Supabase there's no session to wait for.
   const [loading, setLoading] = useState(isSupabaseConfigured);
-  const syncedUserRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -53,14 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Auto-sync subscription on login (fire-and-forget, once per user)
-  useEffect(() => {
-    if (!user || syncedUserRef.current === user.id) return;
-    syncedUserRef.current = user.id;
-    syncSubscription(user.id).catch(() => {
-      // Ignored on purpose, the sync is best effort
-    });
-  }, [user]);
+  // The plan sync at sign-in lives with the plan, in SubscriptionProvider,
+  // which reads the plan again once the sync answers.
 
   const signUp = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({
