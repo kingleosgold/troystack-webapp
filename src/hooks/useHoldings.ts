@@ -59,6 +59,11 @@ function sendOnce(userId: string) {
   return run;
 }
 
+/** Sends an account's waiting changes the way the stack does, joining a send already going. */
+export function sendQueuedChanges(userId: string) {
+  return sendOnce(userId);
+}
+
 /**
  * The stack. Signed in, it's the account's rows in Supabase, the same rows
  * the iPhone app reads. Signed out, it's saved in this browser. The first
