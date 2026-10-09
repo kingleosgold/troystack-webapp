@@ -204,7 +204,7 @@ function SignInCard() {
 export default function Troy() {
   usePageMeta({ ...SEO['/troy'], canonical: '/troy' });
   const { user, loading: authLoading, isConfigured } = useAuth();
-  const { isGold } = useSubscription();
+  const { isGold, loading: planLoading } = useSubscription();
   const { holdings, addMany } = useHoldings();
   const { openTrial } = useTrial();
   const navigate = useNavigate();
@@ -259,6 +259,9 @@ export default function Troy() {
     if (shownFor.current === conversationId) return;
     let cancelled = false;
     setError(null);
+    // Nothing is on screen while this one loads, so going back to the chat
+    // that was showing loads it again.
+    shownFor.current = null;
     setMessages([]);
     setLoadingChat(true);
     getConversation(conversationId, user.id)
@@ -329,10 +332,14 @@ export default function Troy() {
         const conv = await createConversation(user.id);
         id = conv.id;
         madeForThis = true;
-        shownFor.current = id;
         qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', user.id], (prev) => [conv, ...(prev ?? [])]);
-        openChat.current = id;
-        navigate(`/troy/c/${id}`, { replace: true });
+        // Someone who opened another chat while this one was being made stays
+        // there. The question still goes to the new chat, which shows up on the list.
+        if (openChat.current === null) {
+          shownFor.current = id;
+          openChat.current = id;
+          navigate(`/troy/c/${id}`, { replace: true });
+        }
       }
       const controller = new AbortController();
       abortRef.current = controller;
@@ -346,8 +353,14 @@ export default function Troy() {
         if (madeForThis && e instanceof QuotaError) {
           const emptyId = id;
           const owner = user.id;
-          deleteConversation(emptyId, owner).catch(() => undefined);
-          qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', owner], (prev) => (prev ?? []).filter((c) => c.id !== emptyId));
+          // It leaves the list once the delete goes through, tried twice. If it
+          // doesn't, the list is read again so it shows what's saved.
+          deleteConversation(emptyId, owner)
+            .catch(() => deleteConversation(emptyId, owner))
+            .then(
+              () => qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', owner], (prev) => (prev ?? []).filter((c) => c.id !== emptyId)),
+              () => qc.invalidateQueries({ queryKey: ['troy-conversations', owner] }),
+            );
           if (openChat.current === emptyId) {
             openChat.current = null;
             navigate('/troy', { replace: true });
@@ -443,12 +456,28 @@ export default function Troy() {
     }
   }, [user]);
 
+  // The plan as it stands now, for a scan that waits for it to load.
+  const planRef = useRef({ loading: planLoading, gold: isGold });
+  useEffect(() => {
+    planRef.current = { loading: planLoading, gold: isGold };
+  }, [planLoading, isGold]);
+
   const onPhoto = useCallback(
     async (file: File) => {
       if (!user) return;
       setError(null);
+      // Gold scans without a limit, so a plan that hasn't loaded isn't
+      // counted as Free. It gets a few seconds to arrive.
+      for (let waited = 0; planRef.current.loading && waited < 5000; waited += 250) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      if (planRef.current.loading) {
+        setError('Your plan is still loading. Try the receipt again in a moment.');
+        return;
+      }
+      const gold = planRef.current.gold;
       try {
-        if (!isGold) {
+        if (!gold) {
           const s = await scanStatus(user.id);
           if (s.scansUsed >= s.scansLimit) {
             openTrial({ reason: `Free accounts get ${s.scansLimit} receipt scans every 30 days, and you've used them.`, campaign: 'webapp-trial' });
@@ -493,7 +522,7 @@ export default function Troy() {
         setBusy(false);
       }
     },
-    [user, isGold, openTrial],
+    [user, openTrial],
   );
 
   const onSpreadsheet = useCallback(async (file: File) => {
@@ -529,10 +558,13 @@ export default function Troy() {
         if (!user) return;
         try {
           await deleteConversation(id, user.id);
-        } catch {
-          // The chat is still saved, so it stays on the list and on screen.
-          setError("That chat couldn't be deleted. Check your connection and try again.");
-          return;
+        } catch (e) {
+          // Gone already, deleted in the app say, is as good as deleted here.
+          // Anything else means the chat is still saved, so it stays.
+          if (!(e instanceof ApiError && e.status === 404)) {
+            setError("That chat couldn't be deleted. Check your connection and try again.");
+            return;
+          }
         }
         qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', user.id], (prev) => (prev ?? []).filter((c) => c.id !== id));
         if (id === conversationId) navigate('/troy');

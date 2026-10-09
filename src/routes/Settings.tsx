@@ -65,7 +65,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const { user, session, loading: authLoading, isConfigured, signOut, linkWithGoogle, linkWithApple, updateEmailPassword, getLinkedProviders, hasEmailPassword } = useAuth();
-  const { tier, isTrial, trialEnd, refetch } = useSubscription();
+  const { tier, isTrial, trialEnd, refetch, loading: planLoading } = useSubscription();
   const { openTrial } = useTrial();
   const { holdings, isGuest, clearBrowserStack } = useHoldings();
   const { theme, setTheme } = useTheme();
@@ -118,9 +118,12 @@ export default function Settings() {
   const providers = user ? getLinkedProviders() : [];
   const hasEmail = user ? hasEmailPassword() : false;
   const trialDays = trialEnd ? Math.max(0, Math.ceil((new Date(trialEnd).getTime() - Date.now()) / 86400000)) : 0;
-  const planName = tier === 'lifetime' ? 'Lifetime' : tier === 'gold' ? (isTrial ? 'Gold, free week' : 'Gold') : 'Free';
-  const planDetail =
-    tier === 'lifetime'
+  // Until a signed-in account's plan loads it isn't Free, it's unknown.
+  const planUnknown = Boolean(user) && planLoading;
+  const planName = planUnknown ? 'Checking your plan' : tier === 'lifetime' ? 'Lifetime' : tier === 'gold' ? (isTrial ? 'Gold, free week' : 'Gold') : 'Free';
+  const planDetail = planUnknown
+    ? 'It keeps trying if the connection dropped.'
+    : tier === 'lifetime'
       ? 'Gold for good.'
       : tier === 'gold'
         ? isTrial && trialEnd
@@ -253,12 +256,14 @@ export default function Settings() {
           title={planName}
           detail={planDetail}
           right={
-            <span className={cx('rounded-full px-2.5 py-1 text-[12px] font-semibold', tier === 'free' ? 'bg-surface-2 text-fg-2' : 'bg-gold-soft text-gold')}>
-              {tier === 'free' ? 'Free' : tier === 'lifetime' ? 'Lifetime' : 'Gold'}
-            </span>
+            planUnknown ? undefined : (
+              <span className={cx('rounded-full px-2.5 py-1 text-[12px] font-semibold', tier === 'free' ? 'bg-surface-2 text-fg-2' : 'bg-gold-soft text-gold')}>
+                {tier === 'free' ? 'Free' : tier === 'lifetime' ? 'Lifetime' : 'Gold'}
+              </span>
+            )
           }
         />
-        {tier === 'free' ? (
+        {planUnknown ? null : tier === 'free' ? (
           <Row
             title={<span className="font-semibold text-gold">Try Gold free for a week</span>}
             detail="30 questions a day with Troy, your morning brief, full vault data and more"
