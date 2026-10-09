@@ -136,7 +136,13 @@ export default function Settings() {
     } catch (e) {
       setBillingBusy(false);
       if (e instanceof ApiError && e.status === 404) {
-        setBanner({ tone: 'neutral', text: "Your Gold is through Apple. On your iPhone, open Settings, tap your name, then Subscriptions." });
+        setBanner({
+          tone: 'neutral',
+          text:
+            tier === 'lifetime'
+              ? "Your Lifetime came through Apple, so there's no web billing to manage."
+              : 'Your Gold is through Apple. On your iPhone, open Settings, tap your name, then Subscriptions.',
+        });
       } else {
         setBanner({ tone: 'down', text: "The billing page didn't open. Try again in a moment." });
       }
@@ -259,11 +265,14 @@ export default function Settings() {
             onClick={() => openTrial({ campaign: 'webapp-settings' })}
           />
         ) : (
-          tier === 'gold' &&
           user && (
             <Row
-              title={billingBusy ? 'Opening the billing page' : 'Change plan or cancel'}
-              detail="Bought on the web? This opens Stripe. Bought in the app? Your iPhone's settings handle it."
+              title={billingBusy ? 'Opening the billing page' : tier === 'lifetime' ? 'Billing and receipts' : 'Change plan or cancel'}
+              detail={
+                tier === 'lifetime'
+                  ? 'Bought on the web? This opens Stripe, with your receipt and any older subscription still billing.'
+                  : "Bought on the web? This opens Stripe. Bought in the app? Your iPhone's settings handle it."
+              }
               onClick={() => void manageBilling()}
             />
           )

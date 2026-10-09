@@ -454,6 +454,14 @@ export default function Troy() {
             openTrial({ reason: `Free accounts get ${s.scansLimit} receipt scans every 30 days, and you've used them.`, campaign: 'webapp-trial' });
             return;
           }
+          // The scan is counted before it runs, so a count that doesn't go
+          // through can't let scans past the limit.
+          try {
+            await countScan(user.id);
+          } catch {
+            setError("Receipt scans aren't available right now. Try again in a moment.");
+            return;
+          }
         }
         setBusy(true);
         const base64 = await new Promise<string>((resolve, reject) => {
@@ -463,7 +471,6 @@ export default function Troy() {
           r.readAsDataURL(file);
         });
         const result = await scanReceipt(base64, file.type || 'image/jpeg');
-        if (!isGold) countScan(user.id).catch(() => undefined);
         if (!result.items?.length) {
           setError("Troy couldn't find any metal on that receipt.");
           return;
