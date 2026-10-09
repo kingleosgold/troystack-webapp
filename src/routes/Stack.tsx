@@ -162,6 +162,11 @@ export default function Stack() {
   const [editing, setEditing] = useState<Holding | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [start, setStart] = useState<HoldingStart | null>(null);
+  // Whether the add form is up, for the coin lookup that finishes after a tap.
+  const editorOpenRef = useRef(false);
+  useEffect(() => {
+    editorOpenRef.current = editorOpen;
+  }, [editorOpen]);
   const [filter, setFilter] = useState<'all' | Metal>('all');
   const [importRows, setImportRows] = useState<{ rows: ImportRow[]; source: string } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -189,10 +194,14 @@ export default function Stack() {
       else {
         import('../lib/coins')
           .then(({ coinBySlug }) => {
+            // Someone who already opened the form by hand keeps what they typed.
+            if (editorOpenRef.current) return;
             const c = coinBySlug(slug);
             open(c ? { metal: c.metal, type: c.name, weightOzt: c.fineOzt } : null);
           })
-          .catch(() => open(null));
+          .catch(() => {
+            if (!editorOpenRef.current) open(null);
+          });
       }
     } else if (params.get('import') === '1') {
       params.delete('import');

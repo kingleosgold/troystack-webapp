@@ -55,7 +55,10 @@ export default function CoinPage() {
   const metal = METAL_LABEL[coin.metal];
   const perOz = spot.prices[coin.metal] || 0;
   const ready = perOz > 0;
-  const pieces = Math.max(0, Math.floor(Number(qty.replace(/,/g, '')) || 0));
+  // Coins come whole, so a count like 2.5 is read as 2 and the field says so.
+  const typed = Number(qty.replace(/,/g, ''));
+  const pieces = Number.isFinite(typed) && typed > 0 ? Math.floor(typed) : 0;
+  const fractional = Number.isFinite(typed) && typed > 0 && !Number.isInteger(typed);
   const unit = isBar(coin) ? 'piece' : 'coin';
   const show = (value: number) => (ready ? money(value) : spot.isLoading ? '...' : 'Not available');
 
@@ -83,8 +86,8 @@ export default function CoinPage() {
           </p>
 
           <div className="mt-5 border-t border-line pt-4">
-            <Field label="How many" htmlFor="coin-qty">
-              <Input id="coin-qty" inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9,]/g, ''))} />
+            <Field label="How many" htmlFor="coin-qty" hint={fractional ? `Whole ${unit}s only, so this counts ${pieces.toLocaleString('en-US')}.` : undefined}>
+              <Input id="coin-qty" inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9.,]/g, ''))} />
             </Field>
             <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Quick amounts">
               {QUICK.map((n) => (
@@ -150,7 +153,7 @@ export default function CoinPage() {
           <h2 className="text-[15px] font-semibold text-fg">Track what you own</h2>
           <p className="mt-1 text-[14px] text-fg-2">Add yours to a stack and it's valued at live spot every time you look, here and in the iPhone app. Free, no account needed to start.</p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           <LinkButton to={`/stack?add=1&coin=${coin.slug}`}>
             <Plus size={15} aria-hidden="true" /> Add to my stack
           </LinkButton>
@@ -160,7 +163,7 @@ export default function CoinPage() {
 
       <section className="mt-8">
         <h2 className="mb-3 text-[15px] font-semibold text-fg">More {coin.metal}</h2>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {relatedCoins(coin).map((c) => (
             <Link
               key={c.slug}

@@ -172,23 +172,29 @@ export default function Prices() {
       {price != null && price > 0 && (
         <Card className="mt-4 p-5">
           <h2 className="text-[15px] font-semibold text-fg">{label} price by weight and purity</h2>
-          <div className="mt-2 grid gap-x-8 sm:grid-cols-2">
-            <dl className="divide-y divide-line text-[14px]" aria-label={`${label} by weight`}>
-              {WEIGHTS.map((w) => (
-                <div key={w.label} className="flex justify-between gap-3 py-2.5">
-                  <dt className="text-fg-3">{w.label}</dt>
-                  <dd className="font-semibold text-fg tnum">{money(price * w.ozt)}</dd>
-                </div>
-              ))}
-            </dl>
-            <dl className="divide-y divide-line text-[14px]" aria-label={`${label} per gram by purity`}>
-              {PURITIES[metal].map((p) => (
-                <div key={p.label} className="flex justify-between gap-3 py-2.5">
-                  <dt className="text-fg-3">{p.label}, per gram</dt>
-                  <dd className="font-semibold text-fg tnum">{money(perGram(price, p.fineness))}</dd>
-                </div>
-              ))}
-            </dl>
+          <div className="mt-3 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+            <div role="group" aria-labelledby="by-weight">
+              <h3 id="by-weight" className="text-[12px] font-semibold uppercase tracking-[0.06em] text-fg-3">By weight</h3>
+              <dl className="divide-y divide-line text-[14px]">
+                {WEIGHTS.map((w) => (
+                  <div key={w.label} className="flex justify-between gap-3 py-2.5">
+                    <dt className="text-fg-3">{w.label}</dt>
+                    <dd className="font-semibold text-fg tnum">{money(price * w.ozt)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            <div role="group" aria-labelledby="by-purity">
+              <h3 id="by-purity" className="text-[12px] font-semibold uppercase tracking-[0.06em] text-fg-3">By purity, per gram</h3>
+              <dl className="divide-y divide-line text-[14px]">
+                {PURITIES[metal].map((p) => (
+                  <div key={p.label} className="flex justify-between gap-3 py-2.5">
+                    <dt className="text-fg-3">{p.label}</dt>
+                    <dd className="font-semibold text-fg tnum">{money(perGram(price, p.fineness))}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           </div>
           <p className="mt-3 text-[12px] text-fg-3">These are melt values at spot. Jewelry buyers and pawn shops pay less than melt, and coins and bars sell for more.</p>
         </Card>

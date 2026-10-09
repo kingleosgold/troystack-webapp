@@ -6,6 +6,8 @@ import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { COINS, COIN_GROUPS, coinsInGroup, ounces } from '../lib/coins';
 import { money } from '../lib/format';
+import { METALS } from '../lib/metals';
+import type { Metal } from '../types/holding';
 import { Card, EmptyState, ErrorNote, Input, LinkButton, PageHeader } from '../ui/primitives';
 import { AppStoreButton } from '../ui/AppStore';
 
@@ -25,7 +27,8 @@ export default function Coins() {
     })).filter((g) => g.coins.length > 0);
   }, [query]);
 
-  const loaded = spot.prices.gold > 0;
+  const priced = (m: Metal) => spot.prices[m] > 0;
+  const loaded = METALS.some(priced);
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-6 sm:pt-8">
@@ -62,7 +65,7 @@ export default function Coins() {
           />
         </div>
       ) : (
-        <div className="mt-5 grid items-start gap-4 lg:grid-cols-2">
+        <div className="mt-5 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
           {groups.map((g) => (
             <Card key={g.id} className="overflow-hidden">
               <h2 className="px-5 pt-4 pb-2 text-[15px] font-semibold text-fg">{g.label}</h2>
@@ -77,7 +80,7 @@ export default function Coins() {
                         </span>
                       </span>
                       <span className="shrink-0 text-[14px] font-semibold text-fg tnum">
-                        {loaded ? money(c.fineOzt * spot.prices[c.metal]) : spot.isLoading ? '...' : ''}
+                        {priced(c.metal) ? money(c.fineOzt * spot.prices[c.metal]) : spot.isLoading ? '...' : ''}
                       </span>
                     </Link>
                   </li>
@@ -93,7 +96,7 @@ export default function Coins() {
           <h2 className="text-[15px] font-semibold text-fg">Own some of these?</h2>
           <p className="mt-1 text-[14px] text-fg-2">Add them to a stack and see the whole thing at live spot, here and in the iPhone app. In the app you can snap a dealer receipt and Troy adds every line.</p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           <LinkButton to="/stack?add=1">Add to my stack</LinkButton>
           <AppStoreButton campaign="webapp-coins" variant="dark" label="Get the app" />
         </div>

@@ -127,7 +127,7 @@ export default function ToolMelt() {
           <p className="mt-4 text-[12px] text-fg-3">Dealers sell above melt and usually buy back near it. Collectible coins can be worth well over melt.</p>
           {!custom && (
             <Link to={`/coins/${preset}`} className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-gold hover:underline">
-              Weight, purity and history <ArrowRight size={13} aria-hidden="true" />
+              Weight, purity and what to know <ArrowRight size={13} aria-hidden="true" />
             </Link>
           )}
         </Card>
