@@ -12,7 +12,7 @@ import { WEIGHT_TO_OZT } from '../types/holding';
  * premium live in the `notes` JSON. Deletes are soft, by `deleted_at`.
  */
 
-interface HoldingRow {
+export interface HoldingRow {
   id: string;
   user_id: string;
   metal: string;
@@ -114,18 +114,51 @@ export async function fetchSupabaseHoldings(userId: string): Promise<Holding[]> 
   return ((data || []) as HoldingRow[]).map(fromRow);
 }
 
-export async function addSupabaseHolding(form: HoldingFormData, userId: string): Promise<Holding> {
+/**
+ * A write that didn't reach the account. `retryable` means the connection or
+ * the server failed, not Supabase refusing the change, so the same write can
+ * go again later. supabase-js reports a request that never got an answer as
+ * status 0.
+ */
+export class HoldingWriteError extends Error {
+  readonly retryable: boolean;
+
+  constructor(message: string, retryable: boolean) {
+    super(message);
+    this.name = 'HoldingWriteError';
+    this.retryable = retryable;
+  }
+}
+
+function writeFailed(error: { message?: string; code?: string }, status: number, message: string): HoldingWriteError {
+  console.error('holding write failed', status, error);
+  return new HoldingWriteError(message, status === 0 || status === 408 || status === 429 || status >= 500);
+}
+
+/** A new row, its id made here so sending it twice can't add it twice. */
+export function newHoldingRow(form: HoldingFormData, userId: string): HoldingRow {
   const now = new Date().toISOString();
-  const row = {
+  return {
     id: crypto.randomUUID(),
     user_id: userId,
     ...toColumns(form),
     created_at: now,
     updated_at: now,
   };
-  const { error } = await supabase.from('holdings').insert(row);
-  if (error) throw error;
-  return fromRow(row as HoldingRow);
+}
+
+/**
+ * Saves one new row. When an earlier try already landed and only its answer
+ * was lost, the id is taken and the row is there, which counts as saved.
+ */
+export async function insertHoldingRow(row: HoldingRow): Promise<Holding> {
+  const { error, status } = await supabase.from('holdings').insert(row);
+  if (error && error.code !== '23505') throw writeFailed(error, status, "That didn't save. Try again.");
+  return fromRow(row);
+}
+
+export async function addSupabaseHolding(form: HoldingFormData, userId: string): Promise<Holding> {
+  return insertHoldingRow(newHoldingRow(form, userId));
 }
 
 /**
@@ -150,26 +183,45 @@ export async function addSupabaseHoldings(forms: HoldingFormData[], userId: stri
   return rows.map((row) => fromRow(row as HoldingRow));
 }
 
-export async function updateSupabaseHolding(existing: Holding, form: HoldingFormData, userId: string): Promise<Holding> {
-  const updates = { ...toColumns(form, existing.notesMeta), updated_at: new Date().toISOString() };
-  const { data, error } = await supabase
+export type HoldingUpdates = ReturnType<typeof toColumns> & { updated_at: string };
+
+/** The columns an edit changes, the row's other notes keys kept. */
+export function holdingUpdates(existing: Holding, form: HoldingFormData): HoldingUpdates {
+  return { ...toColumns(form, existing.notesMeta), updated_at: new Date().toISOString() };
+}
+
+/** The holding as it reads once an edit is saved, for showing before it is. */
+export function holdingAfter(existing: Holding, updates: HoldingUpdates, userId: string): Holding {
+  return fromRow({ id: existing.id, user_id: userId, created_at: existing.createdAt, ...updates });
+}
+
+export async function applyHoldingUpdates(id: string, updates: HoldingUpdates, userId: string): Promise<Holding> {
+  const { data, error, status } = await supabase
     .from('holdings')
     .update(updates)
-    .eq('id', existing.id)
+    .eq('id', id)
     .eq('user_id', userId)
     .select()
     .single();
-  if (error) throw error;
+  if (error) throw writeFailed(error, status, "That didn't save. Try again.");
   return fromRow(data as HoldingRow);
 }
 
-export async function deleteSupabaseHolding(id: string, userId: string): Promise<void> {
-  const { error } = await supabase
+export async function updateSupabaseHolding(existing: Holding, form: HoldingFormData, userId: string): Promise<Holding> {
+  return applyHoldingUpdates(existing.id, holdingUpdates(existing, form), userId);
+}
+
+export async function softDeleteHolding(id: string, deletedAt: string, userId: string): Promise<void> {
+  const { error, status } = await supabase
     .from('holdings')
-    .update({ deleted_at: new Date().toISOString() })
+    .update({ deleted_at: deletedAt })
     .eq('id', id)
     .eq('user_id', userId);
-  if (error) throw error;
+  if (error) throw writeFailed(error, status, "That didn't delete. Try again.");
+}
+
+export async function deleteSupabaseHolding(id: string, userId: string): Promise<void> {
+  return softDeleteHolding(id, new Date().toISOString(), userId);
 }
 
 /** Copy holdings saved in this browser into a new account. */
