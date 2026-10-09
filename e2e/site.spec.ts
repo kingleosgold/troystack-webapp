@@ -432,3 +432,36 @@ test.describe('coin values', () => {
     expect(sitemap).toContain('<loc>https://troystack.ai/coins/mercury-dime</loc>');
   });
 });
+
+test('the count on a coin page starts at one on the next coin', async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/coins/morgan-silver-dollar');
+  await page.getByLabel('How many').fill('20');
+  await page.getByRole('link', { name: /Peace silver dollar/ }).first().click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Peace silver dollar');
+  await expect(page.getByLabel('How many')).toHaveValue('1');
+});
+
+test("a coin's add form that loads late doesn't reopen after the form was used by hand", async ({ page }) => {
+  await signIn(page);
+  const api = await mockBackends(page);
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  await page.route(/\/assets\/coins-[^/]+\.js$/, async (route) => {
+    await gate;
+    await route.fallback();
+  });
+  await page.goto('/stack?add=1&coin=morgan-silver-dollar');
+  await page.getByRole('button', { name: 'Add a holding' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Add a holding' });
+  await dialog.getByLabel('Product').fill('Morgan dollar');
+  await dialog.getByLabel('Weight of one piece').fill('0.7734');
+  await dialog.getByRole('button', { name: 'Add to stack' }).click();
+  await expect(dialog).toBeHidden();
+  release();
+  await page.waitForTimeout(800);
+  await expect(dialog).toBeHidden();
+  expect(api.inserts.length).toBe(1);
+});
