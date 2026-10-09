@@ -95,7 +95,15 @@ export default function Settings() {
     params.delete('checkout');
     setParams(params, { replace: true });
     if (haveGold) {
-      setBanner({ tone: 'up', text: 'This account already has Gold, so there was nothing to buy. Your plan is below.' });
+      setBanner({ tone: 'up', text: 'This account already has Gold, so there was nothing to buy. If Plan below still says Free, tap Refresh my plan.' });
+      // The API knew about Gold the site's plan read may not have, as when the
+      // app wrote Free over a web plan. The same sync Refresh my plan runs puts
+      // it right, then the plan is read again.
+      if (user) {
+        void syncSubscription(user.id)
+          .catch(() => undefined)
+          .then(() => refetch({ force: true }));
+      }
       return;
     }
     if (failed) {
@@ -118,7 +126,7 @@ export default function Settings() {
         await refetch({ force: true });
         setBanner({ tone: 'neutral', text: confirming });
       });
-  }, [params, setParams, refetch, authLoading]);
+  }, [params, setParams, refetch, authLoading, user]);
 
   const providers = user ? getLinkedProviders() : [];
   const hasEmail = user ? hasEmailPassword() : false;

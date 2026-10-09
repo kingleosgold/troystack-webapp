@@ -78,7 +78,7 @@ export default function Auth() {
   if (loading || user) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <p className="text-[14px] text-fg-3">{forCheckout ? 'Opening checkout' : 'Signing you in'}</p>
+        <p className="text-[14px] text-fg-3">{forCheckout ? 'One moment' : 'Signing you in'}</p>
       </div>
     );
   }
