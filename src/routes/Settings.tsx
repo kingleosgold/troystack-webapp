@@ -105,6 +105,8 @@ export default function Settings() {
         await refetch({ force: true });
         if (!res.success) setBanner({ tone: 'neutral', text: confirming });
         else if (res.tier === 'lifetime') setBanner({ tone: 'up', text: 'Lifetime is yours. Thanks for backing TroyStack.' });
+        // The free week is for a first subscription. Someone coming back pays from day one.
+        else if (res.status && res.status !== 'trialing') setBanner({ tone: 'up', text: 'Gold is on. Thanks for coming back.' });
         else setBanner({ tone: 'up', text: "Gold is on. Your free week has started, and you won't be charged until it ends." });
       })
       .catch(async () => {
@@ -145,9 +147,13 @@ export default function Settings() {
     if (!user) return;
     setRefreshing(true);
     try {
-      await syncSubscription(user.id).catch(() => undefined);
-      await refetch({ force: true });
-      setBanner({ tone: 'neutral', text: 'Your plan is up to date.' });
+      const synced = await syncSubscription(user.id).then(
+        () => true,
+        () => false,
+      );
+      const read = await refetch({ force: true });
+      if (synced && read) setBanner({ tone: 'neutral', text: 'Your plan is up to date.' });
+      else setBanner({ tone: 'down', text: "Your plan couldn't be checked just now. Try again in a minute." });
     } finally {
       setRefreshing(false);
     }
