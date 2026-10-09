@@ -136,6 +136,7 @@ function rowToForm(r: ImportRow): HoldingFormData | null {
     dealer: r.dealer,
     taxes: r.taxes,
     shipping: r.shipping,
+    note: r.note,
   };
 }
 

@@ -598,6 +598,7 @@ export default function Troy() {
                 dealer: r.dealer,
                 taxes: r.taxes,
                 shipping: r.shipping,
+                note: r.note,
               }));
             const n = await addMany(forms);
             setMessages((prev) => [

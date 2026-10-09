@@ -103,15 +103,19 @@ export default function Settings() {
       setBanner({ tone: 'down', text: "Checkout didn't open. You can start it again from Plan below." });
       return;
     }
+    const confirming = "We're confirming your payment with Stripe. Gold turns on as soon as it clears, usually within a minute.";
+    // The plan is read again right away, past the ten-second guard, because
+    // verifying the session is what writes Gold to the profile.
     verifyCheckout(sessionId!)
       .then(async (res) => {
-        await refetch();
-        if (res.tier === 'lifetime') setBanner({ tone: 'up', text: 'Lifetime is yours. Thanks for backing TroyStack.' });
+        await refetch({ force: true });
+        if (!res.success) setBanner({ tone: 'neutral', text: confirming });
+        else if (res.tier === 'lifetime') setBanner({ tone: 'up', text: 'Lifetime is yours. Thanks for backing TroyStack.' });
         else setBanner({ tone: 'up', text: "Gold is on. Your free week has started, and you won't be charged until it ends." });
       })
       .catch(async () => {
-        await refetch();
-        setBanner({ tone: 'neutral', text: "We're confirming your payment with Stripe. Gold turns on as soon as it clears, usually within a minute." });
+        await refetch({ force: true });
+        setBanner({ tone: 'neutral', text: confirming });
       });
   }, [params, setParams, refetch]);
 
@@ -148,7 +152,7 @@ export default function Settings() {
     setRefreshing(true);
     try {
       await syncSubscription(user.id).catch(() => undefined);
-      await refetch();
+      await refetch({ force: true });
       setBanner({ tone: 'neutral', text: 'Your plan is up to date.' });
     } finally {
       setRefreshing(false);
