@@ -10,6 +10,7 @@ import {
 import { fetchArticle, fetchLatestDigest, fetchSignalPage, SIGNAL_PAGE_SIZE } from '../lib/signalApi';
 import { fetchPodcast } from '../lib/podcastApi';
 import { marketsClosedET } from '../lib/market';
+import type { Metal } from '../types/holding';
 
 /** Live spot. Refreshes every minute while the page is open, like the app. */
 export function useSpot() {
@@ -21,14 +22,21 @@ export function useSpot() {
   });
 }
 
-/** Spot as a plain map with zeros while loading, for math. */
+/**
+ * Spot as a plain map with zeros while loading, for math. A zero isn't a
+ * price, though. The feed can leave a metal out, and the read can fail, so
+ * `priced` says whether a metal has a live price to show or value with.
+ */
 export function useSpotMap() {
   const q = useSpot();
   const prices = q.data?.prices ?? { gold: 0, silver: 0, platinum: 0, palladium: 0 };
   const changePct = q.data?.changePct ?? { gold: 0, silver: 0, platinum: 0, palladium: 0 };
   const marketsClosed = q.data ? q.data.marketsClosed : marketsClosedET();
-  return { ...q, prices, changePct, marketsClosed };
+  const priced = (m: Metal) => Boolean(q.data) && prices[m] > 0;
+  return { ...q, prices, changePct, marketsClosed, priced };
 }
+
+export type SpotMap = ReturnType<typeof useSpotMap>;
 
 export function useSparklines() {
   return useQuery({
