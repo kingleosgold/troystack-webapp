@@ -25,14 +25,18 @@ function positive(value: unknown): number | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
-/** Older builds saved a free-text `notes`; it becomes `note`. */
-function normalize(raw: unknown): Holding | null {
+/**
+ * Older builds saved a free-text `notes`; it becomes `note`. A holding saved
+ * without an id gets one from its place in the list, so it reads the same
+ * every time.
+ */
+function normalize(raw: unknown, index: number): Holding | null {
   if (!raw || typeof raw !== 'object') return null;
   const h = raw as Record<string, unknown>;
   if (!isMetal(h.metal)) return null;
   const now = new Date().toISOString();
   return {
-    id: String(h.id || crypto.randomUUID()),
+    id: String(h.id || `guest-${index}`),
     metal: h.metal,
     type: String(h.type || 'Other'),
     weight: Number(h.weight) || 0,
@@ -52,7 +56,9 @@ function normalize(raw: unknown): Holding | null {
 }
 
 export function getLocalHoldings(): Holding[] {
-  return readRaw().map(normalize).filter((h): h is Holding => h !== null);
+  return readRaw()
+    .map((raw, i) => normalize(raw, i))
+    .filter((h): h is Holding => h !== null);
 }
 
 function save(holdings: Holding[]): void {

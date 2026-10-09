@@ -137,7 +137,9 @@ export async function askAsVisitor(message: string, history: VisitorTurn[], sign
     return await postJson<AskResponse>('/v1/troy/ask', { message, history: history.slice(-6) }, { signal, timeoutMs: 90000 });
   } catch (err) {
     if (err instanceof ApiError) {
-      if (err.status === 429) throw new QuotaError(quotaFrom(err));
+      // The visitor limit says how many questions were used. A 429 without
+      // that is the API's general rate limit, which passes in a minute.
+      if (err.status === 429 && err.body.questionsLimit != null) throw new QuotaError(quotaFrom(err));
       if (err.status === 404 || err.status === 405) throw new VisitorChatUnavailable();
     }
     throw err;

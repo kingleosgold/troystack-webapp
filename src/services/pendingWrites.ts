@@ -22,6 +22,18 @@ function keyFor(userId: string) {
   return `troystack_pending_writes_${userId}`;
 }
 
+function refusedKeyFor(userId: string) {
+  return `troystack_pending_refused_${userId}`;
+}
+
+function announce() {
+  try {
+    globalThis.dispatchEvent?.(new Event(EVENT));
+  } catch {
+    // no window, as in unit tests
+  }
+}
+
 function defaultStore(): Store | null {
   try {
     return globalThis.localStorage ?? null;
@@ -59,18 +71,48 @@ export function savePending(userId: string, list: PendingWrite[], store: Store |
   } catch {
     return false;
   }
-  try {
-    globalThis.dispatchEvent?.(new Event(EVENT));
-  } catch {
-    // no window, as in unit tests
-  }
+  announce();
   return true;
+}
+
+/**
+ * How many changes made offline the account refused, kept until someone
+ * reads the notice, so it shows on the stack page whichever page sent them.
+ */
+export function readRefused(userId: string, store: Store | null = defaultStore()): number {
+  if (!store) return 0;
+  try {
+    const n = Number(store.getItem(refusedKeyFor(userId)));
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function addRefused(userId: string, count: number, store: Store | null = defaultStore()): void {
+  if (!store || count <= 0) return;
+  try {
+    store.setItem(refusedKeyFor(userId), String(readRefused(userId, store) + count));
+  } catch {
+    return;
+  }
+  announce();
+}
+
+export function clearRefused(userId: string, store: Store | null = defaultStore()): void {
+  if (!store) return;
+  try {
+    store.removeItem(refusedKeyFor(userId));
+  } catch {
+    return;
+  }
+  announce();
 }
 
 /** Calls back when any account's list changes, in this tab or another. */
 export function subscribePending(callback: () => void): () => void {
   const onStorage = (e: StorageEvent) => {
-    if (!e.key || e.key.startsWith('troystack_pending_writes_')) callback();
+    if (!e.key || e.key.startsWith('troystack_pending_writes_') || e.key.startsWith('troystack_pending_refused_')) callback();
   };
   globalThis.addEventListener?.(EVENT, callback);
   globalThis.addEventListener?.('storage', onStorage);
@@ -132,5 +174,6 @@ export async function sendPending(
     }
     if (!savePending(userId, readPending(userId, store).filter((w) => w.wid !== next.wid), store)) break;
   }
+  addRefused(userId, refused, store);
   return { sent, refused, waiting: readPending(userId, store).length };
 }

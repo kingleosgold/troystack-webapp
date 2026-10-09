@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { buildNotes, parseNotes } from '../lib/holdingNotes';
 import { isMetal } from '../lib/metals';
+import { stableUuid } from '../lib/stableId';
 import type { Holding, HoldingFormData, WeightUnit } from '../types/holding';
 import { WEIGHT_TO_OZT } from '../types/holding';
 
@@ -130,9 +131,11 @@ export class HoldingWriteError extends Error {
   }
 }
 
+// A 401 means the sign-in lapsed, which signing in again fixes, so the write
+// waits for that rather than being dropped.
 function writeFailed(error: { message?: string; code?: string }, status: number, message: string): HoldingWriteError {
   console.error('holding write failed', status, error);
-  return new HoldingWriteError(message, status === 0 || status === 408 || status === 429 || status >= 500);
+  return new HoldingWriteError(message, status === 0 || status === 401 || status === 408 || status === 429 || status >= 500);
 }
 
 /** A new row, its id made here so sending it twice can't add it twice. */
@@ -162,32 +165,47 @@ export async function addSupabaseHolding(form: HoldingFormData, userId: string):
 }
 
 /**
- * Several holdings in one insert. PostgREST runs it as a single statement, so
- * an import saves every row or none of them, and trying again can't double up.
+ * Several holdings in one write. PostgREST runs it as a single statement, so
+ * an import saves every row or none of them. Each row's id comes from the
+ * import's own id and the row's place in it, so sending the same import again
+ * after a lost answer finds those rows already there and adds nothing twice.
  */
-export async function addSupabaseHoldings(forms: HoldingFormData[], userId: string): Promise<Holding[]> {
+export async function addSupabaseHoldings(forms: HoldingFormData[], userId: string, batchId: string = crypto.randomUUID()): Promise<Holding[]> {
   if (forms.length === 0) return [];
   const now = new Date().toISOString();
-  const rows = forms.map((form) => ({
-    id: crypto.randomUUID(),
-    user_id: userId,
-    ...toColumns(form),
-    created_at: now,
-    updated_at: now,
-  }));
-  const { error } = await supabase.from('holdings').insert(rows);
-  if (error) {
-    console.error('holdings import failed', error);
-    throw new Error("That didn't save, so nothing was added. Try again.");
-  }
-  return rows.map((row) => fromRow(row as HoldingRow));
+  const rows: HoldingRow[] = await Promise.all(
+    forms.map(async (form, i) => ({
+      id: await stableUuid(`${userId}:import:${batchId}:${i}`),
+      user_id: userId,
+      ...toColumns(form),
+      created_at: now,
+      updated_at: now,
+    })),
+  );
+  const { error, status } = await supabase.from('holdings').upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
+  if (error) throw writeFailed(error, status, "That didn't save, so nothing was added. Try again.");
+  return rows.map(fromRow);
 }
 
 export type HoldingUpdates = ReturnType<typeof toColumns> & { updated_at: string };
 
-/** The columns an edit changes, the row's other notes keys kept. */
+/**
+ * The columns an edit changes, the row's other notes keys kept. The app's
+ * cost-basis override is a total for the line as it was, so it goes once the
+ * price, count, tax or shipping changes.
+ */
 export function holdingUpdates(existing: Holding, form: HoldingFormData): HoldingUpdates {
-  return { ...toColumns(form, existing.notesMeta), updated_at: new Date().toISOString() };
+  let meta = existing.notesMeta;
+  const costChanged =
+    form.purchasePrice !== existing.purchasePrice ||
+    form.quantity !== existing.quantity ||
+    (form.taxes ?? 0) !== (existing.taxes ?? 0) ||
+    (form.shipping ?? 0) !== (existing.shipping ?? 0);
+  if (meta && 'cost_basis' in meta && costChanged) {
+    meta = { ...meta };
+    delete meta.cost_basis;
+  }
+  return { ...toColumns(form, meta), updated_at: new Date().toISOString() };
 }
 
 /** The holding as it reads once an edit is saved, for showing before it is. */
@@ -224,31 +242,43 @@ export async function deleteSupabaseHolding(id: string, userId: string): Promise
   return softDeleteHolding(id, new Date().toISOString(), userId);
 }
 
-/** Copy holdings saved in this browser into a new account. */
+/**
+ * Copies holdings saved in this browser into an account. Each row's id comes
+ * from the account and the browser holding, so a second copy, from another
+ * tab or a retry after a lost answer, finds the rows already there. The
+ * account keeps whole pieces, so a fractional count from an older build
+ * becomes one piece holding the same ounces and cost.
+ */
 export async function uploadLocalHoldings(local: Holding[], userId: string): Promise<void> {
   if (local.length === 0) return;
   const now = new Date().toISOString();
-  const rows = local.map((h) => ({
-    id: crypto.randomUUID(),
-    user_id: userId,
-    metal: h.metal,
-    type: h.type,
-    weight: h.weight,
-    weight_unit: h.weightUnit,
-    quantity: h.quantity,
-    purchase_price: h.purchasePrice,
-    purchase_date: h.purchaseDate || null,
-    notes: buildNotes(h.notesMeta, {
-      dealer: h.dealer,
-      taxes: h.taxes,
-      shipping: h.shipping,
-      spotAtPurchase: h.spotAtPurchase,
-      premium: h.premium,
-      note: h.note,
+  const rows: HoldingRow[] = await Promise.all(
+    local.map(async (h) => {
+      const whole = Number.isInteger(h.quantity) && h.quantity > 0;
+      const scale = whole ? 1 : h.quantity;
+      return {
+        id: await stableUuid(`${userId}:guest:${h.id}`),
+        user_id: userId,
+        metal: h.metal,
+        type: h.type,
+        weight: h.weight * scale,
+        weight_unit: h.weightUnit,
+        quantity: whole ? h.quantity : 1,
+        purchase_price: h.purchasePrice * scale,
+        purchase_date: h.purchaseDate || null,
+        notes: buildNotes(h.notesMeta, {
+          dealer: h.dealer,
+          taxes: h.taxes,
+          shipping: h.shipping,
+          spotAtPurchase: h.spotAtPurchase,
+          premium: h.premium,
+          note: h.note,
+        }),
+        created_at: h.createdAt || now,
+        updated_at: now,
+      };
     }),
-    created_at: h.createdAt || now,
-    updated_at: now,
-  }));
-  const { error } = await supabase.from('holdings').insert(rows);
-  if (error) throw error;
+  );
+  const { error, status } = await supabase.from('holdings').upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
+  if (error) throw writeFailed(error, status, "The holdings in this browser didn't move into your account. Try again.");
 }

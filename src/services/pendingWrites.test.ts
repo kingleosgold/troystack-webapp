@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../lib/supabase', () => ({ supabase: {} }));
 
 import { HoldingWriteError, holdingAfter, holdingUpdates, newHoldingRow, fromRow } from './supabaseHoldings';
-import { canRetry, readPending, savePending, sendPending, withPending, type PendingWrite } from './pendingWrites';
+import { canRetry, clearRefused, readPending, readRefused, savePending, sendPending, withPending, type PendingWrite } from './pendingWrites';
+import { stableUuid } from '../lib/stableId';
 import type { HoldingFormData } from '../types/holding';
 
 const USER = 'user-a';
@@ -99,6 +100,10 @@ describe('changes waiting in the browser', () => {
     );
     expect(result).toEqual({ sent: 1, refused: 1, waiting: 0 });
     expect(readPending(USER, store)).toEqual([]);
+    expect(readRefused(USER, store), 'kept for the notice on any page').toBe(1);
+    expect(readRefused('user-b', store)).toBe(0);
+    clearRefused(USER, store);
+    expect(readRefused(USER, store)).toBe(0);
   });
 
   it("stop rather than loop when the store won't save", async () => {
@@ -119,5 +124,27 @@ describe('changes waiting in the browser', () => {
   it('count a dropped connection or a server error as worth retrying, a refusal not', () => {
     expect(canRetry(new HoldingWriteError('x', true))).toBe(true);
     expect(canRetry(new HoldingWriteError('x', false))).toBe(false);
+  });
+});
+
+describe('edits and ids', () => {
+  const existing = fromRow({
+    ...newHoldingRow({ ...FORM, quantity: 10 }, USER),
+    notes: JSON.stringify({ local_id: 1700000000001, cost_basis: 500, source: 'APMEX' }),
+  });
+
+  it("drop the app's cost-basis override once the cost of the line changes", () => {
+    const kept = JSON.parse(holdingUpdates(existing, { ...FORM, quantity: 10, note: 'Second tube' }).notes);
+    expect(kept.cost_basis, 'only the note changed').toBe(500);
+    const changed = JSON.parse(holdingUpdates(existing, { ...FORM, quantity: 20 }).notes);
+    expect(changed.cost_basis).toBeUndefined();
+    expect(changed.local_id, 'the app keeps tracking the row').toBe(1700000000001);
+  });
+
+  it('make the same id from the same seed, shaped like a UUID', async () => {
+    const a = await stableUuid('user-a:guest:h1');
+    expect(a).toBe(await stableUuid('user-a:guest:h1'));
+    expect(a).not.toBe(await stableUuid('user-b:guest:h1'));
+    expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 });
