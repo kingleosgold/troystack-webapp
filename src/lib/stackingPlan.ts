@@ -6,7 +6,8 @@ export type PlanMetal = 'gold' | 'silver';
 export interface PlanResult {
   invested: number;
   ounces: number;
-  value: number;
+  /** What it's worth at today's live spot, or null when there's no live price. */
+  value: number | null;
   months: number;
   series: ChartPoint[];
   investedSeries: ChartPoint[];
@@ -45,7 +46,9 @@ export function priceOnFirstOf(points: HistoryPoint[], metal: PlanMetal): (year:
 
 /**
  * The same dollar amount every month from January of the start year to this
- * month, valued at today's spot.
+ * month, valued at today's live spot. Without a live price there's no value
+ * for today, rather than one from an old sample, and the chart ends on this
+ * month's first.
  */
 export function runPlan(
   points: HistoryPoint[],
@@ -53,7 +56,7 @@ export function runPlan(
   monthly: number,
   startYear: number,
   premiumPct: number,
-  spotNow: number,
+  spotNow: number | null,
   now: Date = new Date(),
 ): PlanResult | null {
   if (!points.length || monthly <= 0) return null;
@@ -63,13 +66,11 @@ export function runPlan(
   let ounces = 0;
   let invested = 0;
   let months = 0;
-  let last = 0;
   const series: ChartPoint[] = [];
   const investedSeries: ChartPoint[] = [];
   for (let y = startYear, m = 1; y < endYear || (y === endYear && m <= endMonth); ) {
     const price = priceAt(y, m);
     if (price > 0) {
-      last = price;
       ounces += monthly / (price * (1 + premiumPct / 100));
       invested += monthly;
       months += 1;
@@ -84,7 +85,8 @@ export function runPlan(
     }
   }
   if (!months) return null;
-  const value = ounces * (spotNow || last);
-  series[series.length - 1] = { ...series[series.length - 1], v: value };
+  const live = spotNow != null && spotNow > 0;
+  const value = live ? ounces * spotNow : null;
+  if (value !== null) series[series.length - 1] = { ...series[series.length - 1], v: value };
   return { invested, ounces, value, months, series, investedSeries };
 }
