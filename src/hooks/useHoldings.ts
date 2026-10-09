@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Holding, HoldingFormData } from '../types/holding';
 import {
   addLocalHolding,
+  addLocalHoldings,
   clearLocalHoldings,
   deleteLocalHolding,
   getLocalHoldings,
@@ -11,11 +12,14 @@ import {
 } from '../services/holdings';
 import {
   addSupabaseHolding,
+  addSupabaseHoldings,
   deleteSupabaseHolding,
   fetchSupabaseHoldings,
   updateSupabaseHolding,
   uploadLocalHoldings,
 } from '../services/supabaseHoldings';
+
+const GUEST_KEY = ['holdings', 'guest'];
 
 /**
  * The stack. Signed in, it's the account's rows in Supabase, the same rows
@@ -26,8 +30,16 @@ import {
 export function useHoldings() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const key = useMemo(() => ['holdings', user?.id ?? 'guest'], [user?.id]);
+  const userId = user?.id;
+  const key = useMemo(() => (userId ? ['holdings', userId] : GUEST_KEY), [userId]);
   const [localVersion, setLocalVersion] = useState(0);
+
+  // Once the browser's guest stack is gone, its cached copy goes too, so no
+  // page keeps showing holdings that were cleared or moved into an account.
+  const emptyGuestStack = useCallback(() => {
+    clearLocalHoldings();
+    qc.setQueryData<Holding[]>(GUEST_KEY, []);
+  }, [qc]);
 
   const query = useQuery({
     queryKey: key,
@@ -38,7 +50,7 @@ export function useHoldings() {
         const local = getLocalHoldings();
         if (local.length > 0) {
           await uploadLocalHoldings(local, user.id);
-          clearLocalHoldings();
+          emptyGuestStack();
           return fetchSupabaseHoldings(user.id);
         }
       }
@@ -61,15 +73,14 @@ export function useHoldings() {
     [user, setData],
   );
 
+  // An import is one write, so a failure leaves nothing behind and trying
+  // the same file again can't add anything twice.
   const addMany = useCallback(
     async (forms: HoldingFormData[]): Promise<number> => {
-      let added = 0;
-      for (const form of forms) {
-        const h = user ? await addSupabaseHolding(form, user.id) : addLocalHolding(form);
-        setData((prev) => [h, ...prev]);
-        added += 1;
-      }
-      return added;
+      if (forms.length === 0) return 0;
+      const added = user ? await addSupabaseHoldings(forms, user.id) : addLocalHoldings(forms);
+      setData((prev) => [...added, ...prev]);
+      return added.length;
     },
     [user, setData],
   );
@@ -103,15 +114,15 @@ export function useHoldings() {
     if (!user) return;
     const local = getLocalHoldings();
     await uploadLocalHoldings(local, user.id);
-    clearLocalHoldings();
+    emptyGuestStack();
     setLocalVersion((v) => v + 1);
     await qc.invalidateQueries({ queryKey: key });
-  }, [user, qc, key]);
+  }, [user, qc, key, emptyGuestStack]);
 
   const clearBrowserStack = useCallback(() => {
-    clearLocalHoldings();
+    emptyGuestStack();
     setLocalVersion((v) => v + 1);
-  }, []);
+  }, [emptyGuestStack]);
 
   return {
     holdings: query.data ?? [],
