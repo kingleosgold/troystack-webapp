@@ -223,7 +223,9 @@ export default function Troy() {
   const [importRows, setImportRows] = useState<{ rows: ImportRow[]; source: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const createdHere = useRef<Set<string>>(new Set());
+  // The conversation whose messages are on screen, so a chat started here
+  // isn't reloaded over its own question, and any other chat always is.
+  const shownFor = useRef<string | null>(null);
   const autoAsked = useRef(false);
 
   const signedIn = Boolean(user);
@@ -247,15 +249,19 @@ export default function Troy() {
     staleTime: 30_000,
   });
 
-  // Load a saved conversation.
+  // Load a saved conversation. Another chat's messages come off the screen
+  // first, so nothing is asked under the wrong one while it loads.
   useEffect(() => {
     if (!user || !conversationId) return;
-    if (createdHere.current.has(conversationId)) return;
+    if (shownFor.current === conversationId) return;
     let cancelled = false;
     setError(null);
+    setMessages([]);
     getConversation(conversationId, user.id)
       .then((conv) => {
-        if (!cancelled) setMessages(conv.messages ?? []);
+        if (cancelled) return;
+        shownFor.current = conversationId;
+        setMessages(conv.messages ?? []);
       })
       .catch(() => {
         if (!cancelled) setError("That conversation didn't load.");
@@ -267,7 +273,10 @@ export default function Troy() {
 
   // Switching accounts or starting a new chat clears the screen.
   useEffect(() => {
-    if (!conversationId && user) setMessages([]);
+    if (!conversationId && user) {
+      shownFor.current = null;
+      setMessages([]);
+    }
   }, [conversationId, user]);
 
   // Signing out here takes the account's chat off the screen. It's never kept
@@ -277,6 +286,7 @@ export default function Troy() {
   useEffect(() => {
     if (wasSignedIn.current && !signedIn) {
       skipVisitorSave.current = true;
+      shownFor.current = null;
       setMessages(readVisitorChat());
     }
     wasSignedIn.current = signedIn;
@@ -311,7 +321,7 @@ export default function Troy() {
         const conv = await createConversation(user.id);
         id = conv.id;
         madeForThis = true;
-        createdHere.current.add(id);
+        shownFor.current = id;
         qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', user.id], (prev) => [conv, ...(prev ?? [])]);
         openChat.current = id;
         navigate(`/troy/c/${id}`, { replace: true });
@@ -502,7 +512,13 @@ export default function Troy() {
       }}
       onDelete={async (id) => {
         if (!user) return;
-        await deleteConversation(id, user.id).catch(() => undefined);
+        try {
+          await deleteConversation(id, user.id);
+        } catch {
+          // The chat is still saved, so it stays on the list and on screen.
+          setError("That chat couldn't be deleted. Check your connection and try again.");
+          return;
+        }
         qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', user.id], (prev) => (prev ?? []).filter((c) => c.id !== id));
         if (id === conversationId) navigate('/troy');
       }}
