@@ -163,7 +163,8 @@ export async function startCheckout(userId: string, token: string | undefined, p
   window.location.assign(url);
 }
 
-export function verifyCheckout(sessionId: string): Promise<{ success: boolean; tier?: string }> {
+/** `status` is the subscription's, 'trialing' during the free week. Older API versions leave it out. */
+export function verifyCheckout(sessionId: string): Promise<{ success: boolean; tier?: string; status?: string }> {
   return postJson('/v1/stripe/verify-session', { session_id: sessionId });
 }
 
