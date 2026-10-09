@@ -47,23 +47,37 @@ for (const tier of ['gold', 'lifetime'] as const) {
   });
 }
 
-test('when the API says the account already holds a plan, Settings says so', async ({ page }) => {
+test('when the API says the account already holds a plan, Settings says so and its Plan row catches up', async ({ page }) => {
   await signIn(page);
-  await mockBackends(page, { checkoutConflict: true });
+  // The profile reads Free, as when the app wrote Free over a web plan. The
+  // API knows better, answers 409, and a sync puts Gold back.
+  await mockBackends(page, { checkoutConflict: true, syncRestoresGold: true });
   await stubStripe(page);
   const checkouts = watchCheckouts(page);
   await page.goto(FREE_WEEK);
   await expect(page.getByText(HAVE_GOLD)).toBeVisible();
   await expect(page).toHaveURL(/\/settings$/);
   expect(checkouts).toHaveLength(1);
+  await expect(page.getByText('Everything in TroyStack is open to you.')).toBeVisible();
 });
 
-test("checkout still opens when the plan can't be read, after a short wait", async ({ page }) => {
+test('an account with Gold that came from a page goes back to it instead', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { tier: 'gold' });
+  await stubStripe(page);
+  const checkouts = watchCheckouts(page);
+  await page.goto('/auth?mode=signup&redirect=checkout&plan=yearly&next=/troy');
+  await expect(page).toHaveURL(/\/troy$/);
+  expect(checkouts).toHaveLength(0);
+});
+
+test("checkout still opens when the plan can't be read, after a short wait under a cover", async ({ page }) => {
   await signIn(page);
   await mockBackends(page, { failProfileRead: true });
   await stubStripe(page);
   const checkouts = watchCheckouts(page);
   await page.goto(FREE_WEEK);
+  await expect(page.getByRole('status').filter({ hasText: 'One moment' })).toBeVisible();
   await page.waitForTimeout(2500);
   expect(checkouts).toHaveLength(0);
   await expect(page).toHaveURL(/checkout\.stripe\.com/, { timeout: 10_000 });

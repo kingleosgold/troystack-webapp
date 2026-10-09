@@ -42,6 +42,12 @@ export interface MockOptions {
   checkoutConflict?: boolean;
   /** Reading the profile row fails, so the plan can't be read. */
   failProfileRead?: boolean;
+  /**
+   * The profile reads Free until a sync after a checkout attempt puts back the
+   * Gold the API knows about, as when the app wrote Free over a web plan and
+   * the sign-in sync lost the race with the plan read.
+   */
+  syncRestoresGold?: boolean;
 }
 
 function fulfillJson(route: Route, body: unknown, status = 200) {
@@ -65,6 +71,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   let connectionUp = true;
   // The profile row. Verifying a checkout turns it to Gold, as the real route does.
   let profile: Record<string, unknown> = { subscription_tier: opts.tier ?? 'free', subscription_status: null, trial_end: null };
+  let checkoutTried = false;
   let releaseChatLoads: () => void = () => undefined;
   const chatLoads = opts.holdChatLoads ? new Promise<void>((resolve) => { releaseChatLoads = resolve; }) : Promise.resolve();
 
@@ -150,6 +157,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (p === '/v1/snapshots' || p.startsWith('/v1/snapshots/')) return fulfillJson(route, { success: true, snapshots: [] });
     if (p === '/v1/sync-subscription') {
       if (opts.failSync) return fulfillJson(route, { error: 'Failed to fetch subscription status' }, 500);
+      if (opts.syncRestoresGold && checkoutTried) profile = { ...profile, subscription_tier: 'gold', subscription_status: 'active' };
       return fulfillJson(route, { user_id: USER_ID, subscription_tier: profile.subscription_tier, subscription_status: profile.subscription_status });
     }
     if (p === '/v1/stripe/verify-session') {
@@ -166,6 +174,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, { success: true, data: { dealer: 'APMEX', purchaseDate: '2026-10-01', items: [{ description: '1 oz Silver Eagle', metal: 'silver', ozt: 1, quantity: 10, unitPrice: 62.5 }] } });
     }
     if (p === '/v1/stripe/create-checkout-session') {
+      checkoutTried = true;
       if (opts.checkoutConflict) return fulfillJson(route, { error: 'This account already has Gold' }, 409);
       return fulfillJson(route, { url: 'https://checkout.stripe.com/c/pay/e2e' });
     }
