@@ -3,77 +3,15 @@ import { useHistory, useSpotMap } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { money, money0, num, signedMoney, signedPercent } from '../lib/format';
-import type { HistoryPoint } from '../lib/marketApi';
+import { runPlan, type PlanMetal } from '../lib/stackingPlan';
 import { cx } from '../lib/cx';
 import { Card, ErrorNote, Field, Input, PageHeader, Segmented, Select, Skeleton } from '../ui/primitives';
 import { AppStoreButton } from '../ui/AppStore';
-import type { ChartPoint } from '../ui/PriceChart';
 
 const PriceChart = lazy(() => import('../ui/PriceChart'));
 
-type DcaMetal = 'gold' | 'silver';
+type DcaMetal = PlanMetal;
 const FIRST_YEAR = 1970;
-
-interface Result {
-  invested: number;
-  ounces: number;
-  value: number;
-  months: number;
-  series: ChartPoint[];
-  investedSeries: ChartPoint[];
-}
-
-/** One price per calendar month, carrying the last known price over any gap. */
-function monthlyPrices(points: HistoryPoint[], metal: DcaMetal): Map<string, number> {
-  const byMonth = new Map<string, number>();
-  for (const p of points) {
-    const key = p.date.slice(0, 7);
-    if (!byMonth.has(key) && p[metal] > 0) byMonth.set(key, p[metal]);
-  }
-  return byMonth;
-}
-
-function runPlan(points: HistoryPoint[], metal: DcaMetal, monthly: number, startYear: number, premiumPct: number, spotNow: number): Result | null {
-  if (!points.length || monthly <= 0) return null;
-  const prices = monthlyPrices(points, metal);
-  const now = new Date();
-  const endKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-  let y = startYear;
-  let m = 1;
-  let last = 0;
-  // Seed the carried price with the last month before the start.
-  for (const [key, price] of [...prices.entries()].sort()) {
-    if (key < `${startYear}-01`) last = price;
-  }
-  let ounces = 0;
-  let invested = 0;
-  let months = 0;
-  const series: ChartPoint[] = [];
-  const investedSeries: ChartPoint[] = [];
-  for (;;) {
-    const key = `${y}-${String(m).padStart(2, '0')}`;
-    if (key > endKey) break;
-    const price = prices.get(key) ?? last;
-    if (price > 0) {
-      last = price;
-      ounces += monthly / (price * (1 + premiumPct / 100));
-      invested += monthly;
-      months += 1;
-      const t = Date.UTC(y, m - 1, 1);
-      series.push({ t, v: ounces * price });
-      investedSeries.push({ t, v: invested });
-    }
-    m += 1;
-    if (m > 12) {
-      m = 1;
-      y += 1;
-    }
-  }
-  if (!months) return null;
-  const value = ounces * (spotNow || last);
-  if (series.length) series[series.length - 1] = { ...series[series.length - 1], v: value };
-  return { invested, ounces, value, months, series, investedSeries };
-}
 
 export default function ToolStackingHistory() {
   usePageMeta({ ...SEO['/tools/stacking-history'], canonical: '/tools/stacking-history' });

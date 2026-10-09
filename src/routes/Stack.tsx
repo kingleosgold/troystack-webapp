@@ -90,7 +90,8 @@ function useDailySnapshot(userId: string | undefined, holdings: Holding[], price
     try {
       if (localStorage.getItem(key) === today) return;
     } catch {
-      return;
+      // Storage is blocked. The stack lives in the account, so the snapshot
+      // still goes, and the ref keeps it to one post per visit.
     }
     sent.current = true;
     const totals = stackTotals(holdings, prices);
