@@ -155,7 +155,7 @@ function holdingDetail(h: Holding): string {
 export default function Stack() {
   usePageMeta({ ...SEO['/stack'], canonical: '/stack' });
   const { user, isConfigured } = useAuth();
-  const { holdings, loading, error, isGuest, add, addMany, update, remove, refresh, leftInBrowser, moveBrowserStackIn, clearBrowserStack } = useHoldings();
+  const { holdings, loading, error, isGuest, add, addMany, update, remove, refresh, leftInBrowser, moveBrowserStackIn, clearBrowserStack, pendingCount, refused, dismissRefused } = useHoldings();
   const spot = useSpotMap();
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState<Holding | null>(null);
@@ -265,6 +265,17 @@ export default function Stack() {
             </Button>
             <Button size="sm" variant="ghost" onClick={clearBrowserStack}>Clear them</Button>
           </div>
+        </div>
+      )}
+      {!isGuest && pendingCount > 0 && (
+        <div role="status" className="mb-4 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg">
+          {pendingCount === 1 ? 'One change is' : `${pendingCount} changes are`} saved in this browser and will reach your account when you're back online.
+        </div>
+      )}
+      {refused > 0 && (
+        <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg">
+          <span>{refused === 1 ? "A change you made offline couldn't" : `${refused} changes you made offline couldn't`} be saved to your account. Check your stack and make {refused === 1 ? 'it' : 'them'} again.</span>
+          <Button size="sm" variant="ghost" onClick={dismissRefused}>OK</Button>
         </div>
       )}
       {importError && <div className="mb-4"><ErrorNote>{importError}</ErrorNote></div>}
