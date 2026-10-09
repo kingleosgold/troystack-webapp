@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSignOut } from '../contexts/SignOutContext';
 import { useTrial } from '../contexts/TrialContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { useHoldings } from '../hooks/useHoldings';
@@ -62,9 +63,9 @@ function Row({ title, detail, right, onClick, href, tone }: { title: ReactNode; 
 
 export default function Settings() {
   usePageMeta({ title: 'Settings', canonical: '/settings', noindex: true });
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const { user, session, loading: authLoading, isConfigured, signOut, linkWithGoogle, linkWithApple, updateEmailPassword, getLinkedProviders, hasEmailPassword } = useAuth();
+  const { user, session, loading: authLoading, isConfigured, linkWithGoogle, linkWithApple, updateEmailPassword, getLinkedProviders, hasEmailPassword } = useAuth();
+  const { requestSignOut } = useSignOut();
   const { tier, isTrial, trialEnd, refetch, loading: planLoading } = useSubscription();
   const { openTrial } = useTrial();
   const { holdings, isGuest, clearBrowserStack, loading: stackLoading, error: stackError, refresh: reloadStack } = useHoldings();
@@ -363,10 +364,9 @@ export default function Settings() {
           </Button>
           <Button
             variant="danger"
-            onClick={async () => {
-              await signOut();
+            onClick={() => {
               setSignOutOpen(false);
-              navigate('/');
+              requestSignOut();
             }}
           >
             Sign out

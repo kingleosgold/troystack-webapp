@@ -33,7 +33,7 @@ import { cx } from '../lib/cx';
 import { Composer, ConsentDialog, MessageBubble, TypingIndicator } from '../ui/TroyChat';
 import { hasTroyConsent } from '../lib/consent';
 import { ImportSheet, type ImportRow } from '../ui/ImportSheet';
-import { Button, Sheet } from '../ui/primitives';
+import { Button, ErrorNote, Sheet } from '../ui/primitives';
 import type { HoldingFormData } from '../types/holding';
 
 const MARKET_CHIPS = [
@@ -229,6 +229,9 @@ export default function Troy() {
   // A saved chat still loading. Nothing is sent until it's on screen, so the
   // load can't land over a question asked in the meantime.
   const [loadingChat, setLoadingChat] = useState(false);
+  // A saved chat that didn't load, and a count bumped to load it again.
+  const [failedChat, setFailedChat] = useState<string | null>(null);
+  const [chatTry, setChatTry] = useState(0);
   const [pending, setPending] = useState<string | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [importRows, setImportRows] = useState<{ rows: ImportRow[]; source: string } | null>(null);
@@ -275,6 +278,7 @@ export default function Troy() {
     if (shownFor.current === conversationId) return;
     let cancelled = false;
     setError(null);
+    setFailedChat(null);
     // Nothing is on screen while this one loads, so going back to the chat
     // that was showing loads it again.
     shownFor.current = null;
@@ -287,7 +291,9 @@ export default function Troy() {
         setMessages(conv.messages ?? []);
       })
       .catch(() => {
-        if (!cancelled) setError("That conversation didn't load.");
+        // Until it loads, the chat takes no new message. One sent now would be
+        // added to it, and the screen would show only the new exchange.
+        if (!cancelled) setFailedChat(conversationId);
       })
       .finally(() => {
         if (!cancelled) setLoadingChat(false);
@@ -296,7 +302,8 @@ export default function Troy() {
       cancelled = true;
       setLoadingChat(false);
     };
-  }, [user, conversationId]);
+  }, [user, conversationId, chatTry]);
+  const chatFailed = conversationId !== null && failedChat === conversationId;
 
   // Switching accounts or starting a new chat clears the screen.
   useEffect(() => {
@@ -404,7 +411,7 @@ export default function Troy() {
   const send = useCallback(
     async (text: string) => {
       const t = text.trim();
-      if (!t || busy || loadingChat) return;
+      if (!t || busy || loadingChat || chatFailed) return;
       if (!hasTroyConsent()) {
         setPending(t);
         setConsentOpen(true);
@@ -451,13 +458,13 @@ export default function Troy() {
         abortRef.current = null;
       }
     },
-    [busy, loadingChat, messages, signedIn, sendSignedIn, sendVisitor, qc],
+    [busy, loadingChat, chatFailed, messages, signedIn, sendSignedIn, sendVisitor, qc],
   );
 
   // A question handed over from another page, /troy?q=...
   useEffect(() => {
     const q = search.get('q');
-    if (!q || autoAsked.current || authLoading || loadingChat) return;
+    if (!q || autoAsked.current || authLoading || loadingChat || chatFailed) return;
     if (!signedIn && visitorStatus.isLoading) return;
     if (!signedIn && !visitorAvailable && isConfigured) return;
     // A visitor already at the day's limit keeps the question in the address,
@@ -467,7 +474,7 @@ export default function Troy() {
     search.delete('q');
     setSearch(search, { replace: true });
     void send(q);
-  }, [search, setSearch, authLoading, loadingChat, signedIn, visitorStatus.isLoading, visitorAvailable, visitorLimit, isConfigured, send]);
+  }, [search, setSearch, authLoading, loadingChat, chatFailed, signedIn, visitorStatus.isLoading, visitorAvailable, visitorLimit, isConfigured, send]);
 
   const todaysBrief = useCallback(async () => {
     if (!user) return;
@@ -509,7 +516,7 @@ export default function Troy() {
       scanning.current = true;
       setError(null);
       // Busy from the start, so the page shows something is happening while
-      // the plan and the scan count are checked.
+      // the plan and the scan limit are checked.
       setBusy(true);
       try {
         // Gold scans without a limit, so a plan that hasn't loaded isn't
@@ -528,14 +535,6 @@ export default function Troy() {
             openTrial({ reason: `Free accounts get ${s.scansLimit} receipt scans every 30 days, and you've used them.`, campaign: 'webapp-trial' });
             return;
           }
-          // The scan is counted before it runs, so a count that doesn't go
-          // through can't let scans past the limit.
-          try {
-            await countScan(user.id);
-          } catch {
-            setError("Receipt scans aren't available right now. Try again in a moment.");
-            return;
-          }
         }
         const base64 = await new Promise<string>((resolve, reject) => {
           const r = new FileReader();
@@ -547,6 +546,17 @@ export default function Troy() {
         if (!result.items?.length) {
           setError("Troy couldn't find any metal on that receipt.");
           return;
+        }
+        // A scan counts once it has found metal, the way the iPhone app counts
+        // it. A photo that can't be read, a scan that fails or a receipt with
+        // nothing on it doesn't use one up. If the count doesn't go through,
+        // what was found still shows.
+        if (!gold) {
+          try {
+            await countScan(user.id);
+          } catch (e) {
+            console.error('counting the receipt scan failed', e);
+          }
         }
         setImportRows({
           source: result.dealer ? `${result.dealer} receipt` : 'your receipt',
@@ -658,7 +668,7 @@ export default function Troy() {
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-3xl px-4 py-6 space-y-6">
-            {isEmpty && !limit && (
+            {isEmpty && !limit && !chatFailed && (
               <div className="flex flex-col items-center text-center pt-6 sm:pt-12">
                 <img src="/troy-96.png" alt="" className="h-20 w-20 rounded-full shadow-card" width={80} height={80} />
                 <h1 className="mt-4 text-[24px] sm:text-[28px] font-semibold tracking-tight text-fg">Ask Troy anything</h1>
@@ -694,6 +704,11 @@ export default function Troy() {
                 Loading this chat
               </p>
             )}
+            {chatFailed && (
+              <div className="pt-6">
+                <ErrorNote onRetry={() => setChatTry((n) => n + 1)}>This chat didn't load.</ErrorNote>
+              </div>
+            )}
             {messages.map((m) => (
               <MessageBubble key={m.id} message={m} userId={user?.id} canListen={isGold && m.role === 'assistant'} />
             ))}
@@ -722,8 +737,8 @@ export default function Troy() {
               onSend={(t) => void send(t)}
               onStop={() => abortRef.current?.abort()}
               busy={busy}
-              disabled={visitorBlocked || Boolean(limit) || loadingChat}
-              placeholder={visitorBlocked ? 'Sign in to ask Troy' : loadingChat ? 'Loading this chat' : 'Ask Troy anything'}
+              disabled={visitorBlocked || Boolean(limit) || loadingChat || chatFailed}
+              placeholder={visitorBlocked ? 'Sign in to ask Troy' : loadingChat ? 'Loading this chat' : chatFailed ? "This chat didn't load" : 'Ask Troy anything'}
               maxLength={signedIn ? 2000 : 500}
               onPhoto={signedIn ? (f) => void onPhoto(f) : undefined}
               onSpreadsheet={signedIn ? (f) => void onSpreadsheet(f) : undefined}
