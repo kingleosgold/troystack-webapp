@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageMeta } from '../hooks/usePageMeta';
-import { isWebPlan, rememberCheckout, rememberNextPath } from '../lib/checkout';
+import { isWebPlan, rememberCheckout, rememberNextPath, siteCampaign } from '../lib/checkout';
 import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { Button, Field, Input } from '../ui/primitives';
 
@@ -59,8 +59,9 @@ export default function Auth() {
   const sessionId = params.get('session_id');
 
   // Keep what they came here to do, so it survives a trip to Google or Apple.
+  // A link from troystack.com can say which part of it the checkout came from.
   useEffect(() => {
-    if (forCheckout && isWebPlan(plan)) rememberCheckout(plan);
+    if (forCheckout && isWebPlan(plan)) rememberCheckout(plan, siteCampaign(params.get('campaign')));
     rememberNextPath(params.get('next'));
   }, [forCheckout, plan, params]);
 
