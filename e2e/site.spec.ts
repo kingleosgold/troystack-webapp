@@ -73,13 +73,25 @@ test('home shows live prices and Troy\'s read', async ({ page }) => {
   await expect(page.getByText(/PBOC's record physical buying/).filter({ visible: true }).first()).toBeVisible();
 });
 
+test('pages fit a small phone without scrolling sideways', async ({ page }) => {
+  await mockBackends(page);
+  await page.setViewportSize({ width: 320, height: 700 });
+  for (const path of ['/', '/prices/gold', '/signal', '/tools/melt', '/tools/what-if', '/troy', '/stack', '/app', '/developers']) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible({ timeout: 15_000 });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, path).toBeLessThanOrEqual(0);
+  }
+});
+
 test("platinum's long-run chart starts where its real prices do", async ({ page }) => {
   await mockBackends(page);
   await page.goto('/prices/platinum');
   await page.getByRole('tab', { name: 'All' }).click();
   await expect(page.getByText('Platinum prices on TroyStack go back to March 2025.')).toBeVisible();
   // The API repeats the first recorded price back to 1915, and none of those repeats is drawn.
-  await expect(page.getByText('over the full history')).toBeVisible();
+  await expect(page.getByText('since March 2025')).toBeVisible();
+  await expect(page.getByText('over the full history')).toHaveCount(0);
   await page.getByRole('tab', { name: '1Y' }).click();
   await expect(page.getByText(/prices on TroyStack go back to/)).toHaveCount(0);
 });
