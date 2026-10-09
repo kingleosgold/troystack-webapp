@@ -390,6 +390,19 @@ test.describe('stack', () => {
     await expect(page.getByText('Platinum Maple Leaf').first()).toBeVisible();
     await page.waitForTimeout(1500);
     expect(mock.calls.filter((c) => c === 'POST /v1/snapshots')).toHaveLength(0);
+    // The values wait too, rather than counting the platinum at $0.
+    await expect(page.getByText("There's no live platinum price right now, so values that need it are on hold.")).toBeVisible();
+    await expect(page.getByText('Waiting for prices').filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByText('No price', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByText('$0.00')).toHaveCount(0);
+  });
+
+  test("a Gold account sees a way to retry when its stack history doesn't load", async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier: 'gold', holdings: SAMPLE_HOLDINGS, failSnapshots: true });
+    await page.goto('/stack');
+    await expect(page.getByText("Your stack's history didn't load.")).toBeVisible();
+    await expect(page.getByText(/history fills in a day at a time/)).toHaveCount(0);
   });
 
   test('signed in, it shows the same rows the app saved', async ({ page }) => {
@@ -715,4 +728,30 @@ test('a chat already deleted in the app leaves the list without an error', async
   await page.getByRole('button', { name: 'Delete Silver ratio' }).filter({ visible: true }).click();
   await expect(page).toHaveURL(/\/troy$/);
   await expect(page.getByText("That chat couldn't be deleted.", { exact: false })).toHaveCount(0);
+});
+
+test.describe('prices that are missing', () => {
+  test("the melt and junk silver calculators say so instead of showing $0.00, and offer to try again", async ({ page }) => {
+    const mock = await mockBackends(page, { failPrices: true });
+    await page.goto('/tools/melt');
+    await expect(page.getByText("Live prices didn't load, so values that need them are on hold.")).toBeVisible();
+    await expect(page.getByText('No price', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByText('$0.00')).toHaveCount(0);
+    const before = mock.calls.filter((c) => c === 'GET /v1/prices').length;
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect.poll(() => mock.calls.filter((c) => c === 'GET /v1/prices').length).toBeGreaterThan(before);
+
+    await page.goto('/tools/junk-silver');
+    await expect(page.getByText("Live prices didn't load, so values that need them are on hold.")).toBeVisible();
+    // The face value can be $0.00, since it isn't a price. The melt value and spot say there's none.
+    await expect(page.getByText('No price', { exact: true }).filter({ visible: true })).toHaveCount(3);
+  });
+
+  test('a metal the feed leaves out reads as no price on the home page and its price page', async ({ page }) => {
+    await mockBackends(page, { missingPrices: ['palladium'] });
+    await page.goto('/');
+    await expect(page.getByText('No price right now')).toBeVisible();
+    await page.goto('/prices/palladium');
+    await expect(page.getByText("There's no live palladium price right now.")).toBeVisible();
+  });
 });

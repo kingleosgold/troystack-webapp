@@ -46,6 +46,10 @@ export interface MockOptions {
   failProfileRead?: boolean;
   /** Metals the prices answer leaves out, as when a feed is down for one. */
   missingPrices?: Array<'gold' | 'silver' | 'platinum' | 'palladium'>;
+  /** The prices request fails, as when the API is down. */
+  failPrices?: boolean;
+  /** The stack history request fails. */
+  failSnapshots?: boolean;
   /** The 30-day vault history request fails. */
   failVaultHistory?: boolean;
   /**
@@ -94,6 +98,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
 
     if (p === '/v1/prices') {
+      if (opts.failPrices) return fulfillJson(route, { error: 'Prices unavailable' }, 503);
       const body = JSON.parse(read('prices.json')) as { prices: Record<string, unknown> };
       for (const m of opts.missingPrices ?? []) delete body.prices[m];
       return fulfillJson(route, body);
@@ -180,6 +185,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       const saved = chats[id] ?? (id.startsWith('conv-') && id !== 'conv-new' ? [{ id: `m-${id}`, role: 'assistant', content: `Saved answer for ${id}.`, created_at: '2026-10-08T12:00:00Z' }] : []);
       return fulfillJson(route, { id, title: 'Silver ratio', created_at: '', updated_at: '', messages: saved });
     }
+    if (p.startsWith('/v1/snapshots/') && opts.failSnapshots) return fulfillJson(route, { error: 'Snapshots unavailable' }, 500);
     if (p === '/v1/snapshots' || p.startsWith('/v1/snapshots/')) return fulfillJson(route, { success: true, snapshots: [] });
     if (p === '/v1/sync-subscription') {
       if (opts.failSync) return fulfillJson(route, { error: 'Failed to fetch subscription status' }, 500);
