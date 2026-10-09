@@ -50,28 +50,41 @@ export function HoldingEditor({ open, onClose, holding, onSave, onDelete }: Prop
   const [more, setMore] = useState(Boolean(holding?.dealer || holding?.taxes || holding?.shipping || holding?.note));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [spotThen, setSpotThen] = useState<number | null>(holding?.spotAtPurchase ?? null);
+  // Spot on the purchase date, for the premium the app records with each
+  // holding. It only counts while the form still shows the date and metal it
+  // was looked up for, so clearing or changing the date never saves an old one.
+  const [spotFor, setSpotFor] = useState<{ date: string; metal: string; spot: number | null }>(() => ({
+    date: holding?.purchaseDate ?? '',
+    metal: holding?.metal ?? '',
+    spot: holding?.spotAtPurchase ?? null,
+  }));
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const metal = f.metal as Metal;
   const set = (key: string, value: string) => setF((prev) => ({ ...prev, [key]: value }));
 
-  // Spot on the purchase date, for the premium the app records with each holding.
+  const spotThen = spotFor.date === f.purchaseDate && spotFor.metal === metal ? spotFor.spot : null;
+
+  // Looks spot up when the form has a date and metal it doesn't know yet. A
+  // holding the app recorded keeps the spot it saved for its own date.
   useEffect(() => {
-    if (!open) return;
+    if (!open || spotThen != null) return;
     const date = f.purchaseDate;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > todayISO()) return;
     const controller = new AbortController();
     const t = setTimeout(() => {
       fetchHistoricalSpot(date, controller.signal)
-        .then((spot) => setSpotThen(spot[metal] ?? null))
-        .catch(() => setSpotThen(null));
+        .then((spot) => {
+          const found = spot[metal];
+          if (found) setSpotFor({ date, metal, spot: found });
+        })
+        .catch(() => undefined);
     }, 400);
     return () => {
       clearTimeout(t);
       controller.abort();
     };
-  }, [open, f.purchaseDate, metal]);
+  }, [open, f.purchaseDate, metal, spotThen]);
 
   const ozPerPiece = (num(f.weight) || 0) * WEIGHT_TO_OZT[f.weightUnit as WeightUnit];
   const price = num(f.purchasePrice);

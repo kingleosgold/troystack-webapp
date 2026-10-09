@@ -14,6 +14,7 @@ export interface ImportRow {
   dealer?: string;
   taxes?: number;
   shipping?: number;
+  note?: string;
 }
 
 interface Props {
@@ -76,7 +77,7 @@ export function ImportSheet({ rows, source, onClose, onConfirm }: Props) {
               await onConfirm(good);
               onClose();
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'Some items didn\'t save. Try again.');
+              setError(e instanceof Error ? e.message : "That didn't save, so nothing was added. Try again.");
             } finally {
               setBusy(false);
             }
