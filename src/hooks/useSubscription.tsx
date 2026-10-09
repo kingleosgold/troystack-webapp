@@ -27,14 +27,20 @@ const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 const SubscriptionContext = createContext<SubscriptionState | undefined>(undefined);
 
-async function readPlan(userId: string): Promise<Plan> {
+/**
+ * The account's plan, or null when it couldn't be read. A profile with no row
+ * is a real answer of Free. A failed read isn't an answer, so it never turns
+ * a Gold account Free.
+ */
+async function readPlan(userId: string): Promise<Plan | null> {
   try {
     const { data, error } = await supabase
       .from('profiles')
       .select('subscription_tier, subscription_status, trial_end')
       .eq('id', userId)
       .single();
-    if (error || !data) return { userId, tier: 'free', isTrial: false, trialEnd: null };
+    if (error) return error.code === 'PGRST116' ? { userId, tier: 'free', isTrial: false, trialEnd: null } : null;
+    if (!data) return { userId, tier: 'free', isTrial: false, trialEnd: null };
     const row = data as Record<string, unknown>;
     const raw = row.subscription_tier;
     return {
@@ -44,9 +50,11 @@ async function readPlan(userId: string): Promise<Plan> {
       trialEnd: typeof row.trial_end === 'string' && row.trial_end ? row.trial_end : null,
     };
   } catch {
-    return { userId, tier: 'free', isTrial: false, trialEnd: null };
+    return null;
   }
 }
+
+const RETRY_AFTER_FAILURE = 30 * 1000;
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -56,6 +64,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   // Each read gets a number and only the newest may set the plan, so a slow
   // read that started before checkout can't put Free back afterwards.
   const readRef = useRef(0);
+  const retryRef = useRef<number | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   const fetchTier = useCallback(
     (options?: { force?: boolean }): Promise<void> => {
@@ -65,11 +75,37 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       if (!options?.force && now - lastFetchRef.current < 10_000) return Promise.resolve();
       lastFetchRef.current = now;
       const read = ++readRef.current;
+      if (retryRef.current != null) {
+        window.clearTimeout(retryRef.current);
+        retryRef.current = null;
+      }
       return readPlan(userId).then((next) => {
-        if (read === readRef.current) setPlan(next);
+        if (read !== readRef.current) return;
+        if (next) {
+          setPlan(next);
+          return;
+        }
+        // The read failed, so the plan already shown stays and the read runs
+        // again shortly, rather than waiting for the five-minute refresh.
+        retryRef.current = window.setTimeout(() => {
+          retryRef.current = null;
+          setRetryTick((t) => t + 1);
+        }, RETRY_AFTER_FAILURE);
       });
     },
     [userId],
+  );
+
+  useEffect(() => {
+    if (retryTick > 0) void fetchTier({ force: true });
+  }, [retryTick, fetchTier]);
+
+  useEffect(
+    () => () => {
+      if (retryRef.current != null) window.clearTimeout(retryRef.current);
+      retryRef.current = null;
+    },
+    [],
   );
 
   // Read once for each account that signs in

@@ -24,7 +24,9 @@ import {
 } from '../services/supabaseHoldings';
 import {
   canRetry,
+  clearRefused,
   readPending,
+  readRefused,
   savePending,
   sendPending,
   subscribePending,
@@ -71,7 +73,6 @@ export function useHoldings() {
   const userId = user?.id;
   const key = useMemo(() => (userId ? ['holdings', userId] : GUEST_KEY), [userId]);
   const [localVersion, setLocalVersion] = useState(0);
-  const [refused, setRefused] = useState(0);
   const mounted = useRef(true);
 
   const pendingCount = useSyncExternalStore(
@@ -79,12 +80,19 @@ export function useHoldings() {
     () => (userId ? readPending(userId).length : 0),
     () => 0,
   );
+  const refused = useSyncExternalStore(
+    subscribePending,
+    () => (userId ? readRefused(userId) : 0),
+    () => 0,
+  );
 
   // Once the browser's guest stack is gone, its cached copy goes too, so no
-  // page keeps showing holdings that were cleared or moved into an account.
+  // page keeps showing holdings that were cleared or moved into an account,
+  // and the offer to move them goes with it.
   const emptyGuestStack = useCallback(() => {
     clearLocalHoldings();
     qc.setQueryData<Holding[]>(GUEST_KEY, []);
+    setLocalVersion((v) => v + 1);
   }, [qc]);
 
   const query = useQuery({
@@ -95,9 +103,15 @@ export function useHoldings() {
       if (remote.length === 0) {
         const local = getLocalHoldings();
         if (local.length > 0) {
-          await uploadLocalHoldings(local, user.id);
-          emptyGuestStack();
-          remote = await fetchSupabaseHoldings(user.id);
+          // If the move fails, the account's stack still loads and the stack
+          // page offers to move them again.
+          try {
+            await uploadLocalHoldings(local, user.id);
+            emptyGuestStack();
+            remote = await fetchSupabaseHoldings(user.id);
+          } catch (e) {
+            console.error('moving the browser stack failed', e);
+          }
         }
       }
       return withPending(remote, readPending(user.id));
@@ -110,11 +124,10 @@ export function useHoldings() {
     [qc, key],
   );
 
-  // After a send, a refusal is told and the stack is read again.
+  // After a send the stack is read again. A refusal is kept for the notice.
   const settle = useCallback(
     (result: { sent: number; refused: number }) => {
       if (!mounted.current || !userId) return;
-      if (result.refused > 0) setRefused((n) => n + result.refused);
       if (result.sent > 0 || result.refused > 0) void qc.invalidateQueries({ queryKey: ['holdings', userId] });
     },
     [qc, userId],
@@ -192,13 +205,15 @@ export function useHoldings() {
     [user, setData, write],
   );
 
-  // An import is one write, so a failure leaves nothing behind and trying
-  // the same file again can't add anything twice. It isn't held for later.
+  // An import is one write, so a failure leaves nothing behind. Trying the
+  // same import again (the same batchId) can't add anything twice. It isn't
+  // held for later.
   const addMany = useCallback(
-    async (forms: HoldingFormData[]): Promise<number> => {
+    async (forms: HoldingFormData[], batchId?: string): Promise<number> => {
       if (forms.length === 0) return 0;
-      const added = user ? await addSupabaseHoldings(forms, user.id) : addLocalHoldings(forms);
-      setData((prev) => [...added, ...prev]);
+      const added = user ? await addSupabaseHoldings(forms, user.id, batchId) : addLocalHoldings(forms);
+      const ids = new Set(added.map((h) => h.id));
+      setData((prev) => [...added, ...prev.filter((h) => !ids.has(h.id))]);
       return added.length;
     },
     [user, setData],
@@ -244,6 +259,9 @@ export function useHoldings() {
     void localVersion;
     return user ? getLocalHoldings() : [];
   }, [user, localVersion]);
+  // While the account's stack is loading, the automatic move may be running,
+  // so the offer to move them waits until it's done.
+  const offerToMove = query.isFetching ? [] : leftInBrowser;
 
   const moveBrowserStackIn = useCallback(async () => {
     if (!user) return;
@@ -269,13 +287,15 @@ export function useHoldings() {
     update,
     remove,
     refresh: query.refetch,
-    leftInBrowser,
+    leftInBrowser: offerToMove,
     moveBrowserStackIn,
     clearBrowserStack,
     /** Changes saved in this browser that haven't reached the account yet. */
     pendingCount,
     /** Changes made offline that the account refused when they were sent. */
     refused,
-    dismissRefused: () => setRefused(0),
+    dismissRefused: () => {
+      if (userId) clearRefused(userId);
+    },
   };
 }

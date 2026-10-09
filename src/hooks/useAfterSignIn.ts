@@ -1,33 +1,72 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { startCheckout, takeCheckoutIntent, takeNextPath } from '../lib/checkout';
+import {
+  forgetCheckout,
+  forgetNextPath,
+  isWebPlan,
+  rememberCheckout,
+  rememberNextPath,
+  siteCampaign,
+  startCheckout,
+  takeCheckoutIntent,
+  takeNextPath,
+} from '../lib/checkout';
 
 /**
  * Finishes what someone started before signing in. Google and Apple sign-in
  * come back to the home page, and email confirmation links do too, so this
  * runs app-wide: it opens checkout for a plan picked in the last half hour,
  * or goes to the page they were on, or leaves the sign-in page.
+ *
+ * It stays out of the way in two places. A password reset link signs the
+ * account in, and the new password comes first. A return from Stripe means the
+ * checkout is done, so nothing waiting from before it may take the page over.
  */
 export function useAfterSignIn(): { openingCheckout: boolean } {
   const { user, session, loading } = useAuth();
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [openingCheckout, setOpeningCheckout] = useState(false);
   const handledFor = useRef<string | null>(null);
+  // Stripe sends people back with a full page load, so the address the page
+  // opened at says whether this visit is a return from checkout.
+  const landedFromStripe = useRef(typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('session_id'));
   const onAuthPage = pathname === '/auth';
+  const onResetPage = pathname === '/reset-password';
+
+  // A sign-in link says what to do afterwards. It's kept as soon as the page
+  // opens, before the sign-in page's own code has loaded, so neither a trip to
+  // Google or Apple nor an account that's already signed in loses it.
+  useEffect(() => {
+    if (!onAuthPage) return;
+    const params = new URLSearchParams(search);
+    const plan = params.get('plan');
+    if (params.get('redirect') === 'checkout' && isWebPlan(plan)) rememberCheckout(plan, siteCampaign(params.get('campaign')));
+    rememberNextPath(params.get('next'));
+  }, [onAuthPage, search]);
 
   useEffect(() => {
     if (loading || !user) {
       handledFor.current = null;
       return;
     }
+    if (onResetPage) return;
     const key = `${user.id}:${onAuthPage}`;
     if (handledFor.current === key) return;
     handledFor.current = key;
 
+    if (landedFromStripe.current) {
+      landedFromStripe.current = false;
+      forgetCheckout();
+      forgetNextPath();
+      return;
+    }
+
     const intent = takeCheckoutIntent();
     if (intent) {
+      // Stripe brings them back to Settings, so an older return path is done with.
+      forgetNextPath();
       // The browser is about to leave for Stripe; the overlay covers the wait.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpeningCheckout(true);
@@ -40,7 +79,7 @@ export function useAfterSignIn(): { openingCheckout: boolean } {
     const next = takeNextPath();
     if (next) navigate(next, { replace: true });
     else if (onAuthPage) navigate('/', { replace: true });
-  }, [loading, user, session?.access_token, onAuthPage, navigate]);
+  }, [loading, user, session?.access_token, onAuthPage, onResetPage, navigate]);
 
   return { openingCheckout };
 }
