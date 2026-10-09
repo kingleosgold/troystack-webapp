@@ -95,6 +95,15 @@ export function forgetCheckout(): void {
 }
 
 /** The plan picked before signing in, if it was picked in the last half hour. Reading it clears it. */
+/** Whether a plan picked before signing in is still waiting, without using it up. */
+export function hasCheckoutIntent(now = Date.now()): boolean {
+  try {
+    return readIntent(now) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function takeCheckoutIntent(now = Date.now()): { plan: WebPlan; campaign?: CheckoutCampaign } | null {
   try {
     const intent = readIntent(now);
