@@ -92,6 +92,13 @@ export function addLocalHolding(form: HoldingFormData): Holding {
   return holding;
 }
 
+/** Several holdings in one save, so an import lands whole or not at all. */
+export function addLocalHoldings(forms: HoldingFormData[]): Holding[] {
+  const added = forms.map((form) => fromForm(form));
+  save([...added, ...getLocalHoldings()]);
+  return added;
+}
+
 export function updateLocalHolding(existing: Holding, form: HoldingFormData): Holding {
   const updated = fromForm(form, existing);
   save(getLocalHoldings().map((h) => (h.id === existing.id ? updated : h)));
@@ -115,7 +122,7 @@ export function holdingsToCSV(holdings: Holding[]): string {
   const header = ['Product', 'Metal', 'Oz per piece', 'Quantity', 'Price per piece', 'Purchase date', 'Dealer', 'Taxes', 'Shipping', 'Note'];
   const esc = (v: unknown) => {
     const s = v == null ? '' : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const rows = holdings.map((h) => [
     h.type,

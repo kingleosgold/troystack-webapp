@@ -128,6 +128,28 @@ export async function addSupabaseHolding(form: HoldingFormData, userId: string):
   return fromRow(row as HoldingRow);
 }
 
+/**
+ * Several holdings in one insert. PostgREST runs it as a single statement, so
+ * an import saves every row or none of them, and trying again can't double up.
+ */
+export async function addSupabaseHoldings(forms: HoldingFormData[], userId: string): Promise<Holding[]> {
+  if (forms.length === 0) return [];
+  const now = new Date().toISOString();
+  const rows = forms.map((form) => ({
+    id: crypto.randomUUID(),
+    user_id: userId,
+    ...toColumns(form),
+    created_at: now,
+    updated_at: now,
+  }));
+  const { error } = await supabase.from('holdings').insert(rows);
+  if (error) {
+    console.error('holdings import failed', error);
+    throw new Error("That didn't save, so nothing was added. Try again.");
+  }
+  return rows.map((row) => fromRow(row as HoldingRow));
+}
+
 export async function updateSupabaseHolding(existing: Holding, form: HoldingFormData, userId: string): Promise<Holding> {
   const updates = { ...toColumns(form, existing.notesMeta), updated_at: new Date().toISOString() };
   const { data, error } = await supabase
