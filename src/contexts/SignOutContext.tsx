@@ -28,23 +28,36 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [phase, setPhase] = useState<Phase>(null);
+  // The phase as it is right now. A close can land after the phase changed
+  // and before the sheet redraws, and it has to act on the phase as it is.
+  const phaseNow = useRef<Phase>(null);
   const [waiting, setWaiting] = useState(0);
   // The account being signed out, and a send still going when the wait ran out.
   const leaving = useRef<{ userId: string; stillSending: Promise<void> | null } | null>(null);
-  // Closing the sheet while changes are being sent means stay signed in.
-  const cancelled = useRef(false);
+  // Each sign-out gets a number. Staying signed in moves it on, and a
+  // sign-out whose number has moved on stops where it is.
+  const flow = useRef(0);
+  // True from a request until its sign-out ends, however it ends.
   const busy = useRef(false);
   const signedInAs = useRef<string | null>(user?.id ?? null);
   useEffect(() => {
     signedInAs.current = user?.id ?? null;
   }, [user]);
 
+  const show = useCallback((next: Phase) => {
+    phaseNow.current = next;
+    setPhase(next);
+  }, []);
+
   const finish = useCallback(async () => {
     const left = leaving.current;
     leaving.current = null;
-    setPhase(null);
-    await signOut();
-    busy.current = false;
+    show(null);
+    try {
+      await signOut();
+    } finally {
+      busy.current = false;
+    }
     navigate('/');
     // A send still going when the account signed out can finish after, and
     // what it leaves goes too, unless the same account has signed back in.
@@ -54,40 +67,54 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
         if (signedInAs.current !== userId) dropQueuedChanges(userId);
       });
     }
-  }, [signOut, navigate]);
+  }, [signOut, navigate, show]);
 
   const requestSignOut = useCallback(() => {
     const userId = signedInAs.current;
     if (!userId || busy.current) return;
     busy.current = true;
-    cancelled.current = false;
+    const me = ++flow.current;
     void (async () => {
-      if (readPending(userId).length > 0) setPhase('sending');
-      const result = await sendBeforeSignOut(userId, () => sendQueuedChanges(userId));
-      leaving.current = { userId, stillSending: result.stillSending };
-      if (cancelled.current) {
-        busy.current = false;
-        void qc.invalidateQueries({ queryKey: ['holdings', userId] });
-        return;
+      // Once it asks, the answer ends the sign-out, not this.
+      let asking = false;
+      try {
+        if (readPending(userId).length > 0) show('sending');
+        const result = await sendBeforeSignOut(userId, () => sendQueuedChanges(userId));
+        if (flow.current !== me) {
+          // They chose to stay while the changes went. Whatever did go out
+          // shows once the stack is read again.
+          void qc.invalidateQueries({ queryKey: ['holdings', userId] });
+          return;
+        }
+        leaving.current = { userId, stillSending: result.stillSending };
+        if (result.waiting > 0) {
+          setWaiting(result.waiting);
+          show('ask');
+          asking = true;
+          return;
+        }
+        await finish();
+      } catch (e) {
+        console.error('signing out failed', e);
+        if (flow.current === me) show(null);
+      } finally {
+        if (flow.current === me && !asking) busy.current = false;
       }
-      if (result.waiting > 0) {
-        setWaiting(result.waiting);
-        setPhase('ask');
-        return;
-      }
-      await finish();
     })();
-  }, [finish, qc]);
+  }, [finish, qc, show]);
 
+  // Closing the sheet, or choosing to stay, keeps the account signed in and
+  // ends this sign-out, so the next one can start right away.
   const stay = useCallback(() => {
+    if (phaseNow.current === null) return;
     const left = leaving.current;
     leaving.current = null;
-    if (phase === 'sending') cancelled.current = true;
-    else busy.current = false;
-    setPhase(null);
+    flow.current += 1;
+    busy.current = false;
+    show(null);
     // Whatever did go out shows once the stack is read again.
     if (left) void qc.invalidateQueries({ queryKey: ['holdings', left.userId] });
-  }, [phase, qc]);
+  }, [qc, show]);
 
   const value = useMemo(() => ({ requestSignOut, signingOut: phase !== null }), [requestSignOut, phase]);
   const one = waiting === 1;
