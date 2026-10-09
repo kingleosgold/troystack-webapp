@@ -22,6 +22,8 @@ export interface MockOptions {
   tier?: 'free' | 'gold' | 'lifetime';
   /** How many holdings inserts fail before they start working. */
   failInserts?: number;
+  /** How many visitor questions fail with a server error before they start working. */
+  failAsks?: number;
   /** A signed-in free account that has used today's questions. */
   chatLimitReached?: boolean;
   /** Deleting a Troy chat fails, as when the connection drops. */
@@ -65,7 +67,12 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   const calls: string[] = [];
   /** The body of every holdings insert, in order. */
   const inserts: unknown[] = [];
+  /** Every holdings update, its query and body, in order. */
+  const patches: Array<{ query: string; body: Record<string, unknown> }> = [];
+  /** The body of every visitor question, in order. */
+  const asks: Array<{ message: string; history: Array<{ role: string; content: string }> }> = [];
   let failures = opts.failInserts ?? 0;
+  let askFailures = opts.failAsks ?? 0;
   let deleteFailures = opts.failDeletesTimes ?? 0;
   /** Messages saved in each Troy chat during the test, by conversation id. */
   const chats: Record<string, Array<Record<string, unknown>>> = {};
@@ -113,6 +120,11 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     }
     if (p === '/v1/troy/ask') {
       if (!quota) return fulfillJson(route, { error: 'Not found' }, 404);
+      asks.push(req.postDataJSON());
+      if (askFailures > 0) {
+        askFailures -= 1;
+        return fulfillJson(route, { error: 'Upstream timed out' }, 502);
+      }
       if (asked >= quota.questionsLimit) {
         return fulfillJson(route, { error: 'Daily limit reached', questionsUsed: asked, questionsLimit: quota.questionsLimit, resetsAt: quota.resetsAt }, 429);
       }
@@ -215,6 +227,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
         }
         return fulfillJson(route, [], 201);
       }
+      if (req.method() === 'PATCH') patches.push({ query: decodeURIComponent(url.search), body: req.postDataJSON() });
       if (!connectionUp) return route.abort('internetdisconnected');
       return fulfillJson(route, [], 200);
     }
@@ -231,6 +244,8 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   return {
     calls,
     inserts,
+    patches,
+    asks,
     setConnection(up: boolean) {
       connectionUp = up;
     },

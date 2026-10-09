@@ -128,6 +128,28 @@ test.describe('Troy for visitors', () => {
     await expect(page.getByText('Sign in to ask Troy')).toBeVisible();
   });
 
+  test("a question that doesn't get through comes off the chat, can be asked again and isn't sent as history", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('troy_ai_consent_v1', '{"version":1}'));
+    const mock = await mockBackends(page, { failAsks: 1 });
+    await page.goto('/troy');
+    await page.getByRole('textbox').fill('What is junk silver worth');
+    await page.getByRole('button', { name: 'Send' }).click();
+    const card = page.getByRole('alert').filter({ hasText: "Troy couldn't answer that just now." });
+    await expect(card).toBeVisible();
+    await expect(page.getByText('What is junk silver worth'), 'only on the card, not in the chat').toHaveCount(1);
+    expect(await page.evaluate(() => sessionStorage.getItem('troy_visitor_chat_v1'))).not.toContain('junk silver');
+
+    await card.getByRole('button', { name: 'Ask again' }).click();
+    await expect(page.getByText(/The move came after the Fed minutes/)).toBeVisible();
+    await expect(card).toHaveCount(0);
+    await page.getByRole('textbox').fill('And platinum?');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByText(/The move came after the Fed minutes/)).toHaveCount(2);
+    expect(mock.asks.map((a) => a.message)).toEqual(['What is junk silver worth', 'What is junk silver worth', 'And platinum?']);
+    expect(mock.asks.map((a) => a.history.length)).toEqual([0, 0, 2]);
+    expect(mock.asks[2].history[0]).toEqual({ role: 'user', content: 'What is junk silver worth' });
+  });
+
   test('a question from another page is asked on arrival', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('troy_ai_consent_v1', '{"version":1}'));
     await mockBackends(page);
@@ -307,6 +329,42 @@ test.describe('stack', () => {
     const [first, second] = mock.inserts as Array<{ id: string; type: string }>;
     expect(second.type).toBe('American Silver Eagle');
     expect(second.id, 'the same row is sent again, so it can never land twice').toBe(first.id);
+  });
+
+  test("changes the old site couldn't send reach the account, and their browser copies aren't offered again", async ({ page }) => {
+    const id = '0b5ad7a0-6f1e-4c55-9b7e-3d1f5e2a9c01';
+    const t = Date.parse('2026-10-08T14:00:00Z');
+    await signIn(page);
+    await page.addInitScript(
+      ({ id, t }) => {
+        if (sessionStorage.getItem('e2e_old_site')) return;
+        sessionStorage.setItem('e2e_old_site', '1');
+        const form = { weight: 1, weightUnit: 'oz', purchaseDate: '2026-10-08', notes: '' };
+        localStorage.setItem(
+          'stacktracker_pending_actions',
+          JSON.stringify([
+            { id: 'a1', type: 'add', data: { ...form, metal: 'gold', type: 'Gold Buffalo', quantity: 1, purchasePrice: 4100 }, timestamp: t },
+            { id: 'a2', type: 'update', holdingId: id, data: { ...form, metal: 'silver', type: 'American Silver Eagle', quantity: 75, purchasePrice: 36.5 }, timestamp: t + 60_000 },
+          ]),
+        );
+        localStorage.setItem(
+          'stacktracker_holdings',
+          JSON.stringify([{ ...form, id: `${t + 1}-abc1234`, metal: 'gold', type: 'Gold Buffalo', quantity: 1, purchasePrice: 4100 }]),
+        );
+      },
+      { id, t },
+    );
+    const mock = await mockBackends(page, { holdings: [{ ...SAMPLE_HOLDINGS[0], id }, SAMPLE_HOLDINGS[1]] });
+    await page.goto('/stack');
+    await expect(page.getByText('Gold Maple Leaf').first()).toBeVisible();
+    await expect.poll(() => mock.inserts.length).toBe(1);
+    expect((mock.inserts[0] as { type: string; user_id: string }).type).toBe('Gold Buffalo');
+    await expect.poll(() => mock.patches.length).toBe(1);
+    expect(mock.patches[0].query).toContain(`id=eq.${id}`);
+    expect(mock.patches[0].body.quantity).toBe(75);
+    await expect(page.getByText(/you added before signing in/)).toHaveCount(0);
+    await expect(page.getByText(/saved in this browser and will reach your account/)).toHaveCount(0);
+    expect(await page.evaluate(() => [localStorage.getItem('stacktracker_pending_actions'), localStorage.getItem('stacktracker_holdings')])).toEqual([null, null]);
   });
 
   test('a signed-in stack records its daily snapshot even when storage is blocked', async ({ page }) => {
