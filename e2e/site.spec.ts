@@ -620,25 +620,28 @@ test('starting one copy of an episode stops the other copy on the page', async (
 // A tiny PNG, enough for the photo picker.
 const PHOTO = { name: 'receipt.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') };
 
-test('a free account\'s receipt scan is counted before it runs', async ({ page }) => {
+test("a free account's receipt scan is counted once it finds metal, the way the app counts it", async ({ page }) => {
   await signIn(page);
   const api = await mockBackends(page);
   await page.goto('/troy');
   await page.locator('input[type="file"][accept="image/*"]').setInputFiles(PHOTO);
   await expect(page.getByText('1 oz Silver Eagle')).toBeVisible();
-  const count = api.calls.indexOf('POST /v1/increment-scan');
   const scan = api.calls.indexOf('POST /v1/scan-receipt');
-  expect(count).toBeGreaterThanOrEqual(0);
-  expect(scan).toBeGreaterThan(count);
+  const count = api.calls.indexOf('POST /v1/increment-scan');
+  expect(scan).toBeGreaterThanOrEqual(0);
+  expect(count).toBeGreaterThan(scan);
+  expect(api.calls.filter((c) => c === 'POST /v1/increment-scan')).toHaveLength(1);
 });
 
-test("a receipt scan that can't be counted doesn't run", async ({ page }) => {
+test("a receipt scan whose count doesn't go through still shows what it found", async ({ page }) => {
   await signIn(page);
   const api = await mockBackends(page, { failScanCount: true });
   await page.goto('/troy');
   await page.locator('input[type="file"][accept="image/*"]').setInputFiles(PHOTO);
-  await expect(page.getByText("Receipt scans aren't available right now. Try again in a moment.")).toBeVisible();
-  expect(api.calls).not.toContain('POST /v1/scan-receipt');
+  await expect(page.getByRole('dialog', { name: 'Add from APMEX receipt' })).toBeVisible();
+  await expect(page.getByText('1 oz Silver Eagle')).toBeVisible();
+  expect(api.calls).toContain('POST /v1/increment-scan');
+  await expect(page.getByText(/Receipt scans aren't available/)).toHaveCount(0);
 });
 
 test('a lifetime account can still reach billing and receipts', async ({ page }) => {

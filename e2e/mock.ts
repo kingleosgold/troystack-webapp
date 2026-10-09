@@ -34,6 +34,10 @@ export interface MockOptions {
   deletesGone?: boolean;
   /** Saved chats don't finish loading until the test calls releaseChatLoads. */
   holdChatLoads?: boolean;
+  /** How many saved-chat reads fail before they start working. */
+  failChatReads?: number;
+  /** The receipt scan finds nothing on the receipt, or fails outright. */
+  scanResult?: 'empty' | 'fail';
   /** GET /v1/sync-subscription fails, as when the API is down. */
   failSync?: boolean;
   /** The subscription status verify-session reports, 'active' for someone who had Gold before. */
@@ -110,6 +114,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   let failures = opts.failInserts ?? 0;
   let askFailures = opts.failAsks ?? 0;
   let deleteFailures = opts.failDeletesTimes ?? 0;
+  let chatReadFailures = opts.failChatReads ?? 0;
   /** Messages saved in each Troy chat during the test, by conversation id. */
   const chats: Record<string, Array<Record<string, unknown>>> = {};
   /** Chats started during the test, newest first in the list. */
@@ -223,6 +228,10 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (/^\/v1\/troy\/conversations\/[^/]+$/.test(p)) {
       const id = p.split('/').pop() as string;
       if (req.method() === 'GET') await chatLoads;
+      if (req.method() === 'GET' && chatReadFailures > 0) {
+        chatReadFailures -= 1;
+        return fulfillJson(route, { error: 'Failed to load conversation' }, 500);
+      }
       if (req.method() === 'DELETE') {
         if (opts.failDeletes) return fulfillJson(route, { error: 'Could not delete' }, 500);
         if (deleteFailures > 0) {
@@ -263,6 +272,8 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, { success: true, scansUsed: 1, scansLimit: 5, resetsAt: '2026-11-01T00:00:00Z' });
     }
     if (p === '/v1/scan-receipt') {
+      if (opts.scanResult === 'fail') return fulfillJson(route, { error: 'Scan failed' }, 500);
+      if (opts.scanResult === 'empty') return fulfillJson(route, { success: true, data: { dealer: null, purchaseDate: null, items: [] } });
       return fulfillJson(route, { success: true, data: { dealer: 'APMEX', purchaseDate: '2026-10-01', items: [{ description: '1 oz Silver Eagle', metal: 'silver', ozt: 1, quantity: 10, unitPrice: 62.5 }] } });
     }
     if (p === '/v1/stripe/create-checkout-session') {
@@ -319,6 +330,10 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     },
     setReads(up: boolean) {
       readsUp = up;
+    },
+    /** How many more saved-chat reads fail from now on. */
+    setChatReadFailures(n: number) {
+      chatReadFailures = n;
     },
     releaseChatLoads() {
       releaseChatLoads();

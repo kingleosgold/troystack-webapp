@@ -1,9 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { BRIEF_TEXT, mockBackends, SAMPLE_HOLDINGS, signIn } from './mock';
+import { BRIEF_TEXT, mockBackends, SAMPLE_HOLDINGS, signIn, USER_ID } from './mock';
 
 // A value the site can't get says so, with a way to try again, instead of
 // reading as zero, as empty or as still loading. A plan it can't read yet is
-// unknown, not Free. And a visitor's question isn't spent on a refusal.
+// unknown, not Free. A visitor's question isn't spent on a refusal, a scan
+// only counts when it finds metal, a chat that didn't load takes no new
+// message, and signing out doesn't quietly drop changes still waiting.
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
@@ -261,5 +263,154 @@ test.describe("Today's brief", () => {
     // Past the brief's answer.
     await page.waitForTimeout(2000);
     await expect(page.getByText(BRIEF_TEXT)).toHaveCount(0);
+  });
+});
+
+test.describe('a receipt scan that finds nothing', () => {
+  for (const scanResult of ['empty', 'fail'] as const) {
+    test(`doesn't use up a free scan (${scanResult === 'empty' ? 'no metal on it' : 'the scan fails'})`, async ({ page }) => {
+      await signIn(page);
+      const mock = await mockBackends(page, { scanResult });
+      await page.goto('/troy');
+      await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: PNG });
+      await expect(page.getByText(scanResult === 'empty' ? "Troy couldn't find any metal on that receipt." : "That receipt didn't scan. Try a clearer photo.")).toBeVisible();
+      expect(mock.calls).toContain('POST /v1/scan-receipt');
+      expect(mock.calls).not.toContain('POST /v1/increment-scan');
+    });
+  }
+});
+
+test.describe("a saved chat that didn't load", () => {
+  test('takes no new message until it loads, and says so with a way to load it again', async ({ page }) => {
+    await signIn(page);
+    const mock = await mockBackends(page, { conversations: 2, failChatReads: 100 });
+    await page.goto('/troy/c/conv-0');
+    await expect(page.getByText("This chat didn't load.")).toBeVisible();
+    const box = page.getByRole('textbox', { name: 'Message Troy' });
+    await expect(box).toBeDisabled();
+    await expect(box).toHaveAttribute('placeholder', "This chat didn't load");
+    await expect(page.getByRole('button', { name: 'What moved metals today?' })).toHaveCount(0);
+
+    mock.setChatReadFailures(0);
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+    await expect(page.getByText("This chat didn't load.")).toHaveCount(0);
+    await expect(box).toBeEnabled();
+    expect(mock.calls.filter((c) => c === 'POST /v1/troy/conversations/conv-0/messages')).toHaveLength(0);
+  });
+
+  test("doesn't stop another chat from opening, or a new one from starting", async ({ page }) => {
+    await signIn(page);
+    const mock = await mockBackends(page, { conversations: 2, failChatReads: 100 });
+    await page.goto('/troy/c/conv-0');
+    await expect(page.getByText("This chat didn't load.")).toBeVisible();
+    mock.setChatReadFailures(0);
+    await openChatList(page);
+    await page.getByRole('button', { name: 'Junk silver value', exact: true }).filter({ visible: true }).click();
+    await expect(page.getByText('Saved answer for conv-1.')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Message Troy' })).toBeEnabled();
+
+    await page.goto('/troy/c/conv-0');
+    await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+    await openChatList(page);
+    await page.getByRole('button', { name: 'New chat' }).filter({ visible: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Ask Troy anything' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Message Troy' })).toBeEnabled();
+  });
+
+  test('a new chat started after one failed to load can be asked in', async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { conversations: 2, failChatReads: 100 });
+    await page.goto('/troy/c/conv-0');
+    await expect(page.getByText("This chat didn't load.")).toBeVisible();
+    await openChatList(page);
+    await page.getByRole('button', { name: 'New chat' }).filter({ visible: true }).first().click();
+    await expect(page).toHaveURL(/\/troy$/);
+    await expect(page.getByText("This chat didn't load.")).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Message Troy' })).toBeEnabled();
+  });
+});
+
+const waitingKey = `troystack_pending_writes_${USER_ID}`;
+const refusedKey = `troystack_pending_refused_${USER_ID}`;
+const keysFor = (page: Page) => page.evaluate(([w, r]) => [localStorage.getItem(w) !== null, localStorage.getItem(r) !== null], [waitingKey, refusedKey]);
+
+async function goInApp(page: Page, path: string) {
+  await page.evaluate((to) => {
+    window.history.pushState({}, '', to);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, path);
+}
+
+/** Adds a holding while the connection is down, so it waits in the browser. */
+async function addWhileOffline(page: Page, mock: Awaited<ReturnType<typeof mockBackends>>) {
+  await page.goto('/stack');
+  await expect(page.getByText('Nothing in your stack yet')).toBeVisible();
+  mock.setConnection(false);
+  await page.getByRole('button', { name: 'Add a holding' }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Add a holding' });
+  await dialog.getByLabel('Product').fill('American Silver Eagle');
+  await dialog.getByRole('button', { name: 'Add to stack' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText("One change is saved in this browser and will reach your account when you're back online.")).toBeVisible();
+}
+
+test.describe('signing out', () => {
+  test('sends changes still waiting first, then drops what this account kept in the browser', async ({ page }) => {
+    await signIn(page);
+    const mock = await mockBackends(page);
+    await addWhileOffline(page, mock);
+    await page.evaluate((key) => localStorage.setItem(key, '1'), refusedKey);
+    await goInApp(page, '/settings');
+    await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
+    // Back online just as they sign out: the waiting add goes, and nothing is asked.
+    mock.setConnection(true);
+    const tries = mock.inserts.length;
+    await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('sb-')).length)).toBe(0);
+    await expect(page.getByRole('dialog', { name: 'Sign out now?' })).toHaveCount(0);
+    expect(mock.inserts, 'the sign-out sent the waiting add once').toHaveLength(tries + 1);
+    expect(await keysFor(page)).toEqual([false, false]);
+  });
+
+  test("asks first when changes can't be sent, and staying keeps them", async ({ page }) => {
+    await signIn(page);
+    const mock = await mockBackends(page);
+    await addWhileOffline(page, mock);
+    await goInApp(page, '/settings');
+    await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
+    await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
+    const ask = page.getByRole('dialog', { name: 'Sign out now?' });
+    await expect(ask.getByText("One change you made hasn't reached your account yet. If you sign out, it's dropped from this browser.")).toBeVisible();
+    await ask.getByRole('button', { name: 'Stay signed in' }).click();
+    await expect(ask).toBeHidden();
+    await expect(page).toHaveURL(/\/settings$/);
+    expect(await page.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith('sb-')))).toBe(true);
+    expect((await keysFor(page))[0], 'the waiting change is still here').toBe(true);
+
+    await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
+    await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Sign out now?' }).getByRole('button', { name: 'Sign out anyway' }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('sb-')).length)).toBe(0);
+    expect(await keysFor(page)).toEqual([false, false]);
+  });
+
+  test('asks the same way from the sidebar and the phone menu', async ({ page }) => {
+    await signIn(page);
+    const mock = await mockBackends(page);
+    await addWhileOffline(page, mock);
+    if (test.info().project.name === 'iphone') {
+      await page.getByRole('button', { name: 'Open menu' }).click();
+      await page.getByRole('dialog', { name: 'TroyStack' }).getByRole('button', { name: 'Sign out' }).click();
+    } else {
+      await page.locator('aside').getByRole('button', { name: 'Sign out' }).click();
+    }
+    const ask = page.getByRole('dialog', { name: 'Sign out now?' });
+    await expect(ask.getByText(/One change you made hasn't reached your account yet/)).toBeVisible();
+    await ask.getByRole('button', { name: 'Stay signed in' }).click();
+    await expect(page).toHaveURL(/\/stack$/);
+    expect((await keysFor(page))[0]).toBe(true);
   });
 });
