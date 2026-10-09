@@ -136,6 +136,18 @@ test.describe('free week', () => {
   });
 });
 
+test('a troystack.com trial link goes from sign-in straight to checkout, tagged with where it came from', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page);
+  const checkout = page.waitForRequest((r) => r.url().endsWith('/v1/stripe/create-checkout-session') && r.method() === 'POST');
+  await page.goto('/auth?mode=signup&redirect=checkout&plan=monthly&campaign=site-pricing');
+  const req = await checkout;
+  const body = req.postDataJSON();
+  expect(body.campaign).toBe('site-pricing');
+  expect(body.price_id).toBe('price_e2e_monthly');
+  expect(req.headers()['authorization']).toMatch(/^Bearer /);
+});
+
 test.describe('stack', () => {
   test('a visitor can add a holding and see it valued at spot', async ({ page }) => {
     await mockBackends(page);
