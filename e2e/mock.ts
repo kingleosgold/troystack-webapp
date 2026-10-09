@@ -28,6 +28,10 @@ export interface MockOptions {
   failDeletes?: boolean;
   /** Saved chats don't finish loading until the test calls releaseChatLoads. */
   holdChatLoads?: boolean;
+  /** GET /v1/sync-subscription fails, as when the API is down. */
+  failSync?: boolean;
+  /** The subscription status verify-session reports, 'active' for someone who had Gold before. */
+  verifyStatus?: string;
 }
 
 function fulfillJson(route: Route, body: unknown, status = 200) {
@@ -128,10 +132,14 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, { id, title: 'Silver ratio', created_at: '', updated_at: '', messages: saved });
     }
     if (p === '/v1/snapshots' || p.startsWith('/v1/snapshots/')) return fulfillJson(route, { success: true, snapshots: [] });
-    if (p === '/v1/sync-subscription') return fulfillJson(route, { user_id: USER_ID, subscription_tier: profile.subscription_tier, subscription_status: profile.subscription_status });
+    if (p === '/v1/sync-subscription') {
+      if (opts.failSync) return fulfillJson(route, { error: 'Failed to fetch subscription status' }, 500);
+      return fulfillJson(route, { user_id: USER_ID, subscription_tier: profile.subscription_tier, subscription_status: profile.subscription_status });
+    }
     if (p === '/v1/stripe/verify-session') {
-      profile = { subscription_tier: 'gold', subscription_status: 'trialing', trial_end: new Date(Date.now() + 7 * 86400000).toISOString() };
-      return fulfillJson(route, { success: true, tier: 'gold' });
+      const status = opts.verifyStatus ?? 'trialing';
+      profile = { subscription_tier: 'gold', subscription_status: status, trial_end: status === 'trialing' ? new Date(Date.now() + 7 * 86400000).toISOString() : null };
+      return fulfillJson(route, opts.verifyStatus ? { success: true, tier: 'gold', status } : { success: true, tier: 'gold' });
     }
     if (p === '/v1/scan-status') return fulfillJson(route, { scansUsed: 0, scansLimit: 5, resetsAt: '2026-11-01T00:00:00Z' });
     if (p === '/v1/stripe/create-checkout-session') return fulfillJson(route, { url: 'https://checkout.stripe.com/c/pay/e2e' });

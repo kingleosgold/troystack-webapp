@@ -305,6 +305,35 @@ test('back from checkout, Gold shows right away', async ({ page }) => {
   await expect(page).not.toHaveURL(/session_id/);
 });
 
+test('someone who had Gold before is welcomed back without a free week', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { verifyStatus: 'active' });
+  await page.goto('/settings?session_id=cs_test_e2e');
+  await expect(page.getByText('Gold is on. Thanks for coming back.')).toBeVisible();
+  await expect(page.getByText(/free week has started/)).toHaveCount(0);
+});
+
+test("a plan refresh that can't reach the API says so", async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { failSync: true });
+  await page.goto('/settings');
+  await page.getByRole('button', { name: /Refresh my plan/ }).click();
+  await expect(page.getByText("Your plan couldn't be checked just now. Try again in a minute.")).toBeVisible();
+  await expect(page.getByText('Your plan is up to date.')).toHaveCount(0);
+});
+
+test('typing in the email and password sheet keeps the cursor in the field', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page);
+  await page.goto('/settings');
+  await page.getByRole('button', { name: /Email and password/ }).click();
+  const email = page.getByLabel('New email');
+  await email.click();
+  await page.keyboard.type('new@example.com', { delay: 20 });
+  await expect(email).toHaveValue('new@example.com');
+  await expect(email).toBeFocused();
+});
+
 test("a page saved before checkout doesn't take over the return from Stripe", async ({ page }) => {
   await signIn(page);
   await page.addInitScript(() => localStorage.setItem('stg_auth_next', JSON.stringify({ path: '/troy', at: Date.now() })));
@@ -401,4 +430,36 @@ test('light theme holds up', async ({ page }) => {
   await expect(page.getByText('$4,180.80').filter({ visible: true }).first()).toBeVisible();
   await page.waitForLoadState('networkidle');
   await shot(page, 'home-light');
+});
+
+test('starting one copy of an episode stops the other copy on the page', async ({ page }) => {
+  // Audio can't load offline, so playing and pausing are stood in for.
+  await page.addInitScript(() => {
+    const playing = new WeakSet<HTMLMediaElement>();
+    Object.defineProperty(HTMLMediaElement.prototype, 'paused', {
+      configurable: true,
+      get(this: HTMLMediaElement) {
+        return !playing.has(this);
+      },
+    });
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      playing.add(this);
+      this.dispatchEvent(new Event('play'));
+      return Promise.resolve();
+    };
+    HTMLMediaElement.prototype.pause = function (this: HTMLMediaElement) {
+      if (!playing.has(this)) return;
+      playing.delete(this);
+      this.dispatchEvent(new Event('pause'));
+    };
+  });
+  await mockBackends(page);
+  await page.goto('/');
+  const plays = page.getByRole('button', { name: /^Play / });
+  await expect(plays).toHaveCount(2);
+  await plays.nth(0).click();
+  await expect(page.getByRole('button', { name: /^Pause / })).toHaveCount(1);
+  await page.getByRole('button', { name: /^Play / }).first().click();
+  await expect(page.getByRole('button', { name: /^Pause / })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: /^Play / })).toHaveCount(1);
 });
