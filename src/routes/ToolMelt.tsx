@@ -6,6 +6,7 @@ import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { METALS, METAL_LABEL, OZT_PER_GRAM, OZT_PER_KG } from '../lib/metals';
 import { COINS, type Coin } from '../lib/coins';
+import { PURITIES, purityPercent } from '../lib/purity';
 import { money, num } from '../lib/format';
 import type { Metal } from '../types/holding';
 import { Card, Field, Input, PageHeader, Segmented, Select } from '../ui/primitives';
@@ -77,6 +78,29 @@ export default function ToolMelt() {
               <Field label="Purity %" htmlFor="melt-purity">
                 <Input id="melt-purity" inputMode="decimal" value={purity} onChange={(e) => setPurity(e.target.value)} />
               </Field>
+            </div>
+          )}
+          {custom && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Common purities">
+              {PURITIES[metal].map((p) => {
+                const value = purityPercent(p.fineness);
+                return (
+                  <button
+                    key={p.short}
+                    type="button"
+                    onClick={() => setPurity(value)}
+                    aria-pressed={purity === value}
+                    title={p.label}
+                    className={
+                      purity === value
+                        ? 'h-8 rounded-lg border border-gold bg-gold-soft px-3 text-[13px] font-semibold text-fg'
+                        : 'h-8 rounded-lg border border-line px-3 text-[13px] font-semibold text-fg-2 hover:bg-surface-2 hover:text-fg'
+                    }
+                  >
+                    {p.short}
+                  </button>
+                );
+              })}
             </div>
           )}
           <Field label="How many" htmlFor="melt-qty">
