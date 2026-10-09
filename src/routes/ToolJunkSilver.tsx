@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useSpotMap } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { money, num } from '../lib/format';
+import { coinsInGroup } from '../lib/coins';
 import { Card, Field, Input, PageHeader, Segmented } from '../ui/primitives';
 import { AppStoreButton } from '../ui/AppStore';
 
@@ -104,6 +106,21 @@ export default function ToolJunkSilver() {
         </div>
         <AppStoreButton campaign="webapp-tools" label="Get the app" />
       </Card>
+      <section className="mt-8">
+        <h2 className="text-[15px] font-semibold text-fg">Coin by coin</h2>
+        <p className="mt-1 text-[13px] text-fg-3">Which years are silver, how much each one holds, and when a coin is worth more than its melt.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {coinsInGroup('us-silver').map((c) => (
+            <Link
+              key={c.slug}
+              to={`/coins/${c.slug}`}
+              className="rounded-lg border border-line px-3 py-1.5 text-[13px] font-semibold text-fg-2 hover:bg-surface-2 hover:text-fg"
+            >
+              {c.name}
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

@@ -18,7 +18,7 @@ import type { Holding, HoldingFormData, Metal } from '../types/holding';
 import { cx } from '../lib/cx';
 import { downloadText } from '../lib/download';
 import { formatDate } from '../lib/text';
-import { HoldingEditor } from '../ui/HoldingEditor';
+import { HoldingEditor, type HoldingStart } from '../ui/HoldingEditor';
 import { ImportSheet, type ImportRow } from '../ui/ImportSheet';
 import { GoldLock } from '../ui/GoldLock';
 import { AppStoreButton } from '../ui/AppStore';
@@ -161,6 +161,7 @@ export default function Stack() {
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState<Holding | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [start, setStart] = useState<HoldingStart | null>(null);
   const [filter, setFilter] = useState<'all' | Metal>('all');
   const [importRows, setImportRows] = useState<{ rows: ImportRow[]; source: string } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -171,13 +172,28 @@ export default function Stack() {
   const totals = useMemo(() => stackTotals(holdings, spot.prices, spot.changePct), [holdings, spot.prices, spot.changePct]);
   useDailySnapshot(user?.id, holdings, spot.prices, Boolean(spot.data) && !loading);
 
-  // Links from elsewhere on the site: /stack?add=1 and /stack?import=1
+  // Links from elsewhere on the site: /stack?add=1 and /stack?import=1. A
+  // coin page adds &coin=<slug>, and the form starts filled in for that coin.
   useEffect(() => {
     if (params.get('add') === '1') {
-      setEditing(null);
-      setEditorOpen(true);
+      const slug = params.get('coin');
       params.delete('add');
+      params.delete('coin');
       setParams(params, { replace: true });
+      setEditing(null);
+      const open = (s: HoldingStart | null) => {
+        setStart(s);
+        setEditorOpen(true);
+      };
+      if (!slug) open(null);
+      else {
+        import('../lib/coins')
+          .then(({ coinBySlug }) => {
+            const c = coinBySlug(slug);
+            open(c ? { metal: c.metal, type: c.name, weightOzt: c.fineOzt } : null);
+          })
+          .catch(() => open(null));
+      }
     } else if (params.get('import') === '1') {
       params.delete('import');
       setParams(params, { replace: true });
@@ -420,7 +436,11 @@ export default function Stack() {
           key={editing?.id ?? 'new'}
           open={editorOpen}
           holding={editing}
-          onClose={() => setEditorOpen(false)}
+          start={editing ? null : start}
+          onClose={() => {
+            setEditorOpen(false);
+            setStart(null);
+          }}
           onSave={async (form) => {
             if (editing) await update(editing, form);
             else await add(form);
