@@ -526,7 +526,8 @@ test.describe('stack', () => {
     // The next morning, with the page still open, the new day's goes.
     await page.clock.fastForward('22:00:00');
     await expect.poll(posts).toBe(2);
-    expect(await page.evaluate((id) => localStorage.getItem(`troystack_snapshot_${id}`), USER_ID)).toBe('2026-10-10');
+    // The day is stored once the post is answered, a moment after it goes.
+    await expect.poll(() => page.evaluate((id) => localStorage.getItem(`troystack_snapshot_${id}`), USER_ID)).toBe('2026-10-10');
   });
 
   test('a signed-in stack records its daily snapshot even when storage is blocked', async ({ page }) => {
@@ -916,6 +917,27 @@ test.describe('prices that are missing', () => {
     await expect(page.getByText("Live prices didn't load, so values that need them are on hold.")).toBeVisible();
     // The face value can be $0.00, since it isn't a price. The melt value and spot say there's none.
     await expect(page.getByText('No price', { exact: true }).filter({ visible: true })).toHaveCount(3);
+  });
+
+  test("the stacking tool has no value for today without a live price, and offers to try again", async ({ page }) => {
+    const mock = await mockBackends(page, { failPrices: true });
+    await page.goto('/tools/stacking-history');
+    await expect(page.getByText('Worth today')).toBeVisible();
+    await expect(page.getByText('No price', { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(page.getByText("Live prices didn't load, so values that need them are on hold.")).toBeVisible();
+    // No gain is shown from an old sample.
+    await expect(page.getByText(/ on \$[\d,]+ put in/)).toHaveCount(0);
+    await expect(page.getByText(/through the first of this month/)).toBeVisible();
+    const before = mock.calls.filter((c) => c === 'GET /v1/prices').length;
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect.poll(() => mock.calls.filter((c) => c === 'GET /v1/prices').length).toBeGreaterThan(before);
+  });
+
+  test("the stacking tool says which metal has no live price", async ({ page }) => {
+    await mockBackends(page, { missingPrices: ['silver'] });
+    await page.goto('/tools/stacking-history');
+    await expect(page.getByText("There's no live silver price right now, so values that need it are on hold.")).toBeVisible();
+    await expect(page.getByText('No price', { exact: true }).filter({ visible: true })).toBeVisible();
   });
 
   test('a metal the feed leaves out reads as no price on the home page and its price page', async ({ page }) => {
