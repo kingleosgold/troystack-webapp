@@ -8,10 +8,19 @@ import { premiumPerPiece } from '../lib/stackMath';
 import { money } from '../lib/format';
 import { Button, Field, Input, Segmented, Select, Sheet, Textarea } from './primitives';
 
+/** What a new holding starts as, when a coin page sends someone to add one. */
+export interface HoldingStart {
+  metal: Metal;
+  type: string;
+  /** Troy ounces of metal in one piece */
+  weightOzt: number;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
   holding?: Holding | null;
+  start?: HoldingStart | null;
   onSave: (form: HoldingFormData) => Promise<void>;
   onDelete?: () => Promise<void>;
 }
@@ -20,9 +29,10 @@ function todayISO(): string {
   return new Date().toLocaleDateString('en-CA');
 }
 
-function initialForm(h?: Holding | null): Record<string, string> {
+function initialForm(h?: Holding | null, start?: HoldingStart | null): Record<string, string> {
   if (!h) {
-    return { metal: 'silver', type: '', weight: '1', weightUnit: 'oz', quantity: '1', purchasePrice: '', purchaseDate: todayISO(), dealer: '', taxes: '', shipping: '', note: '' };
+    const blank = { metal: 'silver', type: '', weight: '1', weightUnit: 'oz', quantity: '1', purchasePrice: '', purchaseDate: todayISO(), dealer: '', taxes: '', shipping: '', note: '' };
+    return start ? { ...blank, metal: start.metal, type: start.type, weight: String(+start.weightOzt.toFixed(5)) } : blank;
   }
   const shownWeight = h.weightUnit === 'oz' ? h.weight : h.weight / WEIGHT_TO_OZT[h.weightUnit];
   return {
@@ -45,8 +55,8 @@ const num = (v: string) => {
   return Number.isFinite(n) ? n : NaN;
 };
 
-export function HoldingEditor({ open, onClose, holding, onSave, onDelete }: Props) {
-  const [f, setF] = useState<Record<string, string>>(() => initialForm(holding));
+export function HoldingEditor({ open, onClose, holding, start, onSave, onDelete }: Props) {
+  const [f, setF] = useState<Record<string, string>>(() => initialForm(holding, start));
   const [more, setMore] = useState(Boolean(holding?.dealer || holding?.taxes || holding?.shipping || holding?.note));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
