@@ -8,6 +8,7 @@ import {
   clearLocalHoldings,
   deleteLocalHolding,
   getLocalHoldings,
+  guestStackSnapshot,
   updateLocalHolding,
 } from '../services/holdings';
 import {
@@ -23,6 +24,7 @@ import {
   uploadLocalHoldings,
 } from '../services/supabaseHoldings';
 import {
+  adoptLegacyPending,
   canRetry,
   clearRefused,
   readPending,
@@ -99,6 +101,10 @@ export function useHoldings() {
     queryKey: key,
     queryFn: async (): Promise<Holding[]> => {
       if (!user) return getLocalHoldings();
+      // Changes the old site couldn't send join this account's list first.
+      // Their browser copies leave the guest stack with them, before it can
+      // be moved into an empty account.
+      adoptLegacyPending(user.id);
       let remote = await fetchSupabaseHoldings(user.id);
       if (remote.length === 0) {
         const local = getLocalHoldings();
@@ -254,11 +260,15 @@ export function useHoldings() {
   );
 
   // A signed-in account that already had holdings leaves a guest stack in
-  // the browser untouched; the stack page offers to add it or clear it.
+  // the browser untouched; the stack page offers to add it or clear it. It's
+  // read again when the stored stack changes, as when copies of the old
+  // site's offline adds leave it.
+  const guestStored = useSyncExternalStore(subscribePending, () => (userId ? guestStackSnapshot() : ''), () => '');
   const leftInBrowser = useMemo(() => {
     void localVersion;
+    void guestStored;
     return user ? getLocalHoldings() : [];
-  }, [user, localVersion]);
+  }, [user, localVersion, guestStored]);
   // While the account's stack is loading, the automatic move may be running,
   // so the offer to move them waits until it's done.
   const offerToMove = query.isFetching ? [] : leftInBrowser;
