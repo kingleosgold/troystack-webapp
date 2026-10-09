@@ -129,6 +129,13 @@ test.describe('coin values', () => {
     expect(html).toContain('<title>Mercury dime melt value today | TroyStack</title>');
     expect(html).toContain('<link rel="canonical" href="https://troystack.ai/coins/mercury-dime" />');
     expect(html).toContain('<noscript><h1>Mercury dime</h1>');
+    // The breadcrumb search results show, Coin and bar values then the coin.
+    const ld = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)![1]);
+    expect(ld['@type']).toBe('BreadcrumbList');
+    expect(ld.itemListElement.map((i: { name: string; item: string }) => [i.name, i.item])).toEqual([
+      ['Coin and bar values', 'https://troystack.ai/coins'],
+      ['Mercury dime', 'https://troystack.ai/coins/mercury-dime'],
+    ]);
     const sitemap = await (await request.get('/sitemap.xml')).text();
     expect(sitemap).toContain('<loc>https://troystack.ai/coins/mercury-dime</loc>');
   });
