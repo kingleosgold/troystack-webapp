@@ -47,8 +47,15 @@ export function useAfterSignIn(): { openingCheckout: boolean } {
   }, [onAuthPage, search]);
 
   useEffect(() => {
-    if (loading || !user) {
+    if (loading) {
       handledFor.current = null;
+      return;
+    }
+    if (!user) {
+      handledFor.current = null;
+      // A return from Stripe that finds nobody signed in has nothing to
+      // settle, so a sign-in later on this page is handled as usual.
+      landedFromStripe.current = false;
       return;
     }
     if (onResetPage) return;
