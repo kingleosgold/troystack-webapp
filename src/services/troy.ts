@@ -1,4 +1,10 @@
-const API_BASE_URL = 'https://api.troystack.ai';
+import { ApiError, getJson, postJson, API_BASE } from '../lib/apiClient';
+
+/**
+ * Troy chat. Signed-in calls use the same endpoints and the same Supabase
+ * user id as the iPhone app, so conversations are shared between the two.
+ * Visitors who haven't signed in use /v1/troy/ask, which keeps nothing.
+ */
 
 export interface TroyMessage {
   id: string;
@@ -13,7 +19,6 @@ export interface TroyConversationSummary {
   title: string;
   created_at: string;
   updated_at: string;
-  message_count?: number;
 }
 
 export interface TroyConversation extends TroyConversationSummary {
@@ -41,42 +46,51 @@ export interface SendMessageResponse {
   preview?: TroyPreview | null;
 }
 
-async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `${res.status} ${res.statusText}`);
-  }
-  return res.json();
+export interface Quota {
+  questionsUsed: number;
+  questionsLimit: number;
+  resetsAt: string;
 }
 
-export async function createConversation(userId: string, title?: string): Promise<TroyConversationSummary> {
-  return jsonFetch(`${API_BASE_URL}/v1/troy/conversations`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, ...(title ? { title } : {}) }),
-  });
+/** Thrown when Troy's daily question limit is reached. */
+export class QuotaError extends Error {
+  quota: Quota;
+  constructor(quota: Quota) {
+    super('Daily question limit reached');
+    this.name = 'QuotaError';
+    this.quota = quota;
+  }
+}
+
+function quotaFrom(err: ApiError): Quota {
+  return {
+    questionsUsed: Number(err.body.questionsUsed) || 0,
+    questionsLimit: Number(err.body.questionsLimit) || 3,
+    resetsAt: String(err.body.resetsAt || new Date(Date.now() + 86400000).toISOString()),
+  };
+}
+
+export async function createConversation(userId: string): Promise<TroyConversationSummary> {
+  return postJson('/v1/troy/conversations', { userId });
 }
 
 export async function listConversations(userId: string): Promise<TroyConversationSummary[]> {
-  const res = await jsonFetch<{ conversations?: TroyConversationSummary[] } | TroyConversationSummary[]>(
-    `${API_BASE_URL}/v1/troy/conversations?userId=${encodeURIComponent(userId)}`,
+  const res = await getJson<{ conversations?: TroyConversationSummary[] } | TroyConversationSummary[]>(
+    `/v1/troy/conversations?userId=${encodeURIComponent(userId)}`,
   );
-  if (Array.isArray(res)) return res;
-  return res.conversations ?? [];
+  return Array.isArray(res) ? res : res.conversations ?? [];
 }
 
 export async function getConversation(conversationId: string, userId: string): Promise<TroyConversation> {
-  return jsonFetch(
-    `${API_BASE_URL}/v1/troy/conversations/${conversationId}?userId=${encodeURIComponent(userId)}`,
-  );
+  return getJson(`/v1/troy/conversations/${encodeURIComponent(conversationId)}?userId=${encodeURIComponent(userId)}`);
 }
 
 export async function deleteConversation(conversationId: string, userId: string): Promise<void> {
-  await jsonFetch(
-    `${API_BASE_URL}/v1/troy/conversations/${conversationId}?userId=${encodeURIComponent(userId)}`,
+  const res = await fetch(
+    `${API_BASE}/v1/troy/conversations/${encodeURIComponent(conversationId)}?userId=${encodeURIComponent(userId)}`,
     { method: 'DELETE' },
   );
+  if (!res.ok) throw new ApiError(`Delete failed (${res.status})`, res.status);
 }
 
 export async function sendMessage(
@@ -85,32 +99,91 @@ export async function sendMessage(
   message: string,
   signal?: AbortSignal,
 ): Promise<SendMessageResponse> {
-  const res = await fetch(
-    `${API_BASE_URL}/v1/troy/conversations/${conversationId}/messages`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, message }),
-      signal,
-    },
-  );
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `${res.status} ${res.statusText}`);
+  try {
+    return await postJson<SendMessageResponse>(
+      `/v1/troy/conversations/${encodeURIComponent(conversationId)}/messages`,
+      { userId, message },
+      { signal, timeoutMs: 90000 },
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 403 && err.body.questionsLimit != null) {
+      throw new QuotaError(quotaFrom(err));
+    }
+    throw err;
   }
-  return res.json();
 }
 
+// ── Visitors ──────────────────────────────────────────────────────
+
+export interface VisitorTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AskResponse extends Quota {
+  reply: string;
+}
+
+/**
+ * What a visitor's next question carries of the chat so far: each question
+ * Troy answered, with its answer. A question that failed or was stopped never
+ * got one, and sent along as if it had, it would leave Troy answering around
+ * a question he never saw.
+ */
+export function answeredTurns(messages: TroyMessage[]): VisitorTurn[] {
+  const turns: VisitorTurn[] = [];
+  for (let i = 0; i < messages.length - 1; i++) {
+    const q = messages[i];
+    const a = messages[i + 1];
+    if (q.role === 'user' && a.role === 'assistant') turns.push({ role: 'user', content: q.content }, { role: 'assistant', content: a.content });
+  }
+  return turns;
+}
+
+/** Thrown when the visitor endpoint isn't live on the API yet. */
+export class VisitorChatUnavailable extends Error {
+  constructor() {
+    super('Visitor chat is unavailable');
+    this.name = 'VisitorChatUnavailable';
+  }
+}
+
+export async function askAsVisitor(message: string, history: VisitorTurn[], signal?: AbortSignal): Promise<AskResponse> {
+  try {
+    return await postJson<AskResponse>('/v1/troy/ask', { message, history: history.slice(-6) }, { signal, timeoutMs: 90000 });
+  } catch (err) {
+    if (err instanceof ApiError) {
+      // The visitor limit says how many questions were used. A 429 without
+      // that is the API's general rate limit, which passes in a minute.
+      if (err.status === 429 && err.body.questionsLimit != null) throw new QuotaError(quotaFrom(err));
+      if (err.status === 404 || err.status === 405) throw new VisitorChatUnavailable();
+    }
+    throw err;
+  }
+}
+
+export async function visitorQuota(signal?: AbortSignal): Promise<Quota | null> {
+  try {
+    return await getJson<Quota>('/v1/troy/ask/status', { signal, timeoutMs: 8000 });
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 404 || err.status === 405)) return null;
+    throw err;
+  }
+}
+
+// ── Voice and receipts ────────────────────────────────────────────
+
+/** Troy reads a reply aloud. Gold only on the API side. */
 export async function speak(text: string, userId: string, signal?: AbortSignal): Promise<Blob> {
-  const res = await fetch(`${API_BASE_URL}/v1/troy/speak`, {
+  const res = await fetch(`${API_BASE}/v1/troy/speak`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, userId }),
+    body: JSON.stringify({ text: text.slice(0, 4000), userId }),
     signal,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `TTS failed: ${res.status}`);
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.message || body.error || `Listen failed (${res.status})`, res.status, body);
   }
   return res.blob();
 }
@@ -132,14 +205,26 @@ export interface ScanReceiptResult {
 }
 
 export async function scanReceipt(base64Image: string, mimeType = 'image/jpeg'): Promise<ScanReceiptResult> {
-  const raw = await jsonFetch<{ success?: boolean; data?: ScanReceiptResult } | ScanReceiptResult>(
-    `${API_BASE_URL}/v1/scan-receipt`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64Image, mimeType }),
-    },
+  const raw = await postJson<{ success?: boolean; data?: ScanReceiptResult } | ScanReceiptResult>(
+    '/v1/scan-receipt',
+    { image: base64Image, mimeType },
+    { timeoutMs: 60000 },
   );
   if ('data' in raw && raw.data) return raw.data;
   return raw as ScanReceiptResult;
+}
+
+export interface ScanStatus {
+  scansUsed: number;
+  scansLimit: number;
+  resetsAt: string;
+}
+
+/** Free accounts get five receipt scans every 30 days, the same as the app. */
+export async function scanStatus(userId: string): Promise<ScanStatus> {
+  return getJson<ScanStatus>(`/v1/scan-status?userId=${encodeURIComponent(userId)}`);
+}
+
+export async function countScan(userId: string): Promise<void> {
+  await postJson('/v1/increment-scan', { userId });
 }

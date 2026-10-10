@@ -1,185 +1,165 @@
-import type { Holding, HoldingFormData, WeightUnit } from '../types/holding';
-import { WEIGHT_CONVERSIONS } from '../types/holding';
+import type { Holding, HoldingFormData } from '../types/holding';
+import { WEIGHT_TO_OZT } from '../types/holding';
+import { isMetal } from '../lib/metals';
+
+/**
+ * A guest's stack, kept in this browser until they sign in. Signing in to an
+ * account with no holdings moves these into it, the same rule the app uses
+ * for a guest's stack.
+ */
 
 const STORAGE_KEY = 'stacktracker_holdings';
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-}
+/** Where the guest stack is kept, for code that reads it with its own storage. */
+export const GUEST_STACK_KEY = STORAGE_KEY;
 
-function convertToTroyOz(weight: number, unit: WeightUnit): number {
-  return weight * WEIGHT_CONVERSIONS[unit];
-}
-
-export function getHoldings(): Holding[] {
+function readRaw(): unknown[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    const parsed = data ? JSON.parse(data) : [];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    console.error('Failed to load holdings from localStorage');
     return [];
   }
 }
 
-function saveHoldings(holdings: Holding[]): void {
+function positive(value: unknown): number | undefined {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/**
+ * Older builds saved a free-text `notes`; it becomes `note`. A holding saved
+ * without an id gets one from its place in the list, so it reads the same
+ * every time.
+ */
+function normalize(raw: unknown, index: number): Holding | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const h = raw as Record<string, unknown>;
+  if (!isMetal(h.metal)) return null;
+  const now = new Date().toISOString();
+  return {
+    id: String(h.id || `guest-${index}`),
+    metal: h.metal,
+    type: String(h.type || 'Other'),
+    weight: Number(h.weight) || 0,
+    weightUnit: h.weightUnit === 'g' || h.weightUnit === 'kg' ? h.weightUnit : 'oz',
+    quantity: positive(h.quantity) ?? 1,
+    purchasePrice: Number(h.purchasePrice) || 0,
+    purchaseDate: typeof h.purchaseDate === 'string' ? h.purchaseDate.slice(0, 10) : '',
+    dealer: typeof h.dealer === 'string' ? h.dealer : undefined,
+    taxes: positive(h.taxes),
+    shipping: positive(h.shipping),
+    spotAtPurchase: positive(h.spotAtPurchase),
+    premium: positive(h.premium),
+    note: typeof h.note === 'string' ? h.note : typeof h.notes === 'string' ? h.notes : undefined,
+    createdAt: typeof h.createdAt === 'string' ? h.createdAt : now,
+    updatedAt: typeof h.updatedAt === 'string' ? h.updatedAt : now,
+  };
+}
+
+export function getLocalHoldings(): Holding[] {
+  return readRaw()
+    .map((raw, i) => normalize(raw, i))
+    .filter((h): h is Holding => h !== null);
+}
+
+function save(holdings: Holding[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(holdings));
-  } catch (error) {
-    console.error('Failed to save holdings to localStorage:', error);
-    throw new Error('Failed to save holdings');
+  } catch {
+    throw new Error("This browser wouldn't save your stack. Check that site storage is allowed.");
   }
 }
 
-export function addHolding(formData: HoldingFormData): Holding {
-  const holdings = getHoldings();
+function fromForm(form: HoldingFormData, base?: Holding): Holding {
   const now = new Date().toISOString();
-
-  const holding: Holding = {
-    id: generateId(),
-    metal: formData.metal,
-    type: formData.type,
-    weight: convertToTroyOz(formData.weight, formData.weightUnit),
-    weightUnit: formData.weightUnit,
-    quantity: formData.quantity,
-    purchasePrice: formData.purchasePrice,
-    purchaseDate: formData.purchaseDate,
-    notes: formData.notes || undefined,
-    createdAt: now,
+  return {
+    id: base?.id ?? crypto.randomUUID(),
+    metal: form.metal,
+    type: form.type.trim() || 'Other',
+    weight: form.weight * WEIGHT_TO_OZT[form.weightUnit],
+    weightUnit: form.weightUnit,
+    quantity: form.quantity,
+    purchasePrice: form.purchasePrice,
+    purchaseDate: form.purchaseDate,
+    dealer: form.dealer?.trim() || undefined,
+    taxes: positive(form.taxes),
+    shipping: positive(form.shipping),
+    spotAtPurchase: positive(form.spotAtPurchase),
+    premium: positive(form.premium),
+    note: form.note?.trim() || undefined,
+    notesMeta: base?.notesMeta,
+    createdAt: base?.createdAt ?? now,
     updatedAt: now,
   };
+}
 
-  holdings.push(holding);
-  saveHoldings(holdings);
+export function addLocalHolding(form: HoldingFormData): Holding {
+  const holding = fromForm(form);
+  save([holding, ...getLocalHoldings()]);
   return holding;
 }
 
-export function updateHolding(id: string, updates: Partial<HoldingFormData>): Holding {
-  const holdings = getHoldings();
-  const index = holdings.findIndex((h) => h.id === id);
+/** Several holdings in one save, so an import lands whole or not at all. */
+export function addLocalHoldings(forms: HoldingFormData[]): Holding[] {
+  const added = forms.map((form) => fromForm(form));
+  save([...added, ...getLocalHoldings()]);
+  return added;
+}
 
-  if (index === -1) {
-    throw new Error(`Holding with id ${id} not found`);
-  }
-
-  const existing = holdings[index];
-  const updated: Holding = {
-    ...existing,
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
-
-  // Recalculate weight in troy oz if weight or unit changed
-  if (updates.weight !== undefined || updates.weightUnit !== undefined) {
-    const weight = updates.weight ?? existing.weight;
-    const unit = updates.weightUnit ?? existing.weightUnit;
-    updated.weight = convertToTroyOz(weight, unit);
-    updated.weightUnit = unit;
-  }
-
-  holdings[index] = updated;
-  saveHoldings(holdings);
+export function updateLocalHolding(existing: Holding, form: HoldingFormData): Holding {
+  const updated = fromForm(form, existing);
+  save(getLocalHoldings().map((h) => (h.id === existing.id ? updated : h)));
   return updated;
 }
 
-export function deleteHolding(id: string): void {
-  const holdings = getHoldings();
-  const filtered = holdings.filter((h) => h.id !== id);
-
-  if (filtered.length === holdings.length) {
-    throw new Error(`Holding with id ${id} not found`);
-  }
-
-  saveHoldings(filtered);
+export function deleteLocalHolding(id: string): void {
+  save(getLocalHoldings().filter((h) => h.id !== id));
 }
 
-export function exportToCSV(): string {
-  const holdings = getHoldings();
+/** Takes holdings out of the guest stack, as once a read finds them in the account. */
+export function removeLocalHoldings(ids: Set<string>): void {
+  const left = getLocalHoldings().filter((h) => !ids.has(h.id));
+  if (left.length === 0) clearLocalHoldings();
+  else save(left);
+}
 
-  if (holdings.length === 0) {
+/** The guest stack as stored, for noticing when it changes. */
+export function guestStackSnapshot(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEY) ?? '';
+  } catch {
     return '';
   }
+}
 
-  const headers = [
-    'Metal',
-    'Type',
-    'Weight (oz)',
-    'Quantity',
-    'Total Oz',
-    'Purchase Price',
-    'Purchase Date',
-    'Notes',
-    'Created At',
-  ];
+export function clearLocalHoldings(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // nothing to clear
+  }
+}
 
+/** CSV of a stack, with the same columns the import reads back. */
+export function holdingsToCSV(holdings: Holding[]): string {
+  const header = ['Product', 'Metal', 'Oz per piece', 'Quantity', 'Price per piece', 'Purchase date', 'Dealer', 'Taxes', 'Shipping', 'Note'];
+  const esc = (v: unknown) => {
+    const s = v == null ? '' : String(v);
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
   const rows = holdings.map((h) => [
-    h.metal,
     h.type,
-    h.weight.toFixed(4),
-    h.quantity.toString(),
-    (h.weight * h.quantity).toFixed(4),
-    h.purchasePrice.toFixed(2),
+    h.metal,
+    h.weight,
+    h.quantity,
+    h.purchasePrice,
     h.purchaseDate,
-    h.notes || '',
-    h.createdAt,
-  ]);
-
-  const csvContent = [
-    headers.join(','),
-    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
-  ].join('\n');
-
-  return csvContent;
-}
-
-export function importFromCSV(csv: string): Holding[] {
-  const lines = csv.trim().split('\n');
-
-  if (lines.length < 2) {
-    throw new Error('CSV must have a header row and at least one data row');
-  }
-
-  const holdings = getHoldings();
-  const imported: Holding[] = [];
-  const now = new Date().toISOString();
-
-  // Skip header row
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    // Simple CSV parsing (handles quoted fields)
-    const cells = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-    const values = cells.map((cell) => cell.replace(/^"|"$/g, '').trim());
-
-    if (values.length < 6) {
-      console.warn(`Skipping row ${i + 1}: not enough columns`);
-      continue;
-    }
-
-    const [metal, type, weight, quantity, , purchasePrice, purchaseDate, notes] = values;
-
-    const holding: Holding = {
-      id: generateId(),
-      metal: metal.toLowerCase() as Holding['metal'],
-      type: type,
-      weight: parseFloat(weight) || 0,
-      weightUnit: 'oz',
-      quantity: parseInt(quantity, 10) || 1,
-      purchasePrice: parseFloat(purchasePrice) || 0,
-      purchaseDate: purchaseDate || now.split('T')[0],
-      notes: notes || undefined,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    imported.push(holding);
-  }
-
-  // Merge with existing holdings
-  const merged = [...holdings, ...imported];
-  saveHoldings(merged);
-
-  return imported;
-}
-
-export function clearAllHoldings(): void {
-  saveHoldings([]);
+    h.dealer ?? '',
+    h.taxes ?? '',
+    h.shipping ?? '',
+    h.note ?? '',
+  ].map(esc).join(','));
+  return [header.join(','), ...rows].join('\n');
 }

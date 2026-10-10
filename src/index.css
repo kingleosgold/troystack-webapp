@@ -1,103 +1,251 @@
 @import "tailwindcss";
 
-@theme {
-  --color-background: #0A0A0E;
-  --color-sidebar: #0B0B10;
-  --color-surface: rgba(255, 255, 255, 0.05);
-  --color-surface-alt: #111115;
-  --color-surface-hover: rgba(255, 255, 255, 0.07);
-  --color-surface-light: rgba(255, 255, 255, 0.08);
-  --color-gold: #DAA520;
-  --color-gold-hover: #E8B42E;
-  --color-gold-dim: rgba(218, 165, 32, 0.2);
-  --color-gold-contrast: #1a1508;
-  --color-text: #ffffff;
-  --color-text-muted: #707070;
-  --color-text-secondary: #A0A0A8;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-light: rgba(255, 255, 255, 0.12);
-  --color-green: #22C55E;
-  --color-red: #EF4444;
-  --color-chart-bg: rgba(255, 255, 255, 0.03);
-  --color-chart-border: rgba(255, 255, 255, 0.08);
-  --color-chart-grid: rgba(255, 255, 255, 0.05);
-  --color-chart-label: #707070;
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Design tokens ───────────────────────────────────────────────
+   Light is the base; .dark on <html> swaps every token. Components only
+   use the semantic names below, never raw hex, so both themes stay in
+   step. */
+:root {
+  --bg: #f6f4ee;
+  --bg-elev: #fbfaf6;
+  --surface: #ffffff;
+  --surface-2: #f2efe7;
+  --surface-3: #e8e4d9;
+  --line: rgba(28, 24, 14, 0.09);
+  --line-strong: rgba(28, 24, 14, 0.16);
+  --fg: #17150f;
+  --fg-2: #47433a;
+  --fg-3: #6b665a;
+  --gold: #8a6512;
+  --gold-2: #6f500c;
+  --gold-soft: rgba(176, 132, 38, 0.12);
+  --btn: #c8992f;
+  --btn-hover: #b98a24;
+  --btn-fg: #1a1305;
+  --up: #12784a;
+  --down: #b83a2a;
+  --up-soft: rgba(18, 120, 74, 0.1);
+  --down-soft: rgba(184, 58, 42, 0.1);
+  --m-gold: #b8871f;
+  --m-silver: #7c8592;
+  --m-platinum: #4f7fae;
+  --m-palladium: #a8674c;
+  --shadow: 0 1px 2px rgba(28, 24, 14, 0.06), 0 8px 24px rgba(28, 24, 14, 0.06);
+  --chart-grid: rgba(28, 24, 14, 0.07);
+  color-scheme: light;
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html, body {
-  background-color: #0A0A0E;
-  color: #ffffff;
+.dark {
+  --bg: #0b0b0d;
+  --bg-elev: #0f0f12;
+  --surface: #151518;
+  --surface-2: #1b1b1f;
+  --surface-3: #242429;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.13);
+  --fg: #f4f1e9;
+  --fg-2: #bdb8ad;
+  --fg-3: #8f8a7f;
+  --gold: #dcb35a;
+  --gold-2: #f0cf7a;
+  --gold-soft: rgba(220, 179, 90, 0.12);
+  --btn: #d9ad4f;
+  --btn-hover: #e8be62;
+  --btn-fg: #1a1305;
+  --up: #45c08a;
+  --down: #f07465;
+  --up-soft: rgba(69, 192, 138, 0.12);
+  --down-soft: rgba(240, 116, 101, 0.12);
+  --m-gold: #dcb35a;
+  --m-silver: #c4cbd4;
+  --m-platinum: #9cbcdc;
+  --m-palladium: #d9a58f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.35);
+  --chart-grid: rgba(255, 255, 255, 0.06);
   color-scheme: dark;
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
-  margin: 0;
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --color-bg: var(--bg);
+  --color-bg-elev: var(--bg-elev);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-gold: var(--gold);
+  --color-gold-2: var(--gold-2);
+  --color-gold-soft: var(--gold-soft);
+  --color-btn: var(--btn);
+  --color-btn-hover: var(--btn-hover);
+  --color-btn-fg: var(--btn-fg);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-up-soft: var(--up-soft);
+  --color-down-soft: var(--down-soft);
+  --color-m-gold: var(--m-gold);
+  --color-m-silver: var(--m-silver);
+  --color-m-platinum: var(--m-platinum);
+  --color-m-palladium: var(--m-palladium);
+
+  --shadow-card: var(--shadow);
 }
 
-#root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+/* ── Base ─────────────────────────────────────────────────────────
+   Kept in the base layer so a utility class on an element always wins.
+   (Tailwind's preflight already makes links inherit their color.) */
+@layer base {
+  html {
+    background-color: var(--bg);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  ::selection {
+    background: var(--gold-soft);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
 }
 
-/* Custom scrollbar */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  background: var(--line-strong);
+  border-radius: 8px;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  scrollbar-width: none;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.scrollbar-none::-webkit-scrollbar { display: none; }
-.scrollbar-none { scrollbar-width: none; }
-
-/* Number inputs: remove spinners */
+/* Number inputs without spinners */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-
 input[type="number"] {
   -moz-appearance: textfield;
 }
 
-/* Message fly-up on append */
-@keyframes messageFlyUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Long-form reading text (Signal articles, Troy's take) */
+.prose-troy p {
+  margin: 0 0 1em;
+}
+.prose-troy p:last-child {
+  margin-bottom: 0;
+}
+.prose-troy strong {
+  color: var(--fg);
+  font-weight: 650;
+}
+.prose-troy ul,
+.prose-troy ol {
+  margin: 0 0 1em;
+  padding-left: 1.25em;
+}
+.prose-troy li {
+  margin: 0.25em 0;
+}
+.prose-troy a {
+  color: var(--gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
-.message-enter {
-  animation: messageFlyUp 0.24s ease-out both;
+/* Motion */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fade-up 0.28s ease-out both;
 }
 
-/* Smooth transitions for route changes */
-.page-enter {
-  opacity: 0;
-  transform: translateY(8px);
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
 }
 
-.page-enter-active {
-  opacity: 1;
-  transform: translateY(0);
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Safe-area padding for the phone tab bar */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
 }

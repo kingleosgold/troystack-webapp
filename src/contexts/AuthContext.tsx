@@ -1,14 +1,16 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { syncSubscription } from '../services/api';
+import { clearStackCopies } from '../services/stackCopy';
+import { dropQueuedChanges } from '../services/pendingWrites';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
   isConfigured: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; needsConfirmation: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signInWithApple: () => Promise<{ error: AuthError | null }>;
@@ -26,14 +28,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-  const syncedUserRef = useRef<string | null>(null);
+  // Without Supabase there's no session to wait for.
+  const [loading, setLoading] = useState(isSupabaseConfigured);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setLoading(false);
-      return;
-    }
+    if (!isSupabaseConfigured) return;
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -53,21 +53,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Auto-sync subscription on login (fire-and-forget, once per user)
-  useEffect(() => {
-    if (!user || syncedUserRef.current === user.id) return;
-    syncedUserRef.current = user.id;
-    syncSubscription(user.id).catch(() => {
-      // Silently ignore — sync is best-effort on login
-    });
-  }, [user]);
+  // The plan sync at sign-in lives with the plan, in SubscriptionProvider,
+  // which reads the plan again once the sync answers.
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
-    return { error };
+    // With email confirmation on, Supabase returns a user but no session yet.
+    return { error, needsConfirmation: !error && !data.session };
   };
 
   const signIn = async (email: string, password: string) => {
@@ -98,15 +93,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  // Signing out goes through useSignOut, which first gives the account's
+  // waiting changes a few seconds to go and asks before any are dropped.
   const signOut = async () => {
+    const userId = user?.id;
     const { error } = await supabase.auth.signOut();
-    if (!error) {
+    try {
       // Clear app data on sign out (keep theme preference)
       localStorage.removeItem('stacktracker_holdings');
       localStorage.removeItem('stacktracker_pending_actions');
       localStorage.removeItem('advisor_usage');
       localStorage.removeItem('stg_upgrade_banner_dismissed');
       localStorage.removeItem('stg_checkout_redirect');
+      localStorage.removeItem('stg_checkout_campaign');
+      localStorage.removeItem('stg_auth_next');
+      // The cached stacks go with the stored ones. A guest stack left cached
+      // after it was cleared here would keep showing, and the next guest add
+      // would write it back.
+      queryClient.removeQueries({ queryKey: ['holdings'] });
+      // So do the copies kept for reading the stack offline.
+      clearStackCopies();
+      // And this account's changes still waiting to be sent, with its count of
+      // refused ones, so a shared browser keeps no holding details and a later
+      // sign-in doesn't send stale changes.
+      if (userId) dropQueuedChanges(userId);
+      if (error) {
+        // The sign-out didn't reach the server, a dropped connection say, and
+        // the client keeps its session when that happens. This browser still
+        // signs out: the stored session goes and the page starts over, signed
+        // out. Other devices stay signed in until their session ends.
+        for (const key of Object.keys(localStorage)) {
+          if (/^sb-.+-auth-token/.test(key)) localStorage.removeItem(key);
+        }
+        window.location.assign('/');
+      }
+    } catch {
+      // storage blocked, nothing kept here to clear
     }
     return { error };
   };
@@ -178,6 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- the hook belongs with its provider
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
