@@ -2,16 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from './useSubscription';
-import { ApiError } from '../lib/apiClient';
 import {
+  CHECKOUT_WAIT,
   forgetCheckout,
   forgetNextPath,
   hasCheckoutIntent,
   isWebPlan,
+  openCheckout,
   rememberCheckout,
   rememberNextPath,
+  settingsAfterCheckout,
   siteCampaign,
-  startCheckout,
   takeCheckoutIntent,
   takeNextPath,
 } from '../lib/checkout';
@@ -29,9 +30,10 @@ import {
  * Checkout waits for the account's plan, five seconds at most, so someone who
  * already has Gold, from the app or the web, lands on Settings instead of
  * being sent to buy it again. If the plan can't be read in time, checkout
- * opens and the API turns away an account that already has a plan.
+ * opens and the API turns away an account that already has a plan. Whatever
+ * the API says is in the way, Settings says so and what to do about it.
  */
-export type CheckoutOverlay = null | 'One moment' | 'Opening checkout';
+export type CheckoutOverlay = null | 'One moment' | 'Opening checkout' | typeof CHECKOUT_WAIT;
 
 export function useAfterSignIn(): { checkoutOverlay: CheckoutOverlay } {
   const { user, session, loading } = useAuth();
@@ -115,11 +117,9 @@ export function useAfterSignIn(): { checkoutOverlay: CheckoutOverlay } {
       forgetNextPath();
       // The browser is about to leave for Stripe; the overlay covers the wait.
       setCheckoutOverlay('Opening checkout');
-      startCheckout(user.id, session?.access_token, intent.plan, intent.campaign).catch((err: unknown) => {
+      openCheckout(user.id, session?.access_token, intent.plan, intent.campaign, () => setCheckoutOverlay(CHECKOUT_WAIT)).catch((err: unknown) => {
         setCheckoutOverlay(null);
-        // 409 is the API saying the account already holds a plan.
-        const haveGold = err instanceof ApiError && err.status === 409;
-        navigate(haveGold ? '/settings?checkout=have-gold' : '/settings?checkout=failed', { replace: true });
+        navigate(settingsAfterCheckout(err), { replace: true });
       });
       return;
     }

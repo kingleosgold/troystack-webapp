@@ -43,6 +43,10 @@ const GUEST_KEY = ['holdings', 'guest'];
 // One send at a time per account, however many components ask.
 const sending = new Map<string, Promise<{ sent: number; refused: number; waiting: number }>>();
 
+// When each account's stack was last read from the account itself, as
+// against shown from the stored copy or changed here since.
+const lastReads = new Map<string, number>();
+
 function sendWrite(userId: string) {
   return (w: PendingWrite) => {
     if (w.kind === 'add') return insertHoldingRow(w.row);
@@ -174,6 +178,7 @@ export function useHoldings() {
       }
       saveStackCopy(user.id, remote);
       markCopyShown(user.id, null);
+      lastReads.set(user.id, Date.now());
       if (taken.length > 0) releaseGuestHoldings(taken);
       return withPending(remote, readPending(user.id));
     },
@@ -355,6 +360,12 @@ export function useHoldings() {
     await qc.invalidateQueries({ queryKey: key });
   }, [user, qc, key, show, releaseGuestHoldings]);
 
+  // Read again with every fetch the query makes, so it's current on the render after one.
+  const readAt = useMemo(() => {
+    void query.dataUpdatedAt;
+    return userId ? lastReads.get(userId) ?? 0 : 0;
+  }, [userId, query.dataUpdatedAt]);
+
   const clearBrowserStack = useCallback(() => {
     emptyGuestStack();
     setLocalVersion((v) => v + 1);
@@ -370,6 +381,10 @@ export function useHoldings() {
     update,
     remove,
     refresh: query.refetch,
+    /** When the account's stack was last read from the account, 0 before the first read. */
+    readAt,
+    /** True while the stack is being read. */
+    reading: query.isFetching,
     leftInBrowser: offerToMove,
     moveBrowserStackIn,
     clearBrowserStack,
