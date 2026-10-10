@@ -24,7 +24,7 @@ const MOVES = [
 export default function ToolWhatIf() {
   usePageMeta({ ...SEO['/tools/what-if'], canonical: '/tools/what-if' });
   const spotMap = useSpotMap();
-  const { prices, data } = spotMap;
+  const { prices, live } = spotMap;
   const { holdings, error: stackError, refresh: reloadStack } = useHoldings();
   const hasStack = holdings.length > 0;
   // A stack that didn't load isn't an empty one. The amounts below stand in until it does.
@@ -36,11 +36,12 @@ export default function ToolWhatIf() {
   // A metal with no live price leaves its box empty for a price to be typed, rather than showing 0.
   const shown = (m: Metal) => targets[m] ?? (spotMap.priced(m) ? String(Math.round(prices[m])) : '');
 
+  // Out of date prices don't stand in for live ones.
   const target: SpotMap = useMemo(() => {
     const t = {} as SpotMap;
-    for (const m of METALS) t[m] = parseFloat(targets[m] ?? '') || prices[m] || 0;
+    for (const m of METALS) t[m] = parseFloat(targets[m] ?? '') || (live ? prices[m] : 0) || 0;
     return t;
-  }, [targets, prices]);
+  }, [targets, prices, live]);
 
   const ounces = useMemo(() => {
     const o = { gold: 0, silver: 0, platinum: 0, palladium: 0 } as Record<Metal, number>;
@@ -54,7 +55,7 @@ export default function ToolWhatIf() {
   // A metal in play with no live price would count at zero today, and with
   // no price typed in, at zero in the what-if too.
   const inPlay = METALS.filter((m) => ounces[m] > 0);
-  const todayKnown = Boolean(data) && inPlay.every((m) => spotMap.priced(m));
+  const todayKnown = live && inPlay.every((m) => spotMap.priced(m));
   const thenKnown = inPlay.every((m) => target[m] > 0);
   const diff = thenValue - nowValue;
   const ratio = target.silver > 0 ? target.gold / target.silver : 0;

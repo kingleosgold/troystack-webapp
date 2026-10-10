@@ -9,7 +9,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { METALS } from '../lib/metals';
 import { stackTotals } from '../lib/stackMath';
 import { money, signedMoney, signedPercent } from '../lib/format';
-import { formatDate, formatShortDate, formatTimeET, greeting, leadParagraphs, minutesLabel } from '../lib/text';
+import { formatDate, formatShortDate, formatTimeET, greeting, leadParagraphs, minutesLabel, whenET } from '../lib/text';
 import { Markdown } from '../lib/markdown';
 import { GOLD, PODCAST_APPLE_URL } from '../lib/appStore';
 import { cx } from '../lib/cx';
@@ -148,11 +148,11 @@ function AskTroyCard({ hasStack }: { hasStack: boolean }) {
 function StackCard() {
   const { holdings, loading, isGuest, error, refresh } = useHoldings();
   const spot = useSpotMap();
-  const { prices, changePct, data } = spot;
+  const { prices, changePct } = spot;
   const totals = useMemo(() => stackTotals(holdings, prices, changePct), [holdings, prices, changePct]);
   const held = METALS.filter((m) => holdings.some((h) => h.metal === m));
   // A metal held with no live price would count at zero, so the totals wait.
-  const ready = Boolean(data) && held.every((m) => spot.priced(m));
+  const ready = spot.live && held.every((m) => spot.priced(m));
 
   if (loading) {
     return (
@@ -206,8 +206,8 @@ function StackCard() {
           </div>
         </div>
       )}
-      {/* With no prices at all, the note above the tiles already says so. */}
-      {data && <SpotNotice spot={spot} metals={held} className="mt-3" />}
+      {/* Without live prices, the note above the tiles already says so. */}
+      {spot.live && <SpotNotice spot={spot} metals={held} className="mt-3" />}
       {isGuest && <p className="mt-3 text-[12px] text-fg-3">Saved in this browser. <Link to="/auth" className="font-semibold text-gold">Sign in</Link> to keep it with your account and the app.</p>}
     </Card>
   );
@@ -349,8 +349,10 @@ export default function Home() {
         <p className="mt-1.5 text-[15px] text-fg-2 max-w-2xl">Live spot for all four metals, Troy's read on what moved them, and your stack at today's prices.</p>
       </header>
 
-      {spot.isError && !spot.data ? (
-        <ErrorNote onRetry={() => spot.refetch()}>Live prices didn't load.</ErrorNote>
+      {!spot.live && !spot.isLoading && !spot.refreshing ? (
+        <ErrorNote onRetry={() => spot.refetch()}>
+          {spot.stale ? `Prices haven't updated since ${whenET(spot.dataUpdatedAt)}.` : "Live prices didn't load."}
+        </ErrorNote>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {METALS.map((m) => (
@@ -361,7 +363,7 @@ export default function Home() {
               pct={spot.data?.changePct[m]}
               amount={spot.data?.changeAmt[m]}
               spark={sparks.data?.series[m]}
-              loading={spot.isLoading}
+              loading={!spot.live}
               to={`/prices/${m}`}
             />
           ))}

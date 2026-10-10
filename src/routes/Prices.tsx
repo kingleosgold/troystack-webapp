@@ -6,7 +6,7 @@ import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { isMetal, METALS, METAL_LABEL, METAL_SYMBOL, METAL_VAR } from '../lib/metals';
 import { money, signedMoney, signedPercent } from '../lib/format';
-import { formatTimeET } from '../lib/text';
+import { formatTimeET, whenET } from '../lib/text';
 import type { HistoryRange } from '../lib/marketApi';
 import type { Metal } from '../types/holding';
 import { cx } from '../lib/cx';
@@ -115,9 +115,13 @@ export default function Prices() {
         <h1 className="text-[15px] font-semibold text-fg-2">
           {label} spot price <span className="text-fg-3 font-medium">· {METAL_SYMBOL[metal]} · USD per troy ounce</span>
         </h1>
-        {spot.isError && !spot.data ? (
-          <div className="max-w-md"><ErrorNote onRetry={() => void spot.refetch()}>Live prices didn't load.</ErrorNote></div>
-        ) : price == null && !spot.data ? (
+        {!spot.live && !spot.isLoading && !spot.refreshing ? (
+          <div className="max-w-md">
+            <ErrorNote onRetry={() => void spot.refetch()}>
+              {spot.stale ? `Prices haven't updated since ${whenET(spot.dataUpdatedAt)}.` : "Live prices didn't load."}
+            </ErrorNote>
+          </div>
+        ) : !spot.live ? (
           <Skeleton className="h-11 w-56" />
         ) : price != null && price > 0 ? (
           <div className="text-[40px] sm:text-[48px] font-semibold tracking-tight text-fg tnum leading-none">{money(price)}</div>
@@ -133,7 +137,7 @@ export default function Prices() {
             </>
           )}
           <MarketStatus closed={spot.marketsClosed} />
-          {spot.data && <span className="text-[12px] text-fg-3">Updated {formatTimeET(spot.data.timestamp)}</span>}
+          {spot.live && spot.data && <span className="text-[12px] text-fg-3">Updated {formatTimeET(spot.data.timestamp)}</span>}
         </div>
       </header>
 

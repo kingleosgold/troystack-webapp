@@ -17,7 +17,7 @@ import { holdingsToCSV } from '../services/holdings';
 import type { Holding, HoldingFormData, Metal } from '../types/holding';
 import { cx } from '../lib/cx';
 import { downloadText } from '../lib/download';
-import { formatDate, formatTimeET, todayET } from '../lib/text';
+import { formatDate, whenET } from '../lib/text';
 import { HoldingEditor } from '../ui/HoldingEditor';
 import { ImportSheet, type ImportRow } from '../ui/ImportSheet';
 import { GoldLock } from '../ui/GoldLock';
@@ -108,33 +108,27 @@ function useSnapshotDay(): string {
   return day;
 }
 
-/** How recent prices have to be for a snapshot. In view, they're read every minute. */
-const SNAPSHOT_PRICES_MS = 5 * 60_000;
-
 /**
  * Record today's value once a day, the way the app does, so history fills in
  * for web users too. It goes from a live read of the stack, not the copy
- * shown while the account can't be reached, and from prices read in the last
- * few minutes of the same day. A tab in the background or a laptop asleep
- * past midnight still holds the day before's prices, so the new day's waits
- * for fresh ones.
+ * shown while the account can't be reached, and from prices that count as
+ * live everywhere else on the site, read on the same day and not being read
+ * again right now. A tab in the background or a laptop asleep past midnight
+ * still holds the day before's prices, so the new day's waits for fresh ones.
  */
-function useDailySnapshot(userId: string | undefined, holdings: Holding[], spot: SpotMap, live: boolean) {
+function useDailySnapshot(userId: string | undefined, holdings: Holding[], spot: SpotMap, stackLive: boolean) {
   const day = useSnapshotDay();
   // The account and day the last snapshot went for, so a page left open
   // overnight sends the new day's.
   const sentFor = useRef<string | null>(null);
-  const { prices, dataUpdatedAt, isFetching } = spot;
-  const hasPrices = Boolean(spot.data);
+  const { prices, live, dataUpdatedAt, isFetching } = spot;
   useEffect(() => {
     // Every metal in the stack needs a price. One missing from the prices
     // read would go into history at zero. Gold and silver also go in as the
     // day's spot.
-    const priced = (m: Metal) => prices[m] > 0;
-    if (!userId || !live || holdings.length === 0 || !priced('gold') || !priced('silver') || holdings.some((h) => !priced(h.metal))) return;
-    const now = new Date();
-    const fresh = hasPrices && !isFetching && now.getTime() - dataUpdatedAt < SNAPSHOT_PRICES_MS && snapshotDay(new Date(dataUpdatedAt)) === day && snapshotDay(now) === day;
-    if (!fresh) return;
+    const priced = (m: Metal) => live && prices[m] > 0;
+    if (!userId || !stackLive || holdings.length === 0 || !priced('gold') || !priced('silver') || holdings.some((h) => !priced(h.metal))) return;
+    if (isFetching || snapshotDay(new Date(dataUpdatedAt)) !== day || snapshotDay() !== day) return;
     const mark = `${userId}:${day}`;
     if (sentFor.current === mark) return;
     const key = `troystack_snapshot_${userId}`;
@@ -172,7 +166,7 @@ function useDailySnapshot(userId: string | undefined, holdings: Holding[], spot:
       .catch(() => {
         if (sentFor.current === mark) sentFor.current = null;
       });
-  }, [userId, holdings, prices, live, day, hasPrices, isFetching, dataUpdatedAt]);
+  }, [userId, holdings, prices, stackLive, day, live, isFetching, dataUpdatedAt]);
 }
 
 function rowToForm(r: ImportRow): HoldingFormData | null {
@@ -243,7 +237,7 @@ export default function Stack() {
   const metalsHeld = METALS.filter((m) => totals.byMetal[m].count > 0);
   // A metal with no live price would count at zero and read as a loss of
   // everything paid for it, so totals wait until every metal held has one.
-  const valuesReady = Boolean(spot.data) && metalsHeld.every((m) => spot.priced(m));
+  const valuesReady = spot.live && metalsHeld.every((m) => spot.priced(m));
   const waiting = <span className="text-[14px] text-fg-3">Waiting for prices</span>;
 
   const onFile = async (file: File) => {
@@ -322,7 +316,7 @@ export default function Stack() {
       {!isGuest && offlineSince && (
         <div role="status" className="mb-4 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg">
           Your account can't be reached right now, so this is your stack as of{' '}
-          {todayET(new Date(offlineSince)) === todayET() ? formatTimeET(offlineSince) : `${formatDate(offlineSince, { month: 'short', year: undefined })}, ${formatTimeET(offlineSince)}`}, with any changes you've made since on top.
+          {whenET(offlineSince)}, with any changes you've made since on top.
         </div>
       )}
       {!isGuest && pendingCount > 0 && (
