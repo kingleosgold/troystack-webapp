@@ -19,6 +19,7 @@ import { cx } from '../lib/cx';
 import { downloadText } from '../lib/download';
 import { formatDate, whenET } from '../lib/text';
 import { HoldingEditor } from '../ui/HoldingEditor';
+import type { HoldingStart } from '../ui/HoldingEditor';
 import { ImportSheet, type ImportRow } from '../ui/ImportSheet';
 import { GoldLock } from '../ui/GoldLock';
 import { AppStoreButton } from '../ui/AppStore';
@@ -205,6 +206,15 @@ export default function Stack() {
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState<Holding | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [start, setStart] = useState<HoldingStart | null>(null);
+  // A coin page's hand-off whose lookup is still loading. Opening or closing
+  // the form by hand cancels it, so a late lookup never reopens the form.
+  const pendingCoinRef = useRef<string | null>(null);
+  const openEditor = (holding: Holding | null) => {
+    pendingCoinRef.current = null;
+    setEditing(holding);
+    setEditorOpen(true);
+  };
   const [filter, setFilter] = useState<'all' | Metal>('all');
   const [importRows, setImportRows] = useState<{ rows: ImportRow[]; source: string } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -215,13 +225,35 @@ export default function Stack() {
   const totals = useMemo(() => stackTotals(holdings, spot.prices, spot.changePct), [holdings, spot.prices, spot.changePct]);
   useDailySnapshot(user?.id, holdings, spot, !loading && !offlineSince);
 
-  // Links from elsewhere on the site: /stack?add=1 and /stack?import=1
+  // Links from elsewhere on the site: /stack?add=1 and /stack?import=1. A
+  // coin page adds &coin=<slug>, and the form starts filled in for that coin.
   useEffect(() => {
     if (params.get('add') === '1') {
-      setEditing(null);
-      setEditorOpen(true);
+      const slug = params.get('coin');
       params.delete('add');
+      params.delete('coin');
       setParams(params, { replace: true });
+      setEditing(null);
+      const open = (s: HoldingStart | null) => {
+        setStart(s);
+        setEditorOpen(true);
+      };
+      if (!slug) open(null);
+      else {
+        pendingCoinRef.current = slug;
+        import('../lib/coins')
+          .then(({ coinBySlug }) => {
+            if (pendingCoinRef.current !== slug) return;
+            pendingCoinRef.current = null;
+            const c = coinBySlug(slug);
+            open(c ? { metal: c.metal, type: c.name, weightOzt: c.fineOzt } : null);
+          })
+          .catch(() => {
+            if (pendingCoinRef.current !== slug) return;
+            pendingCoinRef.current = null;
+            open(null);
+          });
+      }
     } else if (params.get('import') === '1') {
       params.delete('import');
       setParams(params, { replace: true });
@@ -263,7 +295,7 @@ export default function Stack() {
         subtitle={isGuest ? 'Add what you own. It stays in this browser until you sign in.' : 'The same stack you see in the TroyStack app.'}
         action={
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => { setEditing(null); setEditorOpen(true); }}>
+            <Button onClick={() => openEditor(null)}>
               <Plus size={16} aria-hidden="true" /> Add a holding
             </Button>
             <Button variant="secondary" onClick={() => fileRef.current?.click()}>
@@ -347,7 +379,7 @@ export default function Stack() {
             body="Add a coin or bar and TroyStack values it at live spot, with what you paid and what you've gained. Or import a spreadsheet you already keep."
             action={
               <div className="flex flex-wrap justify-center gap-2">
-                <Button onClick={() => { setEditing(null); setEditorOpen(true); }}>Add a holding</Button>
+                <Button onClick={() => openEditor(null)}>Add a holding</Button>
                 <Button variant="secondary" onClick={() => fileRef.current?.click()}>Import a spreadsheet</Button>
               </div>
             }
@@ -455,7 +487,7 @@ export default function Stack() {
                 const gain = value - cost;
                 return (
                   <li key={h.id} className="border-b border-line last:border-b-0">
-                    <button type="button" onClick={() => { setEditing(h); setEditorOpen(true); }} className="w-full text-left flex items-center gap-3 px-5 py-3.5 hover:bg-surface-2 transition-colors">
+                    <button type="button" onClick={() => openEditor(h)} className="w-full text-left flex items-center gap-3 px-5 py-3.5 hover:bg-surface-2 transition-colors">
                       <span className="h-8 w-1 rounded-full shrink-0" style={{ background: METAL_VAR[h.metal] }} aria-hidden="true" />
                       <span className="min-w-0 flex-1">
                         <span className="block text-[14px] font-medium text-fg truncate">{h.type}</span>
@@ -501,7 +533,12 @@ export default function Stack() {
           key={editing?.id ?? 'new'}
           open={editorOpen}
           holding={editing}
-          onClose={() => setEditorOpen(false)}
+          start={editing ? null : start}
+          onClose={() => {
+            pendingCoinRef.current = null;
+            setEditorOpen(false);
+            setStart(null);
+          }}
           onSave={async (form) => {
             if (editing) await update(editing, form);
             else await add(form);
