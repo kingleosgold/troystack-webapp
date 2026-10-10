@@ -122,6 +122,8 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   const snapshots: Array<Record<string, unknown>> = [];
   // Prices the test has moved since the fixture's.
   const priceChanges: Partial<Record<'gold' | 'silver' | 'platinum' | 'palladium', number>> = {};
+  // While false, the prices request fails the way it does when the API is down.
+  let pricesUp = true;
   // While set, holdings writes aren't answered until the test releases them.
   let writesHeld: Promise<void> | null = null;
   let releaseHeldWrites: () => void = () => undefined;
@@ -154,7 +156,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
 
     if (p === '/v1/prices') {
-      if (opts.failPrices) return fulfillJson(route, { error: 'Prices unavailable' }, 503);
+      if (opts.failPrices || !pricesUp) return fulfillJson(route, { error: 'Prices unavailable' }, 503);
       const body = JSON.parse(read('prices.json')) as { prices: Record<string, { price: number }> };
       for (const [m, price] of Object.entries(priceChanges)) body.prices[m].price = price;
       for (const m of opts.missingPrices ?? []) delete body.prices[m];
@@ -377,6 +379,10 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     /** Moves a metal's price in later answers. */
     setPrice(metal: 'gold' | 'silver' | 'platinum' | 'palladium', price: number) {
       priceChanges[metal] = price;
+    },
+    /** Takes the prices request down or brings it back. */
+    setPricesUp(up: boolean) {
+      pricesUp = up;
     },
     /** Holds holdings writes unanswered, as a connection that hangs does, until releaseWrites. */
     holdWrites() {

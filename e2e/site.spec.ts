@@ -989,6 +989,47 @@ test('a chat already deleted in the app leaves the list without an error', async
   await expect(page.getByText("That chat couldn't be deleted.", { exact: false })).toHaveCount(0);
 });
 
+test.describe('prices that stop updating', () => {
+  test('are called out of date after a few minutes without a good read, values wait, and a retry brings them back', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-10-09T14:00:00Z') });
+    await signIn(page);
+    const mock = await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    const reads = () => mock.calls.filter((c) => c === 'GET /v1/prices').length;
+    const ticker = page.getByLabel('Live spot prices').filter({ visible: true });
+    await page.goto('/stack');
+    await expect(page.getByText('$7,795.20').first()).toBeVisible();
+    await expect(ticker.getByText('$4,180.80')).toBeVisible();
+
+    // The feed goes down. A refresh or two that fails doesn't take prices off the page.
+    mock.setPricesUp(false);
+    const before = reads();
+    await page.clock.fastForward('01:05');
+    await expect.poll(reads).toBeGreaterThanOrEqual(before + 2);
+    await expect(page.getByText('$7,795.20').first()).toBeVisible();
+    await expect(page.getByText(/haven't updated since/)).toHaveCount(0);
+
+    // A few minutes on, they're out of date, and nothing is valued with them.
+    await page.clock.fastForward('03:00');
+    const notice = "Prices haven't updated since 10:00 AM ET, so values that need them are on hold.";
+    await expect(page.getByText(notice)).toBeVisible();
+    await expect(page.getByText('Waiting for prices').filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByText('$7,795.20')).toHaveCount(0);
+    await expect(ticker.getByRole('button', { name: 'Prices out of date, tap to retry' })).toBeVisible();
+    await expect(ticker.getByText('$4,180.80')).toHaveCount(0);
+    await goInApp(page, '/tools/melt');
+    await expect(page.getByText(notice)).toBeVisible();
+    await expect(page.getByText('No price', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+
+    // The feed is back, and trying again brings the prices back.
+    mock.setPricesUp(true);
+    await page.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByText(notice)).toHaveCount(0);
+    await expect(ticker.getByText('$4,180.80')).toBeVisible();
+    await goInApp(page, '/stack');
+    await expect(page.getByText('$7,795.20').first()).toBeVisible();
+  });
+});
+
 test.describe('prices that are missing', () => {
   test("the melt and junk silver calculators say so instead of showing $0.00, and offer to try again", async ({ page }) => {
     const mock = await mockBackends(page, { failPrices: true });
