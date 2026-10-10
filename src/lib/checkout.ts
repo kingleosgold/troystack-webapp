@@ -1,4 +1,4 @@
-import { postJson } from './apiClient';
+import { ApiError, postJson } from './apiClient';
 import type { Campaign } from './appStore';
 
 /**
@@ -176,6 +176,70 @@ export async function startCheckout(userId: string, token: string | undefined, p
   }, { token });
   if (!url) throw new Error('Checkout did not start.');
   window.location.assign(url);
+}
+
+/**
+ * What's in the way when checkout answers 409, as the API says in `reason`.
+ *   - has_plan: the account already has Gold or Lifetime.
+ *   - payment_issue: a Gold renewal didn't go through and Stripe is still
+ *     trying the card, so the fix is a new card on the billing page, not a
+ *     second plan.
+ *   - app_store_renewing: App Store Gold that Apple may still renew, which is
+ *     handled on the iPhone.
+ *   - checkout_in_progress: another checkout for the account is opening.
+ * A reason it doesn't know, or none, as from an older API, counts as has_plan.
+ */
+export type CheckoutBlock = 'has_plan' | 'payment_issue' | 'app_store_renewing' | 'checkout_in_progress';
+
+/** What checkout said was in the way, or null when it wasn't a 409. */
+export function checkoutBlock(err: unknown): CheckoutBlock | null {
+  if (!(err instanceof ApiError) || err.status !== 409) return null;
+  const reason = err.body.reason;
+  return reason === 'payment_issue' || reason === 'app_store_renewing' || reason === 'checkout_in_progress' ? reason : 'has_plan';
+}
+
+/** How long checkout waits before asking again while another one for the account is opening. */
+export const CHECKOUT_RETRY_MS = 3000;
+
+/** What the page says during that wait. */
+export const CHECKOUT_WAIT = 'A checkout for this account is already opening. Trying again in a few seconds.';
+
+/**
+ * Sends the browser to Stripe Checkout, as startCheckout does. When another
+ * checkout for the account is still opening, `onWait` hears about it and
+ * checkout is asked for once more after a few seconds.
+ */
+export async function openCheckout(
+  userId: string,
+  token: string | undefined,
+  plan: WebPlan,
+  campaign?: CheckoutCampaign,
+  onWait?: () => void,
+): Promise<void> {
+  try {
+    await startCheckout(userId, token, plan, campaign);
+  } catch (err) {
+    if (checkoutBlock(err) !== 'checkout_in_progress') throw err;
+    onWait?.();
+    await new Promise((resolve) => setTimeout(resolve, CHECKOUT_RETRY_MS));
+    await startCheckout(userId, token, plan, campaign);
+  }
+}
+
+/** Where Settings picks up after a checkout that didn't open, by what was in the way. */
+export function settingsAfterCheckout(err: unknown): string {
+  const block = checkoutBlock(err);
+  const at =
+    block === 'has_plan'
+      ? 'have-gold'
+      : block === 'payment_issue'
+        ? 'payment-issue'
+        : block === 'app_store_renewing'
+          ? 'app-store'
+          : block === 'checkout_in_progress'
+            ? 'in-progress'
+            : 'failed';
+  return `/settings?checkout=${at}`;
 }
 
 /** `status` is the subscription's, 'trialing' during the free week. Older API versions leave it out. */
