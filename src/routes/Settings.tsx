@@ -19,6 +19,9 @@ import { downloadText } from '../lib/download';
 import { InstallPath } from '../ui/AppStore';
 import { Button, Field, Input, PageHeader, Segmented, Sheet } from '../ui/primitives';
 
+/** What a checkout that didn't open leaves in the address for this page to say. */
+const CHECKOUT_NOTES = ['failed', 'have-gold', 'payment-issue', 'app-store', 'in-progress'];
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mt-8">
@@ -71,7 +74,10 @@ export default function Settings() {
   const { holdings, isGuest, clearBrowserStack, loading: stackLoading, error: stackError, refresh: reloadStack } = useHoldings();
   const { theme, setTheme } = useTheme();
 
-  const [banner, setBanner] = useState<{ tone: 'up' | 'down' | 'neutral'; text: string } | null>(null);
+  // A note at the top. One from a checkout that didn't open can come with
+  // what to do: a card to update, or nothing to buy while the App Store plan
+  // may still renew.
+  const [banner, setBanner] = useState<{ tone: 'up' | 'down' | 'neutral'; text: string; kind?: 'payment-issue' | 'app-store' } | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
@@ -82,20 +88,41 @@ export default function Settings() {
   const [credsError, setCredsError] = useState<string | null>(null);
   const handledSession = useRef(false);
 
-  // Back from Stripe Checkout. It waits for the sign-in to load, so the plan
-  // read after verifying is the account's own.
+  // Back from Stripe Checkout, or from a checkout that didn't open. It waits
+  // for the sign-in to load, so the plan read after verifying is the account's own.
   useEffect(() => {
     const sessionId = params.get('session_id');
-    const failed = params.get('checkout') === 'failed';
-    const haveGold = params.get('checkout') === 'have-gold';
-    if (!sessionId && !failed && !haveGold) return;
+    const checkout = params.get('checkout');
+    const note = checkout && CHECKOUT_NOTES.includes(checkout) ? checkout : null;
+    if (!sessionId && !note) {
+      // Once one is handled and cleared, the next is handled too, as when the
+      // Gold sheet on this page finds the account already has a plan.
+      handledSession.current = false;
+      return;
+    }
     if (authLoading) return;
     if (handledSession.current) return;
     handledSession.current = true;
     params.delete('session_id');
     params.delete('checkout');
     setParams(params, { replace: true });
-    if (haveGold) {
+    if (note === 'payment-issue') {
+      setBanner({ tone: 'down', kind: 'payment-issue', text: "Your last Gold payment didn't go through. Update your card on the billing page to keep Gold." });
+      return;
+    }
+    if (note === 'app-store') {
+      setBanner({
+        tone: 'neutral',
+        kind: 'app-store',
+        text: "Your App Store subscription may still be renewing, so there's nothing to buy here. On your iPhone, open Settings, tap your name, then Subscriptions.",
+      });
+      return;
+    }
+    if (note === 'in-progress') {
+      setBanner({ tone: 'neutral', text: "Another checkout for this account was already opening, so this one didn't start. If it didn't go through, start it again from Plan below." });
+      return;
+    }
+    if (note === 'have-gold') {
       setBanner({ tone: 'up', text: 'This account already has Gold, so there was nothing to buy. If Plan below still says Free, tap Refresh my plan.' });
       // The API knew about Gold the site's plan read may not have, as when the
       // app wrote Free over a web plan. The same sync Refresh my plan runs puts
@@ -107,7 +134,7 @@ export default function Settings() {
       }
       return;
     }
-    if (failed) {
+    if (note === 'failed') {
       setBanner({ tone: 'down', text: "Checkout didn't open. You can start it again from Plan below." });
       return;
     }
@@ -207,7 +234,7 @@ export default function Settings() {
       <PageHeader title="Settings" />
 
       {banner && (
-        <p
+        <div
           role="status"
           className={cx(
             'mt-5 rounded-xl border px-4 py-3 text-[14px]',
@@ -216,8 +243,13 @@ export default function Settings() {
             banner.tone === 'neutral' && 'border-line bg-surface-2 text-fg',
           )}
         >
-          {banner.text}
-        </p>
+          <p>{banner.text}</p>
+          {banner.kind === 'payment-issue' && user && (
+            <Button size="sm" className="mt-3" onClick={() => void manageBilling()} disabled={billingBusy}>
+              {billingBusy ? 'Opening the billing page' : 'Update your card'}
+            </Button>
+          )}
+        </div>
       )}
 
       {isConfigured && (
@@ -277,7 +309,8 @@ export default function Settings() {
             )
           }
         />
-        {planUnknown ? null : tier === 'free' ? (
+        {/* No new plan is offered while a payment is past due, and nothing to buy or bill while an App Store plan may still renew. */}
+        {planUnknown || banner?.kind === 'app-store' || (banner?.kind === 'payment-issue' && tier === 'free') ? null : tier === 'free' ? (
           <Row
             title={<span className="font-semibold text-gold">Try Gold free for a week</span>}
             detail="30 questions a day with Troy, your morning brief, full vault data and more"

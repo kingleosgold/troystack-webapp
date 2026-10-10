@@ -194,7 +194,7 @@ function StackCard() {
         <Link to="/stack" className="text-[13px] font-semibold text-gold hover:text-gold-2">Open</Link>
       </div>
       <div className="mt-2 text-[28px] font-semibold tracking-tight text-fg tnum">
-        {ready ? money(totals.value) : spot.isLoading ? <Skeleton className="h-8 w-40" /> : <span className="text-[17px] text-fg-3">Waiting for prices</span>}
+        {ready ? money(totals.value) : spot.awaiting ? <Skeleton className="h-8 w-40" /> : <span className="text-[17px] text-fg-3">Waiting for prices</span>}
       </div>
       {ready && (
         <div className="mt-1 space-y-0.5 text-[13px]">

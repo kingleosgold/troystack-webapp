@@ -48,8 +48,8 @@ export default function ToolRatio() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[280px_1fr]">
         <Card className="p-5 h-fit">
           <div className="text-[13px] text-fg-3">Right now</div>
-          <div className={cx('mt-1 font-semibold tracking-tight tnum', now || spot.isLoading ? 'text-[40px] text-fg' : 'text-[22px] text-fg-3')}>
-            {now ? now.toFixed(1) : spot.isLoading ? '...' : 'No price'}
+          <div className={cx('mt-1 font-semibold tracking-tight tnum', now || spot.awaiting ? 'text-[40px] text-fg' : 'text-[22px] text-fg-3')}>
+            {now ? now.toFixed(1) : spot.awaiting ? '...' : 'No price'}
           </div>
           <div className="text-[13px] text-fg-3">ounces of silver per ounce of gold</div>
           <SpotNotice spot={spot} metals={['gold', 'silver']} className="mt-4" />

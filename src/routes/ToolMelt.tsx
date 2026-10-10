@@ -62,7 +62,7 @@ const UNIT_TO_OZT: Record<Unit, number> = { oz: 1, g: OZT_PER_GRAM, kg: OZT_PER_
 export default function ToolMelt() {
   usePageMeta({ ...SEO['/tools/melt'], canonical: '/tools/melt' });
   const spotMap = useSpotMap();
-  const { prices, isLoading } = spotMap;
+  const { prices, awaiting } = spotMap;
   const [metal, setMetal] = useState<Metal>('gold');
   const [preset, setPreset] = useState<string>(PRESETS.gold[0].id);
   const [qty, setQty] = useState('1');
@@ -84,7 +84,7 @@ export default function ToolMelt() {
   const value = fine * spot;
   // Without a live price the answer would read $0.00, so it says so instead.
   const hasPrice = spotMap.priced(metal);
-  const shown = (n: number) => (isLoading ? '...' : hasPrice ? money(n) : 'No price');
+  const shown = (n: number) => (awaiting ? '...' : hasPrice ? money(n) : 'No price');
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8">
@@ -131,7 +131,7 @@ export default function ToolMelt() {
         </Card>
         <Card className="p-5">
           <div className="text-[13px] text-fg-3">Melt value</div>
-          <div className={cx('mt-1 font-semibold tracking-tight tnum', hasPrice || isLoading ? 'text-[34px] text-fg' : 'text-[22px] text-fg-3')}>{shown(value)}</div>
+          <div className={cx('mt-1 font-semibold tracking-tight tnum', hasPrice || awaiting ? 'text-[34px] text-fg' : 'text-[22px] text-fg-3')}>{shown(value)}</div>
           <dl className="mt-4 space-y-2 text-[14px]">
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Pure {METAL_LABEL[metal].toLowerCase()}</dt>

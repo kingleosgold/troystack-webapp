@@ -85,7 +85,7 @@ export default function ToolWhatIf() {
           <div className="space-y-4">
             {METALS.map((m) => (
               <div key={m} className="grid grid-cols-[1fr_1fr] gap-3 items-end">
-                <Field label={`${METAL_LABEL[m]} price`} hint={spotMap.priced(m) ? `Spot ${money(prices[m])}` : spotMap.isLoading ? 'Spot loading' : 'No live price right now'} htmlFor={`wi-${m}`}>
+                <Field label={`${METAL_LABEL[m]} price`} hint={spotMap.priced(m) ? `Spot ${money(prices[m])}` : spotMap.awaiting ? 'Spot loading' : 'No live price right now'} htmlFor={`wi-${m}`}>
                   <Input id={`wi-${m}`} inputMode="decimal" value={shown(m)} onChange={(e) => setTargets((p) => ({ ...p, [m]: e.target.value }))} />
                 </Field>
                 {hasStack ? (
@@ -113,11 +113,11 @@ export default function ToolWhatIf() {
           <dl className="mt-4 space-y-2 text-[14px]">
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Worth today</dt>
-              <dd className="text-fg tnum">{todayKnown ? money(nowValue) : spotMap.isLoading ? '...' : 'No price'}</dd>
+              <dd className="text-fg tnum">{todayKnown ? money(nowValue) : spotMap.awaiting ? '...' : 'No price'}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Gold/silver ratio</dt>
-              <dd className="text-fg tnum">{ratio ? ratio.toFixed(1) : spotMap.isLoading ? '...' : 'No price'}</dd>
+              <dd className="text-fg tnum">{ratio ? ratio.toFixed(1) : spotMap.awaiting ? '...' : 'No price'}</dd>
             </div>
           </dl>
           <SpotNotice spot={spotMap} metals={inPlay} className="mt-4" />

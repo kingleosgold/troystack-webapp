@@ -25,7 +25,7 @@ type Mode = 'coins' | 'face';
 export default function ToolJunkSilver() {
   usePageMeta({ ...SEO['/tools/junk-silver'], canonical: '/tools/junk-silver' });
   const spotMap = useSpotMap();
-  const { prices, isLoading } = spotMap;
+  const { prices, awaiting } = spotMap;
   const [mode, setMode] = useState<Mode>('coins');
   const [counts, setCounts] = useState<Record<string, string>>({});
   const [face, setFace] = useState('10');
@@ -40,7 +40,7 @@ export default function ToolJunkSilver() {
   const value = oz * spot;
   // Without a live silver price the answer would read $0.00, so it says so instead.
   const hasPrice = spotMap.priced('silver');
-  const shown = (n: number) => (isLoading ? '...' : hasPrice ? money(n) : 'No price');
+  const shown = (n: number) => (awaiting ? '...' : hasPrice ? money(n) : 'No price');
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8">
@@ -80,7 +80,7 @@ export default function ToolJunkSilver() {
         </Card>
         <Card className="p-5">
           <div className="text-[13px] text-fg-3">Melt value</div>
-          <div className={hasPrice || isLoading ? 'mt-1 text-[34px] font-semibold tracking-tight text-fg tnum' : 'mt-1 text-[22px] font-semibold tracking-tight text-fg-3'}>{shown(value)}</div>
+          <div className={hasPrice || awaiting ? 'mt-1 text-[34px] font-semibold tracking-tight text-fg tnum' : 'mt-1 text-[22px] font-semibold tracking-tight text-fg-3'}>{shown(value)}</div>
           <dl className="mt-4 space-y-2 text-[14px]">
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Silver</dt>

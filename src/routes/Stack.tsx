@@ -4,7 +4,7 @@ import { Download, FileSpreadsheet, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useHoldings } from '../hooks/useHoldings';
-import { useSpotMap, type SpotMap } from '../hooks/queries';
+import { SPOT_LIVE_MS, spotIsLive, useSpotMap, type SpotMap } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { useSubscription } from '../hooks/useSubscription';
@@ -108,20 +108,35 @@ function useSnapshotDay(): string {
   return day;
 }
 
+interface StackRead {
+  /** The stack came from the account, not the copy shown while it can't be reached. */
+  live: boolean;
+  /** When the account's stack was last read. */
+  readAt: number;
+  reading: boolean;
+  reread: () => unknown;
+}
+
 /**
  * Record today's value once a day, the way the app does, so history fills in
- * for web users too. It goes from a live read of the stack, not the copy
- * shown while the account can't be reached, and from prices that count as
- * live everywhere else on the site, read on the same day and not being read
- * again right now. A tab in the background or a laptop asleep past midnight
- * still holds the day before's prices, so the new day's waits for fresh ones.
+ * for web users too. It goes from prices that count as live everywhere else
+ * on the site, read on the same day and not being read again right now, and
+ * from a read of the account's stack made today within the same few minutes.
+ * A tab in the background or a laptop asleep past midnight still holds the
+ * day before's prices and stack, so the new day's waits for fresh prices and
+ * reads the stack again, which brings in changes made in the app or another
+ * tab since it was last read.
  */
-function useDailySnapshot(userId: string | undefined, holdings: Holding[], spot: SpotMap, stackLive: boolean) {
+function useDailySnapshot(userId: string | undefined, holdings: Holding[], spot: SpotMap, stack: StackRead) {
   const day = useSnapshotDay();
   // The account and day the last snapshot went for, so a page left open
   // overnight sends the new day's.
   const sentFor = useRef<string | null>(null);
+  // When the stack was last asked for again, so a read that keeps failing
+  // isn't asked for on every render.
+  const rereadAt = useRef(0);
   const { prices, live, dataUpdatedAt, isFetching } = spot;
+  const { live: stackLive, readAt, reading, reread } = stack;
   useEffect(() => {
     // Every metal in the stack needs a price. One missing from the prices
     // read would go into history at zero. Gold and silver also go in as the
@@ -137,6 +152,14 @@ function useDailySnapshot(userId: string | undefined, holdings: Holding[], spot:
     } catch {
       // Storage is blocked. The stack lives in the account, so the snapshot
       // still goes, and the ref keeps it to one post a day.
+    }
+    if (reading) return;
+    if (snapshotDay(new Date(readAt)) !== day || !spotIsLive(readAt)) {
+      if (Date.now() - rereadAt.current > SPOT_LIVE_MS) {
+        rereadAt.current = Date.now();
+        void reread();
+      }
+      return;
     }
     sentFor.current = mark;
     const totals = stackTotals(holdings, prices);
@@ -166,7 +189,7 @@ function useDailySnapshot(userId: string | undefined, holdings: Holding[], spot:
       .catch(() => {
         if (sentFor.current === mark) sentFor.current = null;
       });
-  }, [userId, holdings, prices, stackLive, day, live, isFetching, dataUpdatedAt]);
+  }, [userId, holdings, prices, stackLive, day, live, isFetching, dataUpdatedAt, readAt, reading, reread]);
 }
 
 function rowToForm(r: ImportRow): HoldingFormData | null {
@@ -200,7 +223,7 @@ function holdingDetail(h: Holding): string {
 export default function Stack() {
   usePageMeta({ ...SEO['/stack'], canonical: '/stack' });
   const { user, isConfigured } = useAuth();
-  const { holdings, loading, error, isGuest, add, addMany, update, remove, refresh, leftInBrowser, moveBrowserStackIn, clearBrowserStack, pendingCount, offlineSince, refused, dismissRefused } = useHoldings();
+  const { holdings, loading, error, isGuest, add, addMany, update, remove, refresh, readAt, reading, leftInBrowser, moveBrowserStackIn, clearBrowserStack, pendingCount, offlineSince, refused, dismissRefused } = useHoldings();
   const spot = useSpotMap();
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState<Holding | null>(null);
@@ -213,7 +236,7 @@ export default function Stack() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const totals = useMemo(() => stackTotals(holdings, spot.prices, spot.changePct), [holdings, spot.prices, spot.changePct]);
-  useDailySnapshot(user?.id, holdings, spot, !loading && !offlineSince);
+  useDailySnapshot(user?.id, holdings, spot, { live: !loading && !offlineSince, readAt, reading, reread: refresh });
 
   // Links from elsewhere on the site: /stack?add=1 and /stack?import=1
   useEffect(() => {
@@ -359,7 +382,7 @@ export default function Stack() {
             <Card className="p-5 sm:p-6 lg:col-span-2">
               <div className="text-[13px] text-fg-3">Total value</div>
               <div className="mt-1 text-[36px] sm:text-[42px] font-semibold tracking-tight text-fg tnum leading-tight">
-                {valuesReady ? money(totals.value) : spot.isLoading ? <Skeleton className="h-11 w-56" /> : <span className="text-[20px] text-fg-3">Waiting for prices</span>}
+                {valuesReady ? money(totals.value) : spot.awaiting ? <Skeleton className="h-11 w-56" /> : <span className="text-[20px] text-fg-3">Waiting for prices</span>}
               </div>
               {valuesReady && (
                 <div className={cx('mt-1 text-[14px] font-semibold tnum', dayTone)}>
@@ -424,7 +447,7 @@ export default function Stack() {
                             <div className="text-[14px] font-semibold text-fg tnum">{money(t.value)}</div>
                             <div className={cx('text-[12px] tnum', t.gain > 0 ? 'text-up' : t.gain < 0 ? 'text-down' : 'text-fg-3')}>{signedPercent(t.gainPct, 1)}</div>
                           </>
-                        ) : spot.isLoading ? (
+                        ) : spot.awaiting ? (
                           <Skeleton className="h-4 w-16" />
                         ) : (
                           <div className="text-[13px] text-fg-3">No price</div>
@@ -467,7 +490,7 @@ export default function Stack() {
                             <span className="block text-[14px] font-semibold text-fg tnum">{money(value)}</span>
                             {cost > 0 && <span className={cx('block text-[12px] tnum', gain > 0 ? 'text-up' : gain < 0 ? 'text-down' : 'text-fg-3')}>{signedMoney(gain)}</span>}
                           </>
-                        ) : spot.isLoading ? (
+                        ) : spot.awaiting ? (
                           <Skeleton className="h-4 w-16" />
                         ) : (
                           <span className="block text-[13px] text-fg-3">No price</span>

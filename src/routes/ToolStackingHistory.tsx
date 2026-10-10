@@ -91,7 +91,7 @@ export default function ToolStackingHistory() {
                     </>
                   ) : (
                     <>
-                      <div className="text-[22px] font-semibold tracking-tight text-fg-3 tnum">{spotMap.isLoading ? '...' : 'No price'}</div>
+                      <div className="text-[22px] font-semibold tracking-tight text-fg-3 tnum">{spotMap.awaiting ? '...' : 'No price'}</div>
                       <div className="text-[14px] text-fg-3 tnum">{money0(result.invested)} put in</div>
                     </>
                   )}

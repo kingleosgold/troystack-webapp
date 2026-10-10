@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Lock, MessageSquarePlus, PanelLeft, Trash2 } from 'lucide-react';
@@ -28,7 +28,8 @@ import {
 } from '../services/troy';
 import { ApiError, getJson } from '../lib/apiClient';
 import { parseSpreadsheet } from '../lib/parseSpreadsheet';
-import { formatTimeET, todayET } from '../lib/text';
+import { formatDate, formatTimeET, todayET } from '../lib/text';
+import { Markdown } from '../lib/markdown';
 import { cx } from '../lib/cx';
 import { Composer, ConsentDialog, MessageBubble, TypingIndicator } from '../ui/TroyChat';
 import { hasTroyConsent } from '../lib/consent';
@@ -52,6 +53,11 @@ const STACK_CHIPS = [
 
 const VISITOR_KEY = 'troy_visitor_chat_v1';
 const FREE_HISTORY = 3;
+
+/** A saved chat as one account's, so the same chat open under another account is read again for it. */
+function chatKey(userId: string, conversationId: string): string {
+  return `${userId}:${conversationId}`;
+}
 
 function localId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -193,6 +199,46 @@ function LimitCard({ quota, signedIn, signUpHref = '/auth?next=/troy' }: { quota
   );
 }
 
+/** Today's brief as the page shows it, outside any chat. */
+type BriefState =
+  | { status: 'loading' }
+  | { status: 'failed' }
+  | { status: 'none' }
+  | { status: 'shown'; text: string; date: string; current: boolean };
+
+/**
+ * Troy's daily brief in a card of its own above the chat, dated, the way the
+ * app's Today screen shows it. It isn't part of any chat, so it stays put as
+ * chats change and isn't sent with a question.
+ */
+function BriefCard({ brief, onRetry, onHide }: { brief: BriefState; onRetry: () => void; onHide: () => void }) {
+  const dated = brief.status === 'shown' ? ` · ${formatDate(`${brief.date}T12:00:00Z`)}` : '';
+  return (
+    <section aria-label="Your daily brief" className="rounded-2xl border border-line border-l-[3px] border-l-gold bg-surface p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[13px] font-semibold text-fg-2">Your daily brief{dated}</h2>
+        <button type="button" onClick={onHide} className="text-[12px] font-semibold text-fg-3 hover:text-fg">
+          Hide
+        </button>
+      </div>
+      <div className="mt-2 text-[14px] text-fg">
+        {brief.status === 'loading' ? (
+          <p className="text-fg-3" role="status">Loading today's brief</p>
+        ) : brief.status === 'failed' ? (
+          <ErrorNote onRetry={onRetry}>Today's brief didn't load.</ErrorNote>
+        ) : brief.status === 'none' ? (
+          <p className="text-fg-2">Your first brief lands tomorrow morning. Troy writes one each day from your stack and the overnight news.</p>
+        ) : (
+          <>
+            {!brief.current && <p className="mb-2 text-[13px] text-fg-3">Today's brief isn't out yet, so this is the most recent one.</p>}
+            <Markdown text={brief.text} />
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function SignInCard({ href }: { href: string }) {
   return (
     <div className="rounded-2xl border border-line bg-surface p-5">
@@ -235,14 +281,25 @@ export default function Troy() {
   const [pending, setPending] = useState<string | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [importRows, setImportRows] = useState<{ rows: ImportRow[]; source: string } | null>(null);
+  // Today's brief and the account it was read for. It's written from that
+  // account's stack, so it never shows to anyone else.
+  const [brief, setBrief] = useState<(BriefState & { userId: string }) | null>(null);
+  // Each read of the brief gets a number. A newer read, hiding the card or a
+  // change of account makes an answer still on its way out of date.
+  const briefRead = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  // The conversation whose messages are on screen, so a chat started here
-  // isn't reloaded over its own question, and any other chat always is.
+  // The account and conversation whose messages are on screen, so a chat
+  // started here isn't reloaded over its own question, and any other chat,
+  // or the same one under another account, always is.
   const shownFor = useRef<string | null>(null);
+  // Bumped when the account changes, so a question still on its way for the
+  // last account never lands on the screen of the next.
+  const accountTurn = useRef(0);
   const autoAsked = useRef(false);
 
   const signedIn = Boolean(user);
+  const userId = user?.id ?? null;
 
   // Visitors: is the no-account endpoint live, and how many questions are left?
   // A status read that failed isn't a no. The question can still go, and the
@@ -271,11 +328,31 @@ export default function Troy() {
     staleTime: 30_000,
   });
 
+  // A saved chat belongs to the account that read it. When another account
+  // signs in, here or in another tab, or this one signs out, the chat comes
+  // off the screen before the page is drawn again, and a question still on
+  // its way for the last account is dropped. The load below then reads the
+  // chat open here for the new account.
+  const lastAccount = useRef(userId);
+  useLayoutEffect(() => {
+    const last = lastAccount.current;
+    lastAccount.current = userId;
+    if (last === null || last === userId) return;
+    accountTurn.current += 1;
+    abortRef.current?.abort();
+    shownFor.current = null;
+    setMessages([]);
+    setError(null);
+    setQuotaHit(null);
+    setFailedChat(null);
+  }, [userId]);
+
   // Load a saved conversation. Another chat's messages come off the screen
   // first, so nothing is asked under the wrong one while it loads.
   useEffect(() => {
-    if (!user || !conversationId) return;
-    if (shownFor.current === conversationId) return;
+    if (!userId || !conversationId) return;
+    const key = chatKey(userId, conversationId);
+    if (shownFor.current === key) return;
     let cancelled = false;
     setError(null);
     setFailedChat(null);
@@ -284,16 +361,23 @@ export default function Troy() {
     shownFor.current = null;
     setMessages([]);
     setLoadingChat(true);
-    getConversation(conversationId, user.id)
+    getConversation(conversationId, userId)
       .then((conv) => {
         if (cancelled) return;
-        shownFor.current = conversationId;
+        shownFor.current = key;
         setMessages(conv.messages ?? []);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // Not a chat this account has, as when another account signed in
+        // with it open, or it was deleted in the app. The page leaves it.
+        if (err instanceof ApiError && err.status === 404) {
+          navigate('/troy', { replace: true });
+          return;
+        }
         // Until it loads, the chat takes no new message. One sent now would be
         // added to it, and the screen would show only the new exchange.
-        if (!cancelled) setFailedChat(conversationId);
+        setFailedChat(conversationId);
       })
       .finally(() => {
         if (!cancelled) setLoadingChat(false);
@@ -302,7 +386,7 @@ export default function Troy() {
       cancelled = true;
       setLoadingChat(false);
     };
-  }, [user, conversationId, chatTry]);
+  }, [userId, conversationId, chatTry, navigate]);
   const chatFailed = conversationId !== null && failedChat === conversationId;
 
   // Switching accounts or starting a new chat clears the screen.
@@ -349,17 +433,21 @@ export default function Troy() {
   const sendSignedIn = useCallback(
     async (text: string) => {
       if (!user) return;
+      const turn = accountTurn.current;
       let id = conversationId;
       let madeForThis = false;
       if (!id) {
         const conv = await createConversation(user.id);
+        qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', user.id], (prev) => [conv, ...(prev ?? [])]);
+        // Another account signed in while the chat was being made. It stays
+        // with the account that asked, and nothing more happens on this screen.
+        if (turn !== accountTurn.current) throw new DOMException('Another account signed in', 'AbortError');
         id = conv.id;
         madeForThis = true;
-        qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', user.id], (prev) => [conv, ...(prev ?? [])]);
         // Someone who opened another chat while this one was being made stays
         // there. The question still goes to the new chat, which shows up on the list.
         if (openChat.current === null) {
-          shownFor.current = id;
+          shownFor.current = chatKey(user.id, id);
           openChat.current = id;
           navigate(`/troy/c/${id}`, { replace: true });
         }
@@ -391,7 +479,7 @@ export default function Troy() {
         }
         throw e;
       }
-      if (openChat.current === id) setMessages((prev) => [...prev, { ...res.message, preview: res.preview ?? null }]);
+      if (openChat.current === id && turn === accountTurn.current) setMessages((prev) => [...prev, { ...res.message, preview: res.preview ?? null }]);
       qc.invalidateQueries({ queryKey: ['troy-conversations', user.id] });
     },
     [user, conversationId, navigate, qc],
@@ -421,6 +509,7 @@ export default function Troy() {
       setUnsent(null);
       setQuotaHit(null);
       setTurnedAway(null);
+      const turn = accountTurn.current;
       const userMsg: TroyMessage = { id: localId('me'), role: 'user', content: t, created_at: new Date().toISOString() };
       const history = messages;
       setMessages((prev) => [...prev, userMsg]);
@@ -429,7 +518,8 @@ export default function Troy() {
         if (signedIn) await sendSignedIn(t);
         else await sendVisitor(t, history);
       } catch (e) {
-        if ((e as Error)?.name === 'AbortError') return;
+        // Stopped, or the account it was asked from is no longer the one here.
+        if ((e as Error)?.name === 'AbortError' || turn !== accountTurn.current) return;
         if (e instanceof QuotaError) {
           setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
           setQuotaHit(e.quota);
@@ -476,29 +566,34 @@ export default function Troy() {
     void send(q);
   }, [search, setSearch, authLoading, loadingChat, chatFailed, signedIn, visitorStatus.isLoading, visitorAvailable, visitorLimit, isConfigured, send]);
 
+  // The brief has a card of its own above the chat rather than a place in it.
+  // A message added here would vanish when the chat is opened again, and
+  // wouldn't go with the next question as the rest of the chat does.
   const todaysBrief = useCallback(async () => {
     if (!user) return;
-    // The brief goes in the chat it was asked from. If another chat is opened
-    // while it loads, it stays out of that one.
-    const askedIn = openChat.current;
-    setBusy(true);
+    const userId = user.id;
+    const read = ++briefRead.current;
+    setBrief({ userId, status: 'loading' });
     try {
-      const res = await getJson<{ brief?: { brief_text: string; date: string; is_current?: boolean } | null }>(`/v1/daily-brief?userId=${encodeURIComponent(user.id)}`);
+      const res = await getJson<{ brief?: { brief_text: string; date: string; is_current?: boolean } | null }>(`/v1/daily-brief?userId=${encodeURIComponent(userId)}`);
+      if (read !== briefRead.current) return;
       const b = res.brief;
-      const text = !b
-        ? "Your first brief lands tomorrow morning. Troy writes one each day from your stack and the overnight news."
-        : b.is_current === false
-          ? `Today's brief isn't out yet. Here's the last one, from ${b.date}.\n\n${b.brief_text}`
-          : b.brief_text;
-      if (openChat.current === askedIn) {
-        setMessages((prev) => [...prev, { id: localId('brief'), role: 'assistant', content: text, created_at: new Date().toISOString() }]);
-      }
+      setBrief(b?.brief_text ? { userId, status: 'shown', text: b.brief_text, date: b.date, current: b.is_current !== false } : { userId, status: 'none' });
     } catch {
-      if (openChat.current === askedIn) setError("Today's brief didn't load.");
-    } finally {
-      setBusy(false);
+      if (read === briefRead.current) setBrief({ userId, status: 'failed' });
     }
   }, [user]);
+
+  const hideBrief = useCallback(() => {
+    briefRead.current += 1;
+    setBrief(null);
+  }, []);
+
+  // Another account signing in, here or in another tab, takes the brief off
+  // the screen, along with any answer still on its way for the last one.
+  useEffect(() => {
+    hideBrief();
+  }, [user?.id, hideBrief]);
 
   // The plan as it stands now, for a scan that waits for it to load.
   const planRef = useRef({ loading: planLoading, gold: isGold });
@@ -668,6 +763,7 @@ export default function Troy() {
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-3xl px-4 py-6 space-y-6">
+            {brief && brief.userId === user?.id && <BriefCard brief={brief} onRetry={() => void todaysBrief()} onHide={hideBrief} />}
             {isEmpty && !limit && !chatFailed && (
               <div className="flex flex-col items-center text-center pt-6 sm:pt-12">
                 <img src="/troy-96.png" alt="" className="h-20 w-20 rounded-full shadow-card" width={80} height={80} />
