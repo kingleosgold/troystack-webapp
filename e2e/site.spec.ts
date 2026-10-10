@@ -569,6 +569,48 @@ test.describe('stack', () => {
     await expect.poll(() => page.evaluate((id) => localStorage.getItem(`troystack_snapshot_${id}`), USER_ID)).toBe('2026-10-10');
   });
 
+  test("the new day's snapshot reads the stack again first, so a holding added in the app overnight is in it", async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-10-09T14:00:00Z') });
+    await signIn(page);
+    const mock = await mockBackends(page, { holdings: SAMPLE_HOLDINGS, liveRows: true });
+    await page.goto('/stack');
+    await expect.poll(() => mock.snapshots.length).toBe(1);
+    expect(mock.snapshots[0].goldOz).toBe(1);
+
+    // Late that night the iPhone app adds a 10 oz gold bar to the account.
+    mock.addRow({ id: 'r9', user_id: USER_ID, metal: 'gold', type: 'Gold Bar 10 oz', weight: 10, weight_unit: 'oz', quantity: 1, purchase_price: 41000, purchase_date: '2026-10-09', notes: null, created_at: '2026-10-09T23:00:00Z', updated_at: '2026-10-09T23:00:00Z' });
+    await page.clock.fastForward('24:00:00');
+    await expect.poll(() => mock.snapshots.length).toBe(2);
+    expect(mock.snapshots[1].goldOz).toBe(11);
+    await expect(page.getByText('Gold Bar 10 oz').first()).toBeVisible();
+  });
+
+  test('an import being saved stays open until it lands, whatever tries to close it', async ({ page }) => {
+    await signIn(page);
+    const mock = await mockBackends(page);
+    await page.goto('/stack');
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'my-stack.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('Product,Metal,Oz per piece,Quantity,Price per piece\nAmerican Silver Eagle,silver,1,20,38\nGold Maple Leaf,gold,1,1,4050\n'),
+    });
+    const sheet = page.getByRole('dialog', { name: 'Add from my-stack.csv' });
+    mock.holdWrites();
+    await sheet.getByRole('button', { name: 'Add 2 to my stack' }).click();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole('button', { name: 'Close' }).click();
+    await expect(sheet).toBeVisible();
+    await page.mouse.click(5, 5);
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByText("Adding these to your stack. This closes once they're saved.")).toBeVisible();
+
+    mock.releaseWrites();
+    await expect(sheet).toBeHidden();
+    await expect(page.getByText('Gold Maple Leaf').first()).toBeVisible();
+    expect(mock.inserts).toHaveLength(1);
+  });
+
   test("a stack left in a background tab overnight waits for fresh prices before the new day's snapshot", async ({ page }) => {
     await page.clock.install({ time: new Date('2026-10-09T14:00:00Z') });
     await signIn(page);
@@ -1027,6 +1069,85 @@ test.describe('prices that stop updating', () => {
     await expect(ticker.getByText('$4,180.80')).toBeVisible();
     await goInApp(page, '/stack');
     await expect(page.getByText('$7,795.20').first()).toBeVisible();
+  });
+
+  test('offline, they go out of date on time with nothing else happening, the price bar and the page agree, and they come back with the connection', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-10-09T14:00:00Z') });
+    await mockBackends(page);
+    const ticker = page.getByLabel('Live spot prices').filter({ visible: true });
+    const main = page.locator('main');
+    await page.goto('/tools/melt');
+    await expect(ticker.getByText('$4,180.80')).toBeVisible();
+    await expect(main.getByText('$4,180.80')).toHaveCount(3);
+
+    // The connection drops. The next refresh waits for it, and a minute on the prices still count.
+    await page.context().setOffline(true);
+    await page.clock.fastForward('01:05');
+    await expect(main.getByText('$4,180.80')).toHaveCount(3);
+
+    // Ten minutes on, nothing has answered, and both say so without a click or a reload.
+    await page.clock.fastForward('09:00');
+    const notice = "Prices haven't updated since 10:00 AM ET, so values that need them are on hold.";
+    await expect(ticker.getByRole('button', { name: 'Prices out of date, tap to retry' })).toBeVisible();
+    await expect(ticker.getByText('$4,180.80')).toHaveCount(0);
+    await expect(main.getByText(notice)).toBeVisible();
+    await expect(main.getByText('No price', { exact: true })).toHaveCount(3);
+    await expect(main.getByText('$4,180.80')).toHaveCount(0);
+
+    // The connection is back, and so are the prices, with nothing to tap.
+    await page.context().setOffline(false);
+    await expect(ticker.getByText('$4,180.80')).toBeVisible();
+    await expect(main.getByText('$4,180.80')).toHaveCount(3);
+    await expect(main.getByText(notice)).toHaveCount(0);
+  });
+
+  test('back in view after a few minutes, values show as loading until the new read lands, not as No price', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-10-09T14:00:00Z') });
+    await signIn(page);
+    await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    const ticker = page.getByLabel('Live spot prices').filter({ visible: true });
+    const main = page.locator('main');
+    await page.goto('/tools/melt');
+    await expect(main.getByText('$4,180.80')).toHaveCount(3);
+
+    // The tab sits in the background past the live window, and the read on coming back is slow.
+    await setVisible(page, false);
+    await page.clock.fastForward('04:00');
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route(
+      (url) => url.pathname === '/v1/prices',
+      async (route) => {
+        if (route.request().method() === 'GET') await held;
+        return route.fallback();
+      },
+    );
+    await setVisible(page, true);
+    await expect(main.getByText('...', { exact: true })).toHaveCount(3);
+    await expect(main.getByText('No price', { exact: true })).toHaveCount(0);
+    await expect(main.getByText(/haven't updated since/)).toHaveCount(0);
+    await expect(ticker.getByRole('button', { name: /tap to retry/ })).toHaveCount(0);
+
+    // The other tools and the stack wait the same way.
+    await goInApp(page, '/tools/junk-silver');
+    await expect(main.getByText('...', { exact: true }).first()).toBeVisible();
+    await goInApp(page, '/tools/ratio');
+    await expect(main.getByText('...', { exact: true }).first()).toBeVisible();
+    await goInApp(page, '/tools/stacking-history');
+    await expect(main.getByText('Worth today')).toBeVisible();
+    await expect(main.getByText('...', { exact: true }).first()).toBeVisible();
+    await goInApp(page, '/stack');
+    await expect(main.getByText('American Silver Eagle').first()).toBeVisible();
+    for (const path of ['/tools/junk-silver', '/tools/ratio', '/tools/stacking-history', '/stack']) {
+      await goInApp(page, path);
+      await expect(main.getByText('No price', { exact: true }), path).toHaveCount(0);
+      await expect(main.getByText(/haven't updated since/), path).toHaveCount(0);
+    }
+
+    release();
+    await expect(main.getByText('$7,795.20').first()).toBeVisible();
+    await goInApp(page, '/tools/melt');
+    await expect(main.getByText('$4,180.80')).toHaveCount(3);
   });
 });
 

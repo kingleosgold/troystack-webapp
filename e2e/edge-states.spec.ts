@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { BRIEF_TEXT, mockBackends, SAMPLE_HOLDINGS, signIn, USER_ID } from './mock';
+import { BRIEF_TEXT, FREE_USER_ID, mockBackends, SAMPLE_HOLDINGS, signIn, signInElsewhere, USER_ID } from './mock';
 
 // A value the site can't get says so, with a way to try again, instead of
 // reading as zero, as empty or as still loading. A plan it can't read yet is
@@ -35,7 +35,8 @@ test.describe('a metal with no live price', () => {
     await expect(header.getByText('since the last close')).toHaveCount(0);
     await expect(header.getByText(/\$14\.00|1\.23%/)).toHaveCount(0);
     await expect(page.getByText('High in range')).toBeVisible();
-    await expect(page.getByText('Per gram')).toHaveCount(0);
+    // No price per gram anywhere, whether or not a row for one is shown.
+    await expect(page.locator('dt:text-is("Per gram") + dd', { hasText: '$' })).toHaveCount(0);
 
     await page.goto('/');
     const tile = page.getByRole('link', { name: /^Palladium price/ });
@@ -244,25 +245,191 @@ test('a second receipt picked while the first is being checked is ignored, so on
 });
 
 test.describe("Today's brief", () => {
-  test('shows in the chat it was asked from', async ({ page }) => {
+  test('shows in a dated card of its own above the chat', async ({ page }) => {
     await signIn(page);
     await mockBackends(page, { tier: 'gold' });
     await page.goto('/troy');
     await page.getByRole('button', { name: "Today's brief" }).click();
-    await expect(page.getByText(BRIEF_TEXT)).toBeVisible();
+    const card = page.getByRole('region', { name: 'Your daily brief' });
+    await expect(card.getByRole('heading', { name: 'Your daily brief · October 9, 2026' })).toBeVisible();
+    await expect(card.getByText(BRIEF_TEXT)).toBeVisible();
+    await card.getByRole('button', { name: 'Hide' }).click();
+    await expect(card).toHaveCount(0);
   });
 
-  test('stays out of a chat opened while it loads', async ({ page }) => {
+  test("stays put as chats change, since it isn't part of any of them", async ({ page }) => {
     await signIn(page);
     await mockBackends(page, { tier: 'gold', conversations: 2, briefDelayMs: 1500 });
     await page.goto('/troy');
+    // A chat from the list, which sits beside the chat on wide screens and in a sheet on phones.
+    const pick = async (title: string) => {
+      await openChatList(page);
+      await page.locator('aside, [role="dialog"]').getByRole('button', { name: title, exact: true }).filter({ visible: true }).click();
+    };
     await page.getByRole('button', { name: "Today's brief" }).click();
-    await openChatList(page);
-    await page.getByRole('button', { name: 'Junk silver value', exact: true }).filter({ visible: true }).click();
+    await pick('Junk silver value');
     await expect(page.getByText('Saved answer for conv-1.')).toBeVisible();
-    // Past the brief's answer.
-    await page.waitForTimeout(2000);
+    const card = page.getByRole('region', { name: 'Your daily brief' });
+    await expect(card.getByText(BRIEF_TEXT)).toBeVisible();
+    // Off to another chat and back, it's still there, and still not a message in either.
+    await pick('Silver ratio');
+    await expect(page.getByText('Saved answer for conv-0.')).toBeVisible();
+    await pick('Junk silver value');
+    await expect(page.getByText('Saved answer for conv-1.')).toBeVisible();
+    await expect(card.getByText(BRIEF_TEXT)).toBeVisible();
+    await expect(page.getByText(BRIEF_TEXT)).toHaveCount(1);
+  });
+
+  // It's written from the stack of the account that asked for it.
+  test('goes when another tab signs this browser in as someone else', async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier: 'gold' });
+    await page.goto('/troy');
+    await page.getByRole('button', { name: "Today's brief" }).click();
+    const card = page.getByRole('region', { name: 'Your daily brief' });
+    await expect(card.getByText(BRIEF_TEXT)).toBeVisible();
+
+    await signInElsewhere(page);
+    // The Free account has no brief of its own to ask for.
+    await expect(page.getByRole('button', { name: "Today's brief" })).toHaveCount(0);
+    await expect(card).toHaveCount(0);
     await expect(page.getByText(BRIEF_TEXT)).toHaveCount(0);
+  });
+
+  test('still loading when another account signs in, it never lands for that account', async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier: 'gold', briefDelayMs: 1500 });
+    await page.goto('/troy');
+    const answered = page.waitForResponse((r) => new URL(r.url()).pathname === '/v1/daily-brief' && r.request().method() === 'GET');
+    await page.getByRole('button', { name: "Today's brief" }).click();
+    const card = page.getByRole('region', { name: 'Your daily brief' });
+    await expect(card.getByText("Loading today's brief")).toBeVisible();
+
+    await signInElsewhere(page);
+    await expect(page.getByRole('button', { name: "Today's brief" })).toHaveCount(0);
+    await expect(card).toHaveCount(0);
+    await answered;
+    await page.waitForTimeout(300);
+    await expect(card).toHaveCount(0);
+    await expect(page.getByText(BRIEF_TEXT)).toHaveCount(0);
+  });
+
+  test("a slow read can't land over a newer one", async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier: 'gold' });
+    // The first read hangs and then fails. The second answers at once.
+    let reads = 0;
+    let releaseFirst!: () => void;
+    const firstHeld = new Promise<void>((resolve) => (releaseFirst = resolve));
+    await page.route(
+      (url) => url.pathname === '/v1/daily-brief',
+      async (route) => {
+        if (route.request().method() !== 'GET') return route.fallback();
+        reads += 1;
+        if (reads > 1) return route.fallback();
+        await firstHeld;
+        return route.fulfill({ status: 500, headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: '{"error":"Brief unavailable"}' });
+      },
+    );
+    await page.goto('/troy');
+    const ask = page.getByRole('button', { name: "Today's brief" });
+    const card = page.getByRole('region', { name: 'Your daily brief' });
+    await ask.click();
+    await expect(card.getByText("Loading today's brief")).toBeVisible();
+    await ask.click();
+    await expect(card.getByText(BRIEF_TEXT)).toBeVisible();
+
+    const failed = page.waitForResponse((r) => new URL(r.url()).pathname === '/v1/daily-brief' && r.status() === 500);
+    releaseFirst();
+    await failed;
+    await page.waitForTimeout(300);
+    await expect(card.getByText(BRIEF_TEXT)).toBeVisible();
+    await expect(card.getByText("Today's brief didn't load.")).toHaveCount(0);
+  });
+
+  test("hidden while it loads, it doesn't come back when the answer lands", async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier: 'gold', briefDelayMs: 1500 });
+    await page.goto('/troy');
+    const answered = page.waitForResponse((r) => new URL(r.url()).pathname === '/v1/daily-brief' && r.request().method() === 'GET');
+    await page.getByRole('button', { name: "Today's brief" }).click();
+    const card = page.getByRole('region', { name: 'Your daily brief' });
+    await expect(card.getByText("Loading today's brief")).toBeVisible();
+    await card.getByRole('button', { name: 'Hide' }).click();
+    await expect(card).toHaveCount(0);
+    await answered;
+    await page.waitForTimeout(300);
+    await expect(card).toHaveCount(0);
+  });
+});
+
+test.describe('a saved chat and the account it belongs to', () => {
+  test('goes when another tab signs this browser in as someone else, and is read again for them', async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier: 'gold', conversations: 2 });
+    const reads: string[] = [];
+    page.on('request', (r) => {
+      const u = new URL(r.url());
+      if (u.pathname === '/v1/troy/conversations/conv-1' && r.method() === 'GET') reads.push(u.searchParams.get('userId') ?? '');
+    });
+    await page.goto('/troy/c/conv-1');
+    await expect(page.getByText('Saved answer for conv-1.')).toBeVisible();
+
+    await signInElsewhere(page);
+    // It isn't the Free account's chat, so the page leaves it.
+    await expect(page).toHaveURL(/\/troy$/);
+    await expect(page.getByText('Saved answer for conv-1.')).toHaveCount(0);
+    expect(reads).toEqual([USER_ID, FREE_USER_ID]);
+  });
+
+  test('comes off the screen at once, before the read for the new account answers', async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier: 'gold', conversations: 2 });
+    await page.goto('/troy/c/conv-1');
+    await expect(page.getByText('Saved answer for conv-1.')).toBeVisible();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route(
+      (url) => url.pathname === '/v1/troy/conversations/conv-1' && url.searchParams.get('userId') === FREE_USER_ID,
+      async (route) => {
+        if (route.request().method() === 'GET') await held;
+        await route.fallback();
+      },
+    );
+
+    await signInElsewhere(page);
+    await expect(page.getByText('Saved answer for conv-1.')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/troy\/c\/conv-1$/);
+    release();
+    await expect(page).toHaveURL(/\/troy$/);
+    await expect(page.getByText('Saved answer for conv-1.')).toHaveCount(0);
+  });
+
+  test('a question still being answered when another account signs in never lands for that account', async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier: 'gold', conversations: 2 });
+    await page.goto('/troy/c/conv-1');
+    await expect(page.getByText('Saved answer for conv-1.')).toBeVisible();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route(
+      (url) => url.pathname === '/v1/troy/conversations/conv-1/messages',
+      async (route) => {
+        if (route.request().method() === 'POST') await held;
+        await route.fallback().catch(() => undefined);
+      },
+    );
+    await page.getByRole('textbox', { name: 'Message Troy' }).fill('How is my stack doing?');
+    await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByText('How is my stack doing?')).toBeVisible();
+
+    await signInElsewhere(page);
+    await expect(page).toHaveURL(/\/troy$/);
+    await expect(page.getByText('How is my stack doing?')).toHaveCount(0);
+    release();
+    await page.waitForTimeout(500);
+    await expect(page.getByText(/Your stack is worth/)).toHaveCount(0);
+    await expect(page.getByText(/Troy couldn't answer that/)).toHaveCount(0);
   });
 });
 

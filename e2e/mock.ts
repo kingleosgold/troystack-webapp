@@ -7,6 +7,8 @@ const DIR = path.dirname(fileURLToPath(import.meta.url));
 const read = (name: string) => fs.readFileSync(path.join(DIR, name), 'utf8');
 
 export const USER_ID = '7b1c6c1e-1111-4a2b-9c3d-000000000001';
+/** A second account, on the Free plan, for checks where the account changes. */
+export const FREE_USER_ID = '7b1c6c1e-2222-4a2b-9c3d-000000000002';
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -44,8 +46,15 @@ export interface MockOptions {
   verifyStatus?: string;
   /** Counting a receipt scan fails, as when the API is down. */
   failScanCount?: boolean;
-  /** Checkout answers 409, as the API does for an account that already holds a plan. */
+  /** Checkout answers 409 with no reason, as the API did before it gave one, for an account that already holds a plan. */
   checkoutConflict?: boolean;
+  /**
+   * What checkout says is in the way, one answer per checkout in order, as
+   * the API's 409 reasons. Once they run out, checkout opens.
+   */
+  checkoutRefusals?: string[];
+  /** The billing page opens, as it does for an account with a Stripe customer. */
+  billingPortal?: boolean;
   /** Reading the profile row fails, so the plan can't be read. */
   failProfileRead?: boolean;
   /**
@@ -98,6 +107,14 @@ export interface MockOptions {
   syncRestoresGold?: boolean;
 }
 
+/** The API's words for each reason checkout gives on a 409. */
+const CHECKOUT_REFUSALS: Record<string, string> = {
+  has_plan: 'This account already has Gold. You can manage it from Settings.',
+  payment_issue: "Your last Gold payment didn't go through. Update your card on the billing page in Settings to keep Gold.",
+  app_store_renewing: 'Your App Store subscription may still be renewing. On your iPhone, open Settings, tap your name, then Subscriptions.',
+  checkout_in_progress: 'A checkout for this account is already opening. Try again in a moment.',
+};
+
 function fulfillJson(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, headers: { ...CORS, 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 }
@@ -146,6 +163,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   let profile: Record<string, unknown> = { subscription_tier: opts.tier ?? 'free', subscription_status: null, trial_end: null };
   let checkoutTried = false;
   let releaseChatLoads: () => void = () => undefined;
+  const refusals = [...(opts.checkoutRefusals ?? [])];
   const chatLoads = opts.holdChatLoads ? new Promise<void>((resolve) => { releaseChatLoads = resolve; }) : Promise.resolve();
 
   await page.route('https://api.troystack.ai/**', async (route) => {
@@ -218,6 +236,10 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       });
     }
 
+    // The Free account has no saved chats, and the API finds none of the other account's for it.
+    if (p.startsWith('/v1/troy/conversations') && req.method() !== 'POST' && url.searchParams.get('userId') === FREE_USER_ID) {
+      return p === '/v1/troy/conversations' ? fulfillJson(route, { conversations: [] }) : fulfillJson(route, { error: 'Conversation not found' }, 404);
+    }
     if (p === '/v1/troy/conversations' && req.method() === 'GET') {
       const n = opts.conversations ?? 0;
       return fulfillJson(route, {
@@ -300,8 +322,11 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (p === '/v1/stripe/create-checkout-session') {
       checkoutTried = true;
       if (opts.checkoutConflict) return fulfillJson(route, { error: 'This account already has Gold' }, 409);
+      const reason = refusals.shift();
+      if (reason) return fulfillJson(route, { error: CHECKOUT_REFUSALS[reason] ?? 'Checkout is not available for this account.', reason }, 409);
       return fulfillJson(route, { url: 'https://checkout.stripe.com/c/pay/e2e' });
     }
+    if (p === '/v1/stripe/customer-portal' && opts.billingPortal) return fulfillJson(route, { url: 'https://billing.stripe.com/p/session/e2e' });
 
     return fulfillJson(route, { error: `No fixture for ${p}` }, 404);
   });
@@ -311,6 +336,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     const url = new URL(req.url());
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
     if (url.pathname.startsWith('/rest/v1/profiles')) {
+      if (url.searchParams.get('id') === `eq.${FREE_USER_ID}`) return fulfillJson(route, { subscription_tier: 'free', subscription_status: null, trial_end: null });
       if (opts.failProfileRead) return fulfillJson(route, { message: 'upstream connect error' }, 503);
       return fulfillJson(route, profile);
     }
@@ -384,6 +410,10 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     setPricesUp(up: boolean) {
       pricesUp = up;
     },
+    /** A row added to the account somewhere else, as by the iPhone app. Read back with liveRows. */
+    addRow(row: Record<string, unknown>) {
+      table.push({ ...row, deleted_at: null });
+    },
     /** Holds holdings writes unanswered, as a connection that hangs does, until releaseWrites. */
     holdWrites() {
       writesHeld = new Promise((resolve) => {
@@ -407,12 +437,12 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   };
 }
 
-function sessionUser() {
+function sessionUser(id = USER_ID, email = 'stacker@example.com') {
   return {
-    id: USER_ID,
+    id,
     aud: 'authenticated',
     role: 'authenticated',
-    email: 'stacker@example.com',
+    email,
     app_metadata: { provider: 'email', providers: ['email'] },
     user_metadata: {},
     identities: [{ provider: 'email' }],
@@ -420,15 +450,30 @@ function sessionUser() {
   };
 }
 
-function sessionFor() {
+function sessionFor(user = sessionUser()) {
   return {
     access_token: 'e2e-access-token',
     token_type: 'bearer',
     expires_in: 3600,
     expires_at: Math.floor(Date.now() / 1000) + 3600 * 24,
     refresh_token: 'e2e-refresh-token',
-    user: sessionUser(),
+    user,
   };
+}
+
+/**
+ * Signs this browser in as the Free account from another tab. The session
+ * goes where every tab reads it, and the other tab tells this one, the way
+ * supabase-js does on a real sign-in.
+ */
+export async function signInElsewhere(page: Page) {
+  const session = sessionFor(sessionUser(FREE_USER_ID, 'free@example.com'));
+  await page.evaluate((value) => {
+    localStorage.setItem('sb-e2e-auth-token', value);
+    const channel = new BroadcastChannel('sb-e2e-auth-token');
+    channel.postMessage({ event: 'SIGNED_IN', session: JSON.parse(value) });
+    channel.close();
+  }, JSON.stringify(session));
 }
 
 /**
