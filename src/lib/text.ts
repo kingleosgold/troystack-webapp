@@ -91,6 +91,13 @@ export function todayET(now = new Date()): string {
   return now.toLocaleDateString('en-CA', { timeZone: NY });
 }
 
+/** "8:42 PM ET" for a time today, "Oct 8, 8:42 PM ET" for one on another day */
+export function whenET(at: string | number | Date, now = new Date()): string {
+  const d = new Date(at);
+  if (!Number.isFinite(d.getTime())) return '';
+  return todayET(d) === todayET(now) ? formatTimeET(d) : `${formatDate(d, { month: 'short', year: undefined })}, ${formatTimeET(d)}`;
+}
+
 /** "Good morning" by New York hour */
 export function greeting(now = new Date()): string {
   const hour = Number(now.toLocaleString('en-US', { timeZone: NY, hour: 'numeric', hour12: false }));

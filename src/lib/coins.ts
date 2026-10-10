@@ -15,6 +15,11 @@ export interface Coin {
   name: string;
   metal: Metal;
   group: CoinGroup;
+  /**
+   * Shared by the records of a coin whose weight or purity changed over the
+   * years, one record for each run of years, so each holds what that coin did.
+   */
+  series?: string;
   /** Pure metal per piece, in troy ounces */
   fineOzt: number;
   /** The whole piece, alloy included */
@@ -54,9 +59,15 @@ export function coinsInGroup(group: CoinGroup): Coin[] {
   return COINS.filter((c) => c.group === group);
 }
 
-/** Other pieces to look at from a coin's page, its own group first. */
+/** The same coin as it was struck in other years, to a different weight or purity. */
+export function otherEras(coin: Coin): Coin[] {
+  return coin.series ? COINS.filter((c) => c.series === coin.series && c.slug !== coin.slug) : [];
+}
+
+/** Other pieces to look at from a coin's page, its own group first. Its other years have a link of their own. */
 export function relatedCoins(coin: Coin, count = 6): Coin[] {
-  const same = COINS.filter((c) => c.group === coin.group && c.slug !== coin.slug);
+  const eras = new Set(otherEras(coin).map((c) => c.slug));
+  const same = COINS.filter((c) => c.group === coin.group && c.slug !== coin.slug && !eras.has(c.slug));
   const metal = COINS.filter((c) => c.metal === coin.metal && c.group !== coin.group);
   return [...same, ...metal].slice(0, count);
 }

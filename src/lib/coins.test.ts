@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COINS, COIN_GROUPS, aOrAn, coinBySlug, inSentence, isCollectible, ounces, relatedCoins } from './coins';
+import { COINS, COIN_GROUPS, aOrAn, coinBySlug, inSentence, isCollectible, otherEras, ounces, relatedCoins } from './coins';
 import { METALS, OZT_PER_GRAM } from './metals';
 
 describe('the coin catalog', () => {
@@ -63,6 +63,47 @@ describe('the coin catalog', () => {
     expect(isCollectible(coinBySlug('mercury-dime')!)).toBe(true);
     expect(isCollectible(coinBySlug('20-dollar-double-eagle')!)).toBe(true);
     expect(isCollectible(coinBySlug('american-silver-eagle')!)).toBe(false);
+  });
+});
+
+describe('coins struck to different specs over the years', () => {
+  it('holds a full ounce in a Panda from before 2016 and 30 grams in one since', () => {
+    for (const metal of ['silver', 'gold']) {
+      const now = coinBySlug(`chinese-${metal}-panda`)!;
+      const before = coinBySlug(`chinese-${metal}-panda-1-oz`)!;
+      expect(now, metal).toMatchObject({ grossGrams: 30, fineness: 0.999, years: '2016 to today' });
+      expect(before, metal).toMatchObject({ fineOzt: 1, fineness: 0.999 });
+      // The 30 gram coin holds about 3.6% less, which valuing an older coin as one would lose.
+      expect(1 - now.fineOzt / before.fineOzt, metal).toBeCloseTo(0.036, 3);
+    }
+    expect(coinBySlug('chinese-silver-panda-1-oz')!.years).toBe('1989 to 2015');
+    expect(coinBySlug('chinese-gold-panda-1-oz')!.years).toBe('1982 to 2015');
+  });
+
+  it('gives Britannias from before 2013 their own purity and heavier blank, and early Maple Leafs theirs', () => {
+    expect(coinBySlug('british-silver-britannia-1997-2012')).toMatchObject({ fineOzt: 1, fineness: 0.958, grossGrams: 32.45, years: '1997 to 2012' });
+    expect(coinBySlug('british-silver-britannia')).toMatchObject({ fineOzt: 1, fineness: 0.999, years: '2013 to today' });
+    expect(coinBySlug('british-gold-britannia-1987-2012')).toMatchObject({ fineOzt: 1, fineness: 0.9167, grossGrams: 34.05, purity: '22 karat (91.67%)', years: '1987 to 2012' });
+    expect(coinBySlug('british-gold-britannia')).toMatchObject({ fineOzt: 1, fineness: 0.9999, years: '2013 to today' });
+    expect(coinBySlug('canadian-gold-maple-leaf-1979-1982')).toMatchObject({ fineOzt: 1, fineness: 0.999, years: '1979 to 1982' });
+    expect(coinBySlug('canadian-gold-maple-leaf')).toMatchObject({ fineOzt: 1, fineness: 0.9999, years: 'late 1982 to today' });
+  });
+
+  it('keeps the addresses these coins had, and links each run of years to the others', () => {
+    for (const slug of ['chinese-silver-panda', 'chinese-gold-panda', 'british-silver-britannia', 'british-gold-britannia', 'canadian-gold-maple-leaf']) {
+      expect(coinBySlug(slug)?.series, slug).toBe(slug);
+    }
+    const series = COINS.filter((c) => c.series);
+    expect(series).toHaveLength(10);
+    for (const c of series) {
+      const eras = otherEras(c);
+      expect(eras.length, c.slug).toBe(1);
+      expect(eras[0].metal, c.slug).toBe(c.metal);
+      expect(eras[0].years, c.slug).not.toBe(c.years);
+      // The other years have a link of their own, so they aren't among the suggestions too.
+      expect(relatedCoins(c).map((r) => r.slug), c.slug).not.toContain(eras[0].slug);
+    }
+    expect(otherEras(coinBySlug('morgan-silver-dollar')!)).toEqual([]);
   });
 });
 
