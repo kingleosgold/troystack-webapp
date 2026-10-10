@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Metal } from '../types/holding';
 import { money } from '../lib/format';
 import { Button, Sheet } from './primitives';
@@ -34,13 +34,22 @@ function usable(r: ImportRow): boolean {
 /** Review rows from a receipt scan or a spreadsheet before they join the stack. */
 export function ImportSheet({ rows, source, onClose, onConfirm }: Props) {
   const [busy, setBusy] = useState(false);
+  // Set the moment a save starts, so a close that lands before the sheet
+  // redraws is held back too.
+  const saving = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [batchId] = useState(() => crypto.randomUUID());
   const good = rows.filter(usable);
   const skipped = rows.length - good.length;
+  // While the rows are saving, the sheet stays open. Closed, the save would
+  // finish out of sight, and opening the file again would be a new import
+  // that could add the same rows a second time.
+  const close = () => {
+    if (!saving.current) onClose();
+  };
 
   return (
-    <Sheet open onClose={onClose} title={`Add from ${source}`} width="lg">
+    <Sheet open onClose={close} title={`Add from ${source}`} width="lg">
       <p className="text-[14px] text-fg-2">
         {good.length} {good.length === 1 ? 'item' : 'items'} ready to add.
         {skipped > 0 && ` ${skipped} ${skipped === 1 ? "row is missing a metal or weight, or its count isn't a whole number, so it" : "rows are missing a metal or weight, or their count isn't a whole number, so they"} will be skipped.`}
@@ -70,19 +79,28 @@ export function ImportSheet({ rows, source, onClose, onConfirm }: Props) {
         </table>
       </div>
       {error && <p className="mt-3 text-[13px] text-down" role="alert">{error}</p>}
+      {busy && (
+        <p className="mt-3 text-[13px] text-fg-2" role="status">
+          Adding these to your stack. This closes once they're saved.
+        </p>
+      )}
       <div className="mt-4 flex justify-end gap-2">
-        <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+        <Button variant="secondary" onClick={close} disabled={busy}>Cancel</Button>
         <Button
           disabled={busy || good.length === 0}
           onClick={async () => {
+            if (saving.current) return;
+            saving.current = true;
             setBusy(true);
             setError(null);
             try {
               await onConfirm(good, batchId);
+              saving.current = false;
               onClose();
             } catch (e) {
               setError(e instanceof Error ? e.message : "That didn't save, so nothing was added. Try again.");
             } finally {
+              saving.current = false;
               setBusy(false);
             }
           }}
