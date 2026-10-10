@@ -3,11 +3,12 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, MessageCircle, Plus, Store } from 'lucide-react';
 import { useSpotMap } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
-import { COIN_GROUPS, aOrAn, coinBySlug, inSentence, isBar, isCollectible, ounces, relatedCoins, type Coin } from '../lib/coins';
+import { COIN_GROUPS, aOrAn, coinBySlug, inSentence, isBar, isCollectible, otherEras, ounces, relatedCoins, type Coin } from '../lib/coins';
 import { METAL_LABEL, OZT_PER_GRAM } from '../lib/metals';
 import { money } from '../lib/format';
-import { Card, ErrorNote, Field, Input, LinkButton, PageHeader } from '../ui/primitives';
+import { Card, Field, Input, LinkButton, PageHeader } from '../ui/primitives';
 import { AppStoreButton } from '../ui/AppStore';
+import { SpotNotice } from '../ui/SpotNotice';
 
 const QUICK = [1, 10, 20, 100];
 
@@ -56,14 +57,17 @@ export default function CoinPage() {
 
   const group = COIN_GROUPS.find((g) => g.id === coin.group);
   const metal = METAL_LABEL[coin.metal];
-  const perOz = spot.prices[coin.metal] || 0;
-  const ready = perOz > 0;
+  const eras = otherEras(coin);
+  // Only a live price values the coin. One the feed left out, or one too old
+  // to count, leaves the values on hold and the notice says why.
+  const ready = spot.priced(coin.metal);
+  const perOz = ready ? spot.prices[coin.metal] : 0;
   // Coins come whole, so a count like 2.5 is read as 2 and the field says so.
   const typed = Number(qty.replace(/,/g, ''));
   const pieces = Number.isFinite(typed) && typed > 0 ? Math.floor(typed) : 0;
   const fractional = Number.isFinite(typed) && typed > 0 && !Number.isInteger(typed);
   const unit = isBar(coin) ? 'piece' : 'coin';
-  const show = (value: number) => (ready ? money(value) : spot.isLoading ? '...' : 'Not available');
+  const show = (value: number) => (ready ? money(value) : spot.isLoading ? '...' : 'No price');
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8">
@@ -71,12 +75,17 @@ export default function CoinPage() {
         <ArrowLeft size={14} aria-hidden="true" /> Coin and bar values
       </Link>
       <PageHeader eyebrow={group?.label} title={coin.name} subtitle={`Each ${unit} holds ${ounces(coin.fineOzt)} troy oz of ${coin.metal}.${coin.years ? ` Struck ${coin.years}.` : ''}`} />
+      {eras.map((e) => (
+        <p key={e.slug} className="-mt-2 mb-4 text-[14px] text-fg-2">
+          Struck {e.years}? See{' '}
+          <Link to={`/coins/${e.slug}`} className="font-semibold text-gold hover:text-gold-2">
+            {e.name}
+          </Link>
+          .
+        </p>
+      ))}
 
-      {!ready && !spot.isLoading && (
-        <div className="mb-4">
-          <ErrorNote onRetry={() => spot.refetch()}>Live spot didn't load, so the values are missing for now.</ErrorNote>
-        </div>
-      )}
+      <SpotNotice spot={spot} metals={[coin.metal]} className="mb-4" />
 
       <div className="grid gap-4 md:grid-cols-[1fr_300px]">
         <Card className="p-5">
@@ -174,7 +183,7 @@ export default function CoinPage() {
               className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3 hover:border-line-strong hover:bg-surface-2"
             >
               <span className="min-w-0 truncate text-[14px] font-medium text-fg">{c.name}</span>
-              <span className="shrink-0 text-[14px] text-fg-2 tnum">{ready ? money(c.fineOzt * perOz) : ''}</span>
+              <span className="shrink-0 text-[14px] text-fg-2 tnum">{ready ? money(c.fineOzt * perOz) : spot.isLoading ? '' : 'No price'}</span>
             </Link>
           ))}
         </div>

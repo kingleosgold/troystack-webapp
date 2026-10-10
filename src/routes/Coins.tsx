@@ -7,9 +7,9 @@ import SEO from '../lib/seo.json';
 import { COINS, COIN_GROUPS, coinsInGroup, ounces } from '../lib/coins';
 import { money } from '../lib/format';
 import { METALS } from '../lib/metals';
-import type { Metal } from '../types/holding';
-import { Card, EmptyState, ErrorNote, Input, LinkButton, PageHeader } from '../ui/primitives';
+import { Card, EmptyState, Input, LinkButton, PageHeader } from '../ui/primitives';
 import { AppStoreButton } from '../ui/AppStore';
+import { SpotNotice } from '../ui/SpotNotice';
 
 export default function Coins() {
   usePageMeta({ ...SEO['/coins'], canonical: '/coins' });
@@ -27,8 +27,9 @@ export default function Coins() {
     })).filter((g) => g.coins.length > 0);
   }, [query]);
 
-  const priced = (m: Metal) => spot.prices[m] > 0;
-  const loaded = METALS.some(priced);
+  // A metal the feed leaves out, or prices too old to count as live, leave
+  // those rows at No price, and the notice says which and offers to try again.
+  const shownMetals = METALS.filter((m) => groups.some((g) => g.metal === m));
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-6 sm:pt-8">
@@ -50,11 +51,7 @@ export default function Coins() {
         />
       </div>
 
-      {!loaded && !spot.isLoading && (
-        <div className="mt-4">
-          <ErrorNote onRetry={() => spot.refetch()}>Live spot didn't load, so the values are missing for now.</ErrorNote>
-        </div>
-      )}
+      <SpotNotice spot={spot} metals={shownMetals} className="mt-4" />
 
       {groups.length === 0 ? (
         <div className="mt-6">
@@ -79,9 +76,11 @@ export default function Coins() {
                           {ounces(c.fineOzt)} oz {c.metal}, {c.purity}
                         </span>
                       </span>
-                      <span className="shrink-0 text-[14px] font-semibold text-fg tnum">
-                        {priced(c.metal) ? money(c.fineOzt * spot.prices[c.metal]) : spot.isLoading ? '...' : ''}
-                      </span>
+                      {spot.priced(c.metal) ? (
+                        <span className="shrink-0 text-[14px] font-semibold text-fg tnum">{money(c.fineOzt * spot.prices[c.metal])}</span>
+                      ) : (
+                        <span className="shrink-0 text-[13px] text-fg-3">{spot.isLoading ? '...' : 'No price'}</span>
+                      )}
                     </Link>
                   </li>
                 ))}

@@ -6,11 +6,11 @@ import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { isMetal, METALS, METAL_LABEL, METAL_SYMBOL, METAL_VAR } from '../lib/metals';
 import { money, signedMoney, signedPercent } from '../lib/format';
-import { PURITIES, WEIGHTS, perGram } from '../lib/purity';
 import { formatTimeET } from '../lib/text';
 import type { HistoryRange } from '../lib/marketApi';
 import type { Metal } from '../types/holding';
 import { cx } from '../lib/cx';
+import { PURITIES, WEIGHTS, perGram } from '../lib/purity';
 import { ChangeBadge, MarketStatus } from '../ui/Market';
 import { AppStoreButton } from '../ui/AppStore';
 import { Card, ErrorNote, Segmented, Skeleton } from '../ui/primitives';
@@ -169,7 +169,7 @@ export default function Prices() {
         )}
       </Card>
 
-      {price != null && price > 0 && (
+      {spot.priced(metal) && (
         <Card className="mt-4 p-5">
           <h2 className="text-[15px] font-semibold text-fg">{label} price by weight and purity</h2>
           <div className="mt-3 grid gap-x-8 gap-y-4 sm:grid-cols-2">
@@ -179,7 +179,7 @@ export default function Prices() {
                 {WEIGHTS.map((w) => (
                   <div key={w.label} className="flex justify-between gap-3 py-2.5">
                     <dt className="text-fg-3">{w.label}</dt>
-                    <dd className="font-semibold text-fg tnum">{money(price * w.ozt)}</dd>
+                    <dd className="font-semibold text-fg tnum">{money(spot.prices[metal] * w.ozt)}</dd>
                   </div>
                 ))}
               </dl>
@@ -190,7 +190,7 @@ export default function Prices() {
                 {PURITIES[metal].map((p) => (
                   <div key={p.label} className="flex justify-between gap-3 py-2.5">
                     <dt className="text-fg-3">{p.label}</dt>
-                    <dd className="font-semibold text-fg tnum">{money(perGram(price, p.fineness))}</dd>
+                    <dd className="font-semibold text-fg tnum">{money(perGram(spot.prices[metal], p.fineness))}</dd>
                   </div>
                 ))}
               </dl>
