@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { sendQueuedChanges } from '../hooks/useHoldings';
-import { dropQueuedChanges, readPending, sendBeforeSignOut } from '../services/pendingWrites';
+import { dropQueuedChanges, readPending, readRefused, sendBeforeSignOut } from '../services/pendingWrites';
 import { Button, Sheet } from '../ui/primitives';
 
 interface SignOutContextValue {
@@ -32,6 +32,8 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
   // and before the sheet redraws, and it has to act on the phase as it is.
   const phaseNow = useRef<Phase>(null);
   const [waiting, setWaiting] = useState(0);
+  // Changes the account refused while they were being sent before signing out.
+  const [refusedNow, setRefusedNow] = useState(0);
   // The account being signed out, and a send still going when the wait ran out.
   const leaving = useRef<{ userId: string; stillSending: Promise<void> | null } | null>(null);
   // Each sign-out gets a number. Staying signed in moves it on, and a
@@ -53,6 +55,12 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
     const left = leaving.current;
     leaving.current = null;
     show(null);
+    // Another account signed in, here or in another tab, while this one was
+    // signing out. Signing out now would sign out the new one, so it stops.
+    if (left && signedInAs.current !== left.userId) {
+      busy.current = false;
+      return;
+    }
     try {
       await signOut();
     } finally {
@@ -79,6 +87,7 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
       let asking = false;
       try {
         if (readPending(userId).length > 0) show('sending');
+        const refusedBefore = readRefused(userId);
         const result = await sendBeforeSignOut(userId, () => sendQueuedChanges(userId));
         if (flow.current !== me) {
           // They chose to stay while the changes went. Whatever did go out
@@ -86,9 +95,20 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
           void qc.invalidateQueries({ queryKey: ['holdings', userId] });
           return;
         }
+        if (signedInAs.current !== userId) {
+          // Another account signed in while the changes went, so this
+          // sign-out is over and the new account stays signed in.
+          show(null);
+          return;
+        }
         leaving.current = { userId, stillSending: result.stillSending };
-        if (result.waiting > 0) {
+        // Changes the account refused just now were dropped, and signing out
+        // would clear the note that says so. So the account hears about them
+        // first, with the choice to stay and check the stack.
+        const refused = Math.max(0, readRefused(userId) - refusedBefore);
+        if (result.waiting > 0 || refused > 0) {
           setWaiting(result.waiting);
+          setRefusedNow(refused);
           show('ask');
           asking = true;
           return;
@@ -102,6 +122,18 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
       }
     })();
   }, [finish, qc, show]);
+
+  // Another account signing in ends a sign-out waiting on an answer for the
+  // one before it.
+  useEffect(() => {
+    const left = leaving.current;
+    if (left && phaseNow.current !== null && left.userId !== (user?.id ?? null)) {
+      leaving.current = null;
+      flow.current += 1;
+      busy.current = false;
+      show(null);
+    }
+  }, [user, show]);
 
   // Closing the sheet, or choosing to stay, keeps the account signed in and
   // ends this sign-out, so the next one can start right away.
@@ -125,10 +157,18 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
       <Sheet open={phase !== null} onClose={stay} title={phase === 'ask' ? 'Sign out now?' : 'Signing out'} width="sm">
         {phase === 'ask' ? (
           <>
-            <p className="text-[14px] text-fg-2">
-              {one ? "One change you made hasn't" : `${waiting} changes you made haven't`} reached your account yet. If you sign out,{' '}
-              {one ? "it's" : "they're"} dropped from this browser.
-            </p>
+            {refusedNow > 0 && (
+              <p className="text-[14px] text-fg-2">
+                {refusedNow === 1 ? "A change you made offline couldn't" : `${refusedNow} changes you made offline couldn't`} be saved to your account, so{' '}
+                {refusedNow === 1 ? "it wasn't" : "they weren't"} kept. Stay to check your stack and make {refusedNow === 1 ? 'it' : 'them'} again.
+              </p>
+            )}
+            {waiting > 0 && (
+              <p className={`text-[14px] text-fg-2${refusedNow > 0 ? ' mt-3' : ''}`}>
+                {one ? "One change you made hasn't" : `${waiting} changes you made haven't`} reached your account yet. If you sign out,{' '}
+                {one ? "it's" : "they're"} dropped from this browser.
+              </p>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="secondary" onClick={stay}>
                 Stay signed in
