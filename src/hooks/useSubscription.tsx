@@ -126,7 +126,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   // landed before it. So the plan is read again once the sync answers.
   const syncedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!userId || syncedFor.current === userId) return;
+    // Signing out ends the sync's account, so the same account signing back
+    // in without a reload syncs again, picking up anything the app changed.
+    if (!userId) {
+      syncedFor.current = null;
+      return;
+    }
+    if (syncedFor.current === userId) return;
     syncedFor.current = userId;
     syncSubscription(userId).then(
       () => {
