@@ -47,6 +47,11 @@ export interface HoldingFormData {
   /** In `weightUnit` */
   weight: number;
   weightUnit: WeightUnit;
+  /**
+   * Troy ounces per piece, exactly, when the form kept a weight as it came,
+   * from the account or a coin page, rather than as the rounded figure it shows.
+   */
+  weightOzt?: number;
   quantity: number;
   purchasePrice: number;
   purchaseDate: string;
@@ -58,7 +63,8 @@ export interface HoldingFormData {
   note?: string;
 }
 
-/** Common products by metal, with troy ounces per piece. */
+/** Common products by metal, with the fine troy ounces in one piece. Gram
+ * bars count their purity (.9999 gold, .999 silver), as the coin pages do. */
 export interface ProductPreset {
   name: string;
   ozt: number;
@@ -73,8 +79,8 @@ export const PRODUCT_PRESETS: Record<Metal, ProductPreset[]> = {
     { name: 'Austrian Gold Philharmonic 1 oz', ozt: 1 },
     { name: 'American Gold Eagle 1/10 oz', ozt: 0.1 },
     { name: 'Gold Bar 1 oz', ozt: 1 },
-    { name: 'Gold Bar 10 g', ozt: 0.3215 },
-    { name: 'Gold Bar 1 kg', ozt: 32.1507 },
+    { name: 'Gold Bar 10 g', ozt: 0.32147531493971115 },
+    { name: 'Gold Bar 1 kg', ozt: 32.147531493971115 },
   ],
   silver: [
     { name: 'American Silver Eagle 1 oz', ozt: 1 },
@@ -84,8 +90,8 @@ export const PRODUCT_PRESETS: Record<Metal, ProductPreset[]> = {
     { name: 'Silver Round 1 oz', ozt: 1 },
     { name: 'Silver Bar 10 oz', ozt: 10 },
     { name: 'Silver Bar 100 oz', ozt: 100 },
-    { name: 'Silver Bar 1 kg', ozt: 32.1507 },
-    { name: 'Morgan Dollar', ozt: 0.77344 },
+    { name: 'Silver Bar 1 kg', ozt: 32.118595822059355 },
+    { name: 'Morgan Dollar', ozt: 0.7734375 },
     { name: '90% Junk Silver, $1 face', ozt: 0.715 },
   ],
   platinum: [
@@ -105,3 +111,8 @@ export const WEIGHT_TO_OZT: Record<WeightUnit, number> = {
   g: 0.0321507466,
   kg: 32.1507466,
 };
+
+/** Troy ounces per piece a form saves: the exact weight it kept, or what was entered. */
+export function formOzt(form: HoldingFormData): number {
+  return form.weightOzt ?? form.weight * WEIGHT_TO_OZT[form.weightUnit];
+}
