@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { Button, Sheet } from './primitives';
@@ -6,6 +6,7 @@ import { InstallPath } from './AppStore';
 import { GOLD, isAndroid, isAppleMobile, type Campaign } from '../lib/appStore';
 import { CHECKOUT_WAIT, checkoutBlock, openBillingPortal, openCheckout, rememberCheckout, webCheckoutReady, webPlans, type WebPlan } from '../lib/checkout';
 import { cx } from '../lib/cx';
+import { stillSignedInAs } from '../lib/account';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
 
@@ -28,6 +29,23 @@ interface Props {
 /** What checkout said is in the way that the sheet shows instead of the plans. */
 type Blocked = 'payment_issue' | 'app_store_renewing';
 
+/**
+ * Whether what was started here is still wanted when its answer lands: the
+ * sheet is still open, and the account that started it is still the one
+ * signed in. Closed, or under another account, nothing more happens, and
+ * the page isn't sent to Stripe.
+ */
+function useStillWanted(): (owner: string) => () => boolean {
+  const open = useRef(true);
+  useEffect(() => {
+    open.current = true;
+    return () => {
+      open.current = false;
+    };
+  }, []);
+  return (owner) => () => open.current && stillSignedInAs(owner);
+}
+
 function WebCheckout({ campaign, onClose, onBlocked }: { campaign: Campaign; onClose: () => void; onBlocked: (block: Blocked) => void }) {
   const { user, session } = useAuth();
   const navigate = useNavigate();
@@ -40,6 +58,7 @@ function WebCheckout({ campaign, onClose, onBlocked }: { campaign: Campaign; onC
   const [error, setError] = useState<string | null>(null);
   // Another checkout for this account is opening, and this one asks again shortly.
   const [waiting, setWaiting] = useState(false);
+  const stillWantedFor = useStillWanted();
   const chosen = plans.find((p) => p.id === plan) ?? plans[0];
   const lifetime = plan === 'lifetime';
 
@@ -52,11 +71,22 @@ function WebCheckout({ campaign, onClose, onBlocked }: { campaign: Campaign; onC
       return;
     }
     setBusy(true);
-    try {
-      await openCheckout(user.id, session?.access_token, plan, campaign, () => setWaiting(true));
-    } catch (e) {
+    const wanted = stillWantedFor(user.id);
+    const settle = () => {
       setBusy(false);
       setWaiting(false);
+    };
+    try {
+      const left = await openCheckout(user.id, session?.access_token, plan, campaign, {
+        onWait: () => {
+          if (wanted()) setWaiting(true);
+        },
+        stillWanted: wanted,
+      });
+      if (!left) settle();
+    } catch (e) {
+      settle();
+      if (!wanted()) return;
       const block = checkoutBlock(e);
       if (block === 'has_plan') {
         // Settings says so and puts the plan right, as it does after sign-in.
@@ -121,15 +151,17 @@ function PaymentIssue() {
   const { user, session } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const stillWantedFor = useStillWanted();
   const update = async () => {
     if (!user) return;
     setError(null);
     setBusy(true);
+    const wanted = stillWantedFor(user.id);
     try {
-      await openBillingPortal(user.id, session?.access_token);
+      if (!(await openBillingPortal(user.id, session?.access_token, wanted))) setBusy(false);
     } catch {
       setBusy(false);
-      setError("The billing page didn't open. Try again in a moment.");
+      if (wanted()) setError("The billing page didn't open. Try again in a moment.");
     }
   };
   return (
