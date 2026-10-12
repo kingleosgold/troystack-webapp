@@ -31,7 +31,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npx vite build && npx vite preview --port ${PORT} --strictPort`,
+    // The same build Vercel runs, prerendered pages included.
+    command: `npx vite build && node scripts/prerender.mjs && npx vite preview --port ${PORT} --strictPort`,
     port: PORT,
     // Placeholder values so the build turns on accounts and web checkout.
     // The tests answer every request to these, nothing real is called.
