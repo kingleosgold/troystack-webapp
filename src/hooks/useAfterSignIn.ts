@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from './useSubscription';
+import { stillSignedInAs } from '../lib/account';
 import {
   CHECKOUT_WAIT,
   forgetCheckout,
@@ -116,11 +117,23 @@ export function useAfterSignIn(): { checkoutOverlay: CheckoutOverlay } {
       // Stripe brings them back to Settings, so an older return path is done with.
       forgetNextPath();
       // The browser is about to leave for Stripe; the overlay covers the wait.
+      // Checkout belongs to the account it started for. If another account
+      // signs in, or this one signs out, before it opens, nothing more happens.
+      const owner = user.id;
+      const ours = () => stillSignedInAs(owner);
       setCheckoutOverlay('Opening checkout');
-      openCheckout(user.id, session?.access_token, intent.plan, intent.campaign, () => setCheckoutOverlay(CHECKOUT_WAIT)).catch((err: unknown) => {
-        setCheckoutOverlay(null);
-        navigate(settingsAfterCheckout(err), { replace: true });
-      });
+      openCheckout(user.id, session?.access_token, intent.plan, intent.campaign, {
+        onWait: () => setCheckoutOverlay(CHECKOUT_WAIT),
+        stillWanted: ours,
+      }).then(
+        (left) => {
+          if (!left) setCheckoutOverlay(null);
+        },
+        (err: unknown) => {
+          setCheckoutOverlay(null);
+          if (ours()) navigate(settingsAfterCheckout(err), { replace: true });
+        },
+      );
       return;
     }
     setCheckoutOverlay(null);
