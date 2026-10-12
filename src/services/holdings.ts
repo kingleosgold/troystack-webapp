@@ -1,5 +1,5 @@
 import type { Holding, HoldingFormData } from '../types/holding';
-import { WEIGHT_TO_OZT } from '../types/holding';
+import { formOzt } from '../types/holding';
 import { isMetal } from '../lib/metals';
 
 /**
@@ -78,7 +78,7 @@ function fromForm(form: HoldingFormData, base?: Holding): Holding {
     id: base?.id ?? crypto.randomUUID(),
     metal: form.metal,
     type: form.type.trim() || 'Other',
-    weight: form.weight * WEIGHT_TO_OZT[form.weightUnit],
+    weight: formOzt(form),
     weightUnit: form.weightUnit,
     quantity: form.quantity,
     purchasePrice: form.purchasePrice,

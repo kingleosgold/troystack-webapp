@@ -3,7 +3,7 @@ import { buildNotes, parseNotes } from '../lib/holdingNotes';
 import { isMetal } from '../lib/metals';
 import { stableUuid } from '../lib/stableId';
 import type { Holding, HoldingFormData, WeightUnit } from '../types/holding';
-import { WEIGHT_TO_OZT } from '../types/holding';
+import { formOzt } from '../types/holding';
 
 /**
  * The Supabase `holdings` table, shared with the iPhone app. Reads and writes
@@ -88,7 +88,7 @@ export function toColumns(form: HoldingFormData, previousMeta?: Record<string, u
   return {
     metal: form.metal,
     type: form.type.trim() || 'Other',
-    weight: form.weight * WEIGHT_TO_OZT[form.weightUnit],
+    weight: formOzt(form),
     weight_unit: form.weightUnit,
     quantity: form.quantity,
     purchase_price: form.purchasePrice,
