@@ -64,6 +64,8 @@ export interface MockOptions {
   missingPrices?: Array<'gold' | 'silver' | 'platinum' | 'palladium'>;
   /** Metals with no points in the 24-hour series. */
   emptySparklines?: Array<'gold' | 'silver' | 'platinum' | 'palladium'>;
+  /** Samples in the 24-hour sparklines that come back as zero, by metal and position, as when a feed skipped them. */
+  sparklineZeros?: Partial<Record<'gold' | 'silver' | 'platinum' | 'palladium', number[]>>;
   /** The price history answers with no points at all. */
   emptyHistory?: boolean;
   /** Metals the latest vault report leaves out, as the API does when it can't read one. */
@@ -183,6 +185,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (p === '/v1/sparkline-24h') {
       const body = JSON.parse(read('sparkline.json')) as { sparklines: Record<string, number[]> };
       for (const m of opts.emptySparklines ?? []) body.sparklines[m] = [];
+      for (const [m, at] of Object.entries(opts.sparklineZeros ?? {})) for (const i of at ?? []) body.sparklines[m][i] = 0;
       return fulfillJson(route, body);
     }
     if (p === '/v1/prices/history') {
@@ -327,6 +330,14 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, { url: 'https://checkout.stripe.com/c/pay/e2e' });
     }
     if (p === '/v1/stripe/customer-portal' && opts.billingPortal) return fulfillJson(route, { url: 'https://billing.stripe.com/p/session/e2e' });
+    if (p === '/v1/api-keys' && req.method() === 'GET') {
+      return fulfillJson(route, { keys: [{ id: 'key-1', name: null, key_preview: 'a1b2', tier: 'free', rate_limit: 100, created_at: '2026-10-01T12:00:00Z', last_used_at: null, request_count: 0 }] });
+    }
+    if (p === '/v1/api-keys/generate') {
+      return fulfillJson(route, { id: 'key-new', api_key: 'tsk_e2e_new_secret_key', key_preview: '_key', tier: 'free', rate_limit: 100, created_at: '2026-10-09T12:00:00Z', last_used_at: null, request_count: 0 });
+    }
+    if (p.startsWith('/v1/api-keys/') && req.method() === 'DELETE') return fulfillJson(route, { success: true });
+    if (p === '/v1/troy/speak') return route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'audio/mpeg' }, body: Buffer.from([0xff, 0xfb, 0x90, 0x00]) });
 
     return fulfillJson(route, { error: `No fixture for ${p}` }, 404);
   });
@@ -459,6 +470,46 @@ function sessionFor(user = sessionUser()) {
     refresh_token: 'e2e-refresh-token',
     user,
   };
+}
+
+/**
+ * Holds the requests `match` picks, with `method`, until `release`, as a slow
+ * connection does, then lets them go on to the mock. Routes added later win,
+ * so this goes after mockBackends.
+ */
+export async function holdRequests(page: Page, match: (url: URL) => boolean, method = 'GET') {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const seen: string[] = [];
+  await page.route(match, async (route) => {
+    if (route.request().method() !== method) return route.fallback();
+    seen.push(route.request().url());
+    await held;
+    // The page may have given up on it by now.
+    await route.fallback().catch(() => undefined);
+  });
+  return { release, seen };
+}
+
+/**
+ * A signed-in session that has run out, so sign-in at startup waits while
+ * supabase-js asks for a fresh one, which the mock answers for the same account.
+ */
+export async function signInExpired(page: Page) {
+  const session = { ...sessionFor(), expires_at: Math.floor(Date.now() / 1000) - 3600 };
+  await page.addInitScript((value) => localStorage.setItem('sb-e2e-auth-token', value), JSON.stringify(session));
+}
+
+/** Signs this browser out from another tab, the way supabase-js tells the others. */
+export async function signOutElsewhere(page: Page) {
+  await page.evaluate(() => {
+    localStorage.removeItem('sb-e2e-auth-token');
+    const channel = new BroadcastChannel('sb-e2e-auth-token');
+    channel.postMessage({ event: 'SIGNED_OUT', session: null });
+    channel.close();
+  });
 }
 
 /**

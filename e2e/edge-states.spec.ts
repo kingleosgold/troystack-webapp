@@ -211,7 +211,8 @@ test.describe("a visitor at the day's limit", () => {
     await page.locator('form button[type=submit]').click();
     await expect(page).toHaveURL(/\/troy\/c\/conv-new$/);
     await expect(page.getByText(q)).toBeVisible();
-    expect(mock.calls).toContain('POST /v1/troy/conversations/conv-new/messages');
+    // The question goes right after the chat is made, and can reach the mock a moment after the address changes.
+    await expect.poll(() => mock.calls).toContain('POST /v1/troy/conversations/conv-new/messages');
   });
 
   test("that the count didn't know about sees the count and the limit card agree", async ({ page }) => {
