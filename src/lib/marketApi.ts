@@ -50,17 +50,45 @@ export async function fetchSpot(signal?: AbortSignal): Promise<Spot> {
 }
 
 export interface Sparklines {
+  /** Each metal's prices over the last 24 hours, oldest first. */
   series: MetalMap<number[]>;
-  timestamps: string[];
+  /** When each of those prices was taken, in milliseconds, one for one with `series`. */
+  times: MetalMap<number[]>;
+}
+
+const DAY_MS = 24 * 3600_000;
+
+/**
+ * The last 24 hours of prices, each kept with the time it was taken. A
+ * missing price, a zero or one with no usable time leaves out its time with
+ * it, so every price that's left still sits at its own moment. Without a time
+ * for every price, they're spaced over the day before `now`, counted before
+ * anything is left out, for the same reason.
+ */
+export function pairSparklines(raw: { sparklines?: Partial<MetalMap<unknown[]>>; timestamps?: unknown[] }, now = Date.now()): Sparklines {
+  const series = {} as MetalMap<number[]>;
+  const times = {} as MetalMap<number[]>;
+  const stamps = raw.timestamps ?? [];
+  for (const m of METALS) {
+    const values = raw.sparklines?.[m] ?? [];
+    const timed = stamps.length === values.length;
+    const step = DAY_MS / Math.max(1, values.length - 1);
+    series[m] = [];
+    times[m] = [];
+    values.forEach((value, i) => {
+      const v = Number(value);
+      const t = timed ? Date.parse(String(stamps[i])) : now - (values.length - 1 - i) * step;
+      if (value == null || !Number.isFinite(v) || v <= 0 || !Number.isFinite(t)) return;
+      series[m].push(v);
+      times[m].push(t);
+    });
+  }
+  return { series, times };
 }
 
 export async function fetchSparklines(signal?: AbortSignal): Promise<Sparklines> {
-  const raw = await getJson<{ sparklines?: Partial<MetalMap<number[]>>; timestamps?: string[] }>('/v1/sparkline-24h', { signal });
-  const series = {} as MetalMap<number[]>;
-  for (const m of METALS) {
-    series[m] = (raw.sparklines?.[m] || []).filter((v) => Number.isFinite(v) && v > 0);
-  }
-  return { series, timestamps: raw.timestamps || [] };
+  const raw = await getJson<{ sparklines?: Partial<MetalMap<unknown[]>>; timestamps?: unknown[] }>('/v1/sparkline-24h', { signal });
+  return pairSparklines(raw);
 }
 
 export type HistoryRange = '1M' | '3M' | '6M' | '1Y' | '5Y' | 'ALL';

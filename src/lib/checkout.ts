@@ -162,8 +162,18 @@ export function takeNextPath(now = Date.now()): string | null {
   }
 }
 
-/** Sends the browser to Stripe Checkout. Resolves only if something goes wrong before that. */
-export async function startCheckout(userId: string, token: string | undefined, plan: WebPlan, campaign?: CheckoutCampaign): Promise<void> {
+/**
+ * Sends the browser to Stripe Checkout. True once it's on its way. False when
+ * `stillWanted` says no by the time checkout answers, as when another account
+ * signed in or the sheet it started from closed, so the page stays put.
+ */
+export async function startCheckout(
+  userId: string,
+  token: string | undefined,
+  plan: WebPlan,
+  campaign?: CheckoutCampaign,
+  stillWanted: () => boolean = () => true,
+): Promise<boolean> {
   const priceId = PRICE_IDS[plan];
   if (!priceId) throw new Error('Web checkout is not set up here yet.');
   const origin = window.location.origin;
@@ -175,7 +185,9 @@ export async function startCheckout(userId: string, token: string | undefined, p
     cancel_url: `${origin}${window.location.pathname}`,
   }, { token });
   if (!url) throw new Error('Checkout did not start.');
+  if (!stillWanted()) return false;
   window.location.assign(url);
+  return true;
 }
 
 /**
@@ -207,22 +219,23 @@ export const CHECKOUT_WAIT = 'A checkout for this account is already opening. Tr
 /**
  * Sends the browser to Stripe Checkout, as startCheckout does. When another
  * checkout for the account is still opening, `onWait` hears about it and
- * checkout is asked for once more after a few seconds.
+ * checkout is asked for once more after a few seconds, if it's still wanted.
  */
 export async function openCheckout(
   userId: string,
   token: string | undefined,
   plan: WebPlan,
   campaign?: CheckoutCampaign,
-  onWait?: () => void,
-): Promise<void> {
+  { onWait, stillWanted = () => true }: { onWait?: () => void; stillWanted?: () => boolean } = {},
+): Promise<boolean> {
   try {
-    await startCheckout(userId, token, plan, campaign);
+    return await startCheckout(userId, token, plan, campaign, stillWanted);
   } catch (err) {
-    if (checkoutBlock(err) !== 'checkout_in_progress') throw err;
+    if (checkoutBlock(err) !== 'checkout_in_progress' || !stillWanted()) throw err;
     onWait?.();
     await new Promise((resolve) => setTimeout(resolve, CHECKOUT_RETRY_MS));
-    await startCheckout(userId, token, plan, campaign);
+    if (!stillWanted()) return false;
+    return startCheckout(userId, token, plan, campaign, stillWanted);
   }
 }
 
@@ -247,12 +260,17 @@ export function verifyCheckout(sessionId: string): Promise<{ success: boolean; t
   return postJson('/v1/stripe/verify-session', { session_id: sessionId });
 }
 
-/** Stripe's billing page, where web subscribers change plans or cancel. */
-export async function openBillingPortal(userId: string, token: string | undefined): Promise<void> {
+/**
+ * Stripe's billing page, where web subscribers change plans or cancel. True
+ * once the browser is on its way, false when `stillWanted` says no by then.
+ */
+export async function openBillingPortal(userId: string, token: string | undefined, stillWanted: () => boolean = () => true): Promise<boolean> {
   const { url } = await postJson<{ url: string }>(
     '/v1/stripe/customer-portal',
     { user_id: userId, return_url: `${window.location.origin}/settings` },
     { token },
   );
+  if (!stillWanted()) return false;
   window.location.assign(url);
+  return true;
 }

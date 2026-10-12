@@ -71,12 +71,12 @@ describe('what checkout says is in the way', () => {
     vi.stubGlobal('fetch', fetch);
     vi.useFakeTimers();
     const onWait = vi.fn();
-    const done = c.openCheckout('7b1c6c1e-1111-4a2b-9c3d-000000000001', 'token', 'monthly', undefined, onWait);
+    const done = c.openCheckout('7b1c6c1e-1111-4a2b-9c3d-000000000001', 'token', 'monthly', undefined, { onWait });
     await vi.advanceTimersByTimeAsync(c.CHECKOUT_RETRY_MS - 1);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(onWait).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1);
-    await done;
+    expect(await done).toBe(true);
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(assign).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/e2e');
 
@@ -89,5 +89,48 @@ describe('what checkout says is in the way', () => {
     await vi.advanceTimersByTimeAsync(c.CHECKOUT_RETRY_MS);
     expect(c.checkoutBlock(await again)).toBe('checkout_in_progress');
     expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("doesn't leave for Stripe, or ask again, once checkout is no longer wanted", async () => {
+    const c = await withPrices({ monthly: 'price_m' });
+    const assign = vi.fn();
+    vi.stubGlobal('window', { location: { origin: 'https://troystack.ai', pathname: '/settings', assign } });
+    const answers = [
+      { status: 200, body: { url: 'https://checkout.stripe.com/c/pay/e2e' } },
+      { status: 409, body: { error: 'Opening', reason: 'checkout_in_progress' } },
+    ];
+    const fetch = vi.fn(async () => {
+      const a = answers.shift()!;
+      return new Response(JSON.stringify(a.body), { status: a.status, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetch);
+    let wanted = true;
+    const stillWanted = () => wanted;
+
+    // Another account signed in while checkout opened. The page stays put.
+    const first = c.openCheckout('7b1c6c1e-1111-4a2b-9c3d-000000000001', 'token', 'monthly', undefined, {
+      stillWanted: () => {
+        wanted = false;
+        return stillWanted();
+      },
+    });
+    expect(await first).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
+
+    // The same, while it waited to ask again: it doesn't ask.
+    vi.useFakeTimers();
+    wanted = true;
+    const second = c.openCheckout('7b1c6c1e-1111-4a2b-9c3d-000000000001', 'token', 'monthly', undefined, { stillWanted });
+    await vi.advanceTimersByTimeAsync(1);
+    wanted = false;
+    await vi.advanceTimersByTimeAsync(c.CHECKOUT_RETRY_MS);
+    expect(await second).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(assign).not.toHaveBeenCalled();
+
+    // The billing page, the same.
+    answers.push({ status: 200, body: { url: 'https://billing.stripe.com/p/session/e2e' } });
+    expect(await c.openBillingPortal('7b1c6c1e-1111-4a2b-9c3d-000000000001', 'token', () => false)).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
   });
 });
