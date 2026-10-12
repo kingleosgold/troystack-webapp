@@ -6,7 +6,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useHoldings } from '../hooks/useHoldings';
 import { SPOT_LIVE_MS, spotIsLive, useSpotMap, type SpotMap } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { useAccountChange } from '../hooks/useAccountChange';
 import SEO from '../lib/seo.json';
+import { signedInAs, signedInOnceLoaded, stillSignedInAs } from '../lib/account';
 import { useSubscription } from '../hooks/useSubscription';
 import { METALS, METAL_LABEL, METAL_VAR, OZT_PER_GRAM, OZT_PER_KG } from '../lib/metals';
 import { lineCostBasis, lineOz, lineValue, stackTotals } from '../lib/stackMath';
@@ -229,11 +231,26 @@ export default function Stack() {
   const [editing, setEditing] = useState<Holding | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | Metal>('all');
-  const [importRows, setImportRows] = useState<{ rows: ImportRow[]; source: string } | null>(null);
+  // Rows from a spreadsheet waiting to be added, for the account, or the
+  // browser's own stack, that picked the file.
+  const [importRows, setImportRows] = useState<{ owner: string | null; rows: ImportRow[]; source: string } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // A holding open in the editor, rows waiting to be added and notes about
+  // them all belong to the account they came from. When another account
+  // signs in, here or in another tab, or this one signs out, they go, so
+  // nothing from one account is shown to or saved into another.
+  useAccountChange(() => {
+    setEditorOpen(false);
+    setEditing(null);
+    setImportRows(null);
+    setImportError(null);
+    setMoveError(null);
+    setMoving(false);
+  });
 
   const totals = useMemo(() => stackTotals(holdings, spot.prices, spot.changePct), [holdings, spot.prices, spot.changePct]);
   useDailySnapshot(user?.id, holdings, spot, { live: !loading && !offlineSince, readAt, reading, reread: refresh });
@@ -265,11 +282,15 @@ export default function Stack() {
 
   const onFile = async (file: File) => {
     setImportError(null);
+    // A file picked while sign-in is still loading at startup is for the
+    // account the loading finds.
+    const owner = signedInOnceLoaded();
     try {
-      const rows = await parseSpreadsheet(file);
-      setImportRows({ rows, source: file.name });
+      const [rows, who] = await Promise.all([parseSpreadsheet(file), owner]);
+      if (stillSignedInAs(who)) setImportRows({ owner: who, rows, source: file.name });
     } catch (e) {
-      setImportError(e instanceof Error ? e.message : "That file couldn't be read.");
+      const who = await owner;
+      if (stillSignedInAs(who)) setImportError(e instanceof Error ? e.message : "That file couldn't be read.");
     }
   };
 
@@ -318,14 +339,15 @@ export default function Stack() {
               size="sm"
               disabled={moving}
               onClick={async () => {
+                const owner = signedInAs();
                 setMoving(true);
                 setMoveError(null);
                 try {
                   await moveBrowserStackIn();
                 } catch (e) {
-                  setMoveError(e instanceof Error ? e.message : "The holdings in this browser didn't move into your account. Try again.");
+                  if (stillSignedInAs(owner)) setMoveError(e instanceof Error ? e.message : "The holdings in this browser didn't move into your account. Try again.");
                 } finally {
-                  setMoving(false);
+                  if (stillSignedInAs(owner)) setMoving(false);
                 }
               }}
             >
@@ -532,7 +554,7 @@ export default function Stack() {
           onDelete={editing ? () => remove(editing.id) : undefined}
         />
       )}
-      {importRows && (
+      {importRows && importRows.owner === (user?.id ?? null) && (
         <ImportSheet
           rows={importRows.rows}
           source={importRows.source}

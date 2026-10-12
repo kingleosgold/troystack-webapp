@@ -363,6 +363,7 @@ export default function Home() {
               pct={spot.data?.changePct[m]}
               amount={spot.data?.changeAmt[m]}
               spark={sparks.data?.series[m]}
+              sparkTimes={sparks.data?.times[m]}
               loading={!spot.live}
               to={`/prices/${m}`}
             />

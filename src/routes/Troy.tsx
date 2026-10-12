@@ -27,6 +27,7 @@ import {
   answeredTurns,
 } from '../services/troy';
 import { ApiError, getJson } from '../lib/apiClient';
+import { signedInAs, stillSignedInAs } from '../lib/account';
 import { parseSpreadsheet } from '../lib/parseSpreadsheet';
 import { formatDate, formatTimeET, todayET } from '../lib/text';
 import { Markdown } from '../lib/markdown';
@@ -280,7 +281,8 @@ export default function Troy() {
   const [chatTry, setChatTry] = useState(0);
   const [pending, setPending] = useState<string | null>(null);
   const [listOpen, setListOpen] = useState(false);
-  const [importRows, setImportRows] = useState<{ rows: ImportRow[]; source: string } | null>(null);
+  // Rows from a receipt or a spreadsheet waiting to be added, for the account that picked them.
+  const [importRows, setImportRows] = useState<{ owner: string | null; rows: ImportRow[]; source: string } | null>(null);
   // Today's brief and the account it was read for. It's written from that
   // account's stack, so it never shows to anyone else.
   const [brief, setBrief] = useState<(BriefState & { userId: string }) | null>(null);
@@ -296,6 +298,9 @@ export default function Troy() {
   // Bumped when the account changes, so a question still on its way for the
   // last account never lands on the screen of the next.
   const accountTurn = useRef(0);
+  // One receipt at a time. Another picked while the first is being checked
+  // would be counted as a scan of its own.
+  const scanning = useRef(false);
   const autoAsked = useRef(false);
 
   const signedIn = Boolean(user);
@@ -332,18 +337,30 @@ export default function Troy() {
   // signs in, here or in another tab, or this one signs out, the chat comes
   // off the screen before the page is drawn again, and a question still on
   // its way for the last account is dropped. The load below then reads the
-  // chat open here for the new account.
+  // chat open here for the new account. With any change, a visitor signing in
+  // included, the page is free for the account now here: a scan or a question
+  // still going for the last one stops holding it, and rows waiting to be
+  // added, a question waiting on consent, a limit that was reached and any
+  // note about the last one go.
   const lastAccount = useRef(userId);
   useLayoutEffect(() => {
     const last = lastAccount.current;
     lastAccount.current = userId;
-    if (last === null || last === userId) return;
+    if (last === userId) return;
     accountTurn.current += 1;
     abortRef.current?.abort();
+    scanning.current = false;
+    setBusy(false);
+    setImportRows(null);
+    setPending(null);
+    setConsentOpen(false);
+    setQuotaHit(null);
+    setTurnedAway(null);
+    setUnsent(null);
+    setError(null);
+    if (last === null) return;
     shownFor.current = null;
     setMessages([]);
-    setError(null);
-    setQuotaHit(null);
     setFailedChat(null);
   }, [userId]);
 
@@ -487,9 +504,12 @@ export default function Troy() {
 
   const sendVisitor = useCallback(
     async (text: string, history: TroyMessage[]) => {
+      const turn = accountTurn.current;
       const controller = new AbortController();
       abortRef.current = controller;
       const res = await askAsVisitor(text, answeredTurns(history), controller.signal);
+      // An account signed in while it was answered, and the visitor's chat went with it.
+      if (turn !== accountTurn.current) return;
       setMessages((prev) => [...prev, { id: localId('troy'), role: 'assistant', content: res.reply, created_at: new Date().toISOString() }]);
       qc.setQueryData(['troy-visitor-status'], { questionsUsed: res.questionsUsed, questionsLimit: res.questionsLimit, resetsAt: res.resetsAt });
     },
@@ -601,13 +621,19 @@ export default function Troy() {
     planRef.current = { loading: planLoading, gold: isGold };
   }, [planLoading, isGold]);
 
-  // One receipt at a time. Another picked while the first is being checked
-  // would be counted as a scan of its own.
-  const scanning = useRef(false);
 
   const onPhoto = useCallback(
     async (file: File) => {
       if (!user || scanning.current) return;
+      // A scan belongs to the account that started it. If another account
+      // signs in, or this one signs out, before it's done, what it found is
+      // dropped before it's counted or offered to add, so one account's
+      // receipt never lands in another account or the browser's own stack.
+      const owner = user.id;
+      const ours = () => stillSignedInAs(owner);
+      // A change of account frees the page, so only a scan that's still the
+      // page's own lets it go when it ends.
+      const turn = accountTurn.current;
       scanning.current = true;
       setError(null);
       // Busy from the start, so the page shows something is happening while
@@ -619,13 +645,15 @@ export default function Troy() {
         for (let waited = 0; planRef.current.loading && waited < 5000; waited += 250) {
           await new Promise((resolve) => setTimeout(resolve, 250));
         }
+        if (!ours()) return;
         if (planRef.current.loading) {
           setError('Your plan is still loading. Try the receipt again in a moment.');
           return;
         }
         const gold = planRef.current.gold;
         if (!gold) {
-          const s = await scanStatus(user.id);
+          const s = await scanStatus(owner);
+          if (!ours()) return;
           if (s.scansUsed >= s.scansLimit) {
             openTrial({ reason: `Free accounts get ${s.scansLimit} receipt scans every 30 days, and you've used them.`, campaign: 'webapp-trial' });
             return;
@@ -638,6 +666,7 @@ export default function Troy() {
           r.readAsDataURL(file);
         });
         const result = await scanReceipt(base64, file.type || 'image/jpeg');
+        if (!ours()) return;
         if (!result.items?.length) {
           setError("Troy couldn't find any metal on that receipt.");
           return;
@@ -648,12 +677,14 @@ export default function Troy() {
         // what was found still shows.
         if (!gold) {
           try {
-            await countScan(user.id);
+            await countScan(owner);
           } catch (e) {
             console.error('counting the receipt scan failed', e);
           }
         }
+        if (!ours()) return;
         setImportRows({
+          owner,
           source: result.dealer ? `${result.dealer} receipt` : 'your receipt',
           rows: result.items.map((it) => ({
             description: it.description,
@@ -666,20 +697,24 @@ export default function Troy() {
           })),
         });
       } catch {
-        setError("That receipt didn't scan. Try a clearer photo.");
+        if (ours()) setError("That receipt didn't scan. Try a clearer photo.");
       } finally {
-        setBusy(false);
-        scanning.current = false;
+        if (turn === accountTurn.current) {
+          setBusy(false);
+          scanning.current = false;
+        }
       }
     },
     [user, openTrial],
   );
 
   const onSpreadsheet = useCallback(async (file: File) => {
+    const owner = signedInAs();
     try {
-      setImportRows({ rows: await parseSpreadsheet(file), source: file.name });
+      const rows = await parseSpreadsheet(file);
+      if (stillSignedInAs(owner)) setImportRows({ owner, rows, source: file.name });
     } catch {
-      setError("That file couldn't be read.");
+      if (stillSignedInAs(owner)) setError("That file couldn't be read.");
     }
   }, []);
 
@@ -706,18 +741,19 @@ export default function Troy() {
       }}
       onDelete={async (id) => {
         if (!user) return;
+        const owner = user.id;
         try {
-          await deleteConversation(id, user.id);
+          await deleteConversation(id, owner);
         } catch (e) {
           // Gone already, deleted in the app say, is as good as deleted here.
           // Anything else means the chat is still saved, so it stays.
           if (!(e instanceof ApiError && e.status === 404)) {
-            setError("That chat couldn't be deleted. Check your connection and try again.");
+            if (stillSignedInAs(owner)) setError("That chat couldn't be deleted. Check your connection and try again.");
             return;
           }
         }
-        qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', user.id], (prev) => (prev ?? []).filter((c) => c.id !== id));
-        if (id === conversationId) navigate('/troy');
+        qc.setQueryData<TroyConversationSummary[]>(['troy-conversations', owner], (prev) => (prev ?? []).filter((c) => c.id !== id));
+        if (stillSignedInAs(owner) && id === conversationId) navigate('/troy');
       }}
     />
   ) : null;
@@ -860,12 +896,13 @@ export default function Troy() {
           if (p) setTimeout(() => void send(p), 0);
         }}
       />
-      {importRows && (
+      {importRows && importRows.owner === userId && (
         <ImportSheet
           rows={importRows.rows}
           source={importRows.source}
           onClose={() => setImportRows(null)}
           onConfirm={async (rows, batchId) => {
+            const owner = importRows.owner;
             const forms: HoldingFormData[] = rows
               .filter((r) => r.metal && r.weight)
               .map((r) => ({
@@ -882,6 +919,9 @@ export default function Troy() {
                 note: r.note,
               }));
             const n = await addMany(forms, batchId);
+            // Saved in the account that picked them. The note about it only
+            // shows if that account is still the one here.
+            if (!stillSignedInAs(owner)) return;
             setMessages((prev) => [
               ...prev,
               { id: localId('ack'), role: 'assistant', content: `Added ${n} ${n === 1 ? 'item' : 'items'} to your stack from ${importRows.source}.`, created_at: new Date().toISOString() },

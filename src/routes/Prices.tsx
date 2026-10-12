@@ -40,16 +40,11 @@ function useChartData(metal: Metal, range: Range) {
   const history = useHistory(range === '24H' ? '1M' : range, range === 'ALL' || range === '5Y' ? 600 : 260, range !== '24H');
   return useMemo(() => {
     if (range === '24H') {
+      // Each price comes with the time it was taken, so the chart shows each move when it happened.
       const values = sparks.data?.series[metal] ?? [];
-      const times = sparks.data?.timestamps ?? [];
-      // Without per-point times, space the points over the 24 hours before the fetch.
-      const now = sparks.dataUpdatedAt;
-      const aligned = values.length === times.length;
-      const points: ChartPoint[] = values.map((v, i) => ({
-        t: aligned ? Date.parse(times[i]) : now - (values.length - 1 - i) * ((24 * 3600_000) / Math.max(1, values.length - 1)),
-        v,
-      }));
-      return { points: points.filter((p) => Number.isFinite(p.t)), startsLate: false, loading: sparks.isLoading, error: sparks.isError, refetch: sparks.refetch };
+      const times = sparks.data?.times[metal] ?? [];
+      const points: ChartPoint[] = values.map((v, i) => ({ t: times[i], v }));
+      return { points, startsLate: false, loading: sparks.isLoading, error: sparks.isError, refetch: sparks.refetch };
     }
     const all = history.data ?? [];
     const points: ChartPoint[] = all
@@ -58,7 +53,7 @@ function useChartData(metal: Metal, range: Range) {
     // True when the metal's prices begin after the range does, as platinum and palladium's do.
     const startsLate = points.length > 1 && all.length > 0 && points[0].t > Date.parse(`${all[0].date}T12:00:00Z`);
     return { points, startsLate, loading: history.isLoading, error: history.isError, refetch: history.refetch };
-  }, [range, metal, sparks.data, sparks.dataUpdatedAt, sparks.isLoading, sparks.isError, sparks.refetch, history.data, history.isLoading, history.isError, history.refetch]);
+  }, [range, metal, sparks.data, sparks.isLoading, sparks.isError, sparks.refetch, history.data, history.isLoading, history.isError, history.refetch]);
 }
 
 export default function Prices() {
