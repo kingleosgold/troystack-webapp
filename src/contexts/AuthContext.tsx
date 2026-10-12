@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { setSignedInAs } from '../lib/account';
 import { clearStackCopies } from '../services/stackCopy';
 import { dropQueuedChanges } from '../services/pendingWrites';
 
@@ -33,10 +34,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) {
+      // No sign-in here, so nobody is signed in, and that's known from the start.
+      setSignedInAs(null);
+      return;
+    }
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      setSignedInAs(session?.user?.id ?? null);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -46,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSignedInAs(session?.user?.id ?? null);
       setSession(session);
       setUser(session?.user ?? null);
     });
