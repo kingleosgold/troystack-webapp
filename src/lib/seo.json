@@ -59,6 +59,10 @@
     "title": "TroyStack for iPhone",
     "description": "Track your gold and silver at live spot, set price alerts, scan dealer receipts, and talk to Troy. Free to download, with a free week of Gold."
   },
+  "/delete-account": {
+    "title": "Delete your TroyStack account",
+    "description": "How to delete your TroyStack account and what it holds, what's kept, and what happens to an App Store, Google Play or troystack.ai subscription."
+  },
   "/developers": {
     "title": "TroyStack API and MCP server for precious metals data",
     "description": "Live gold and silver prices, history, COMEX vault data and Stack Signal stories, over a REST API or an MCP server you can add to Claude or Cursor."

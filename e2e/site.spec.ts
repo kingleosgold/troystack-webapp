@@ -40,6 +40,7 @@ const PAGES: Array<[string, string | RegExp]> = [
   ['/app', /Your stack and Troy/],
   ['/stack', /stack/i],
   ['/settings', /Settings/],
+  ['/delete-account', /Delete your TroyStack account/],
   ['/auth', /Sign in to TroyStack/],
   ['/developers', /TroyStack API/],
   ['/nope', /That page isn't here/],

@@ -23,6 +23,7 @@ const Coin = lazy(() => import('./routes/Coin'));
 const Dealers = lazy(() => import('./routes/Dealers'));
 const GetApp = lazy(() => import('./routes/GetApp'));
 const Settings = lazy(() => import('./routes/Settings'));
+const DeleteAccount = lazy(() => import('./routes/DeleteAccount'));
 const Auth = lazy(() => import('./routes/Auth'));
 const ResetPassword = lazy(() => import('./routes/ResetPassword'));
 const Developers = lazy(() => import('./routes/Developers'));
@@ -70,6 +71,7 @@ export default function App() {
           <Route path="dealers" element={<Dealers />} />
           <Route path="app" element={<GetApp />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="delete-account" element={<DeleteAccount />} />
           <Route path="auth" element={<Auth />} />
           <Route path="reset-password" element={<ResetPassword />} />
           <Route path="developers" element={<Developers />} />

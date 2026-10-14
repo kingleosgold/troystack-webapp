@@ -49,3 +49,15 @@ export async function revokeApiKey(token: string, id: string): Promise<void> {
     throw new ApiError(body.message || body.error || `Revoke failed (${res.status})`, res.status, body);
   }
 }
+
+/** Deletes the signed-in account and everything kept for it. */
+export async function deleteAccount(token: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/v1/account`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.message || body.error || `Delete failed (${res.status})`, res.status, body);
+  }
+}
