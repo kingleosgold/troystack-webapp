@@ -47,6 +47,10 @@
     "title": "Gold to silver ratio today, with history",
     "description": "How many ounces of silver one ounce of gold buys at live spot, with the ratio charted over one year, five years and back to 1915."
   },
+  "/coins": {
+    "title": "Coin and bar melt values at live spot",
+    "description": "Melt value for Silver Eagles, Maple Leafs, Krugerrands, Morgan dollars, junk silver, old US gold and common bars, with each one's weight and purity."
+  },
   "/dealers": {
     "title": "Where to buy gold and silver online",
     "description": "Bullion dealers TroyStack links to, and what to compare before you order: premium per ounce, payment method, shipping and buyback."
@@ -60,12 +64,12 @@
     "description": "Live gold and silver prices, history, COMEX vault data and Stack Signal stories, over a REST API or an MCP server you can add to Claude or Cursor."
   },
   "/prices/gold": {
-    "title": "Gold price today, live spot and charts",
-    "description": "Live gold spot price per troy ounce with today's move and charts from 24 hours back to the long-run history."
+    "title": "Gold price today per ounce, gram and karat",
+    "description": "Live gold spot price per troy ounce, gram and kilo, with 24k to 10k gold per gram and charts from 24 hours back to the long-run history."
   },
   "/prices/silver": {
-    "title": "Silver price today, live spot and charts",
-    "description": "Live silver spot price per troy ounce with today's move and charts from 24 hours back to the long-run history."
+    "title": "Silver price today per ounce and gram",
+    "description": "Live silver spot price per troy ounce, gram and kilo, with sterling and coin silver per gram and charts from 24 hours back to the long-run history."
   },
   "/prices/platinum": {
     "title": "Platinum price today, live spot and charts",
