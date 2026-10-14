@@ -70,6 +70,8 @@ export interface MockOptions {
   emptyHistory?: boolean;
   /** Metals the latest vault report leaves out, as the API does when it can't read one. */
   vaultMissing?: Array<'gold' | 'silver' | 'platinum' | 'palladium'>;
+  /** What DELETE /v1/account answers. It deletes the account by default. */
+  deleteAccount?: { status: number; body: Record<string, unknown> };
   /** Reading the account's holdings fails. */
   failHoldingsRead?: boolean;
   /** Rows the site saves, edits and deletes are read back that way, as the real table does. */
@@ -133,6 +135,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   const calls: string[] = [];
   /** The body of every holdings insert, in order. */
   const inserts: unknown[] = [];
+  const accountDeletes: string[] = [];
   /** Every holdings update, its query and body, in order. */
   const patches: Array<{ query: string; body: Record<string, unknown> }> = [];
   /** The body of every visitor question, in order. */
@@ -337,6 +340,11 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, { id: 'key-new', api_key: 'tsk_e2e_new_secret_key', key_preview: '_key', tier: 'free', rate_limit: 100, created_at: '2026-10-09T12:00:00Z', last_used_at: null, request_count: 0 });
     }
     if (p.startsWith('/v1/api-keys/') && req.method() === 'DELETE') return fulfillJson(route, { success: true });
+    if (p === '/v1/account' && req.method() === 'DELETE') {
+      accountDeletes.push(req.headers()['authorization'] ?? '');
+      const answer = opts.deleteAccount ?? { status: 200, body: { deleted: true } };
+      return fulfillJson(route, answer.body, answer.status);
+    }
     if (p === '/v1/troy/speak') return route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'audio/mpeg' }, body: Buffer.from([0xff, 0xfb, 0x90, 0x00]) });
 
     return fulfillJson(route, { error: `No fixture for ${p}` }, 404);
@@ -406,6 +414,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
 
   return {
     calls,
+    accountDeletes,
     inserts,
     patches,
     asks,

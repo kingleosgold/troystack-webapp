@@ -442,6 +442,7 @@ export default function Settings() {
         <Row title="Developers and API" href="/developers" />
         <Row title="Privacy Policy" href={PRIVACY_URL} />
         <Row title="Terms" href={TERMS_URL} />
+        <Row title="Delete account" href="/delete-account" tone="down" />
       </Section>
 
       <Sheet open={signOutOpen} onClose={() => setSignOutOpen(false)} title="Sign out?" width="sm">
