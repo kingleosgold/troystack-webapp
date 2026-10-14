@@ -3,7 +3,7 @@ import { buildNotes, parseNotes } from '../lib/holdingNotes';
 import { isMetal } from '../lib/metals';
 import { stableUuid } from '../lib/stableId';
 import type { Holding, HoldingFormData, WeightUnit } from '../types/holding';
-import { WEIGHT_TO_OZT } from '../types/holding';
+import { formOzt } from '../types/holding';
 
 /**
  * The Supabase `holdings` table, shared with the iPhone app. Reads and writes
@@ -88,7 +88,7 @@ export function toColumns(form: HoldingFormData, previousMeta?: Record<string, u
   return {
     metal: form.metal,
     type: form.type.trim() || 'Other',
-    weight: form.weight * WEIGHT_TO_OZT[form.weightUnit],
+    weight: formOzt(form),
     weight_unit: form.weightUnit,
     quantity: form.quantity,
     purchase_price: form.purchasePrice,
@@ -187,7 +187,11 @@ export async function addSupabaseHoldings(forms: HoldingFormData[], userId: stri
   return rows.map(fromRow);
 }
 
-export type HoldingUpdates = ReturnType<typeof toColumns> & { updated_at: string };
+/**
+ * The columns an edit sets. `notes` is left out by an edit that shouldn't
+ * touch them, as one the old site queued with no note of its own.
+ */
+export type HoldingUpdates = Omit<ReturnType<typeof toColumns>, 'notes'> & { notes?: string; updated_at: string };
 
 /**
  * The columns an edit changes, the row's other notes keys kept. The app's
@@ -210,7 +214,7 @@ export function holdingUpdates(existing: Holding, form: HoldingFormData): Holdin
 
 /** The holding as it reads once an edit is saved, for showing before it is. */
 export function holdingAfter(existing: Holding, updates: HoldingUpdates, userId: string): Holding {
-  return fromRow({ id: existing.id, user_id: userId, created_at: existing.createdAt, ...updates });
+  return fromRow({ id: existing.id, user_id: userId, created_at: existing.createdAt, notes: null, ...updates });
 }
 
 export async function applyHoldingUpdates(id: string, updates: HoldingUpdates, userId: string): Promise<Holding> {
@@ -242,43 +246,56 @@ export async function deleteSupabaseHolding(id: string, userId: string): Promise
   return softDeleteHolding(id, new Date().toISOString(), userId);
 }
 
+/** The account's id for a holding moved in from this browser's guest stack. */
+function guestRowId(userId: string, guestId: string): Promise<string> {
+  return stableUuid(`${userId}:guest:${guestId}`);
+}
+
 /**
- * Copies holdings saved in this browser into an account. Each row's id comes
- * from the account and the browser holding, so a second copy, from another
- * tab or a retry after a lost answer, finds the rows already there. The
- * account keeps whole pieces, so a fractional count from an older build
- * becomes one piece holding the same ounces and cost.
+ * A holding from this browser's guest stack as an account row. The account
+ * keeps whole pieces, so a fractional count from an older build becomes one
+ * piece holding the same ounces, cost and premium. Weight, price and premium
+ * are per piece, so they scale with the count. Spot at purchase is per ounce,
+ * and taxes, shipping and any cost basis the app set are totals for the
+ * line, so they stay as they are.
  */
-export async function uploadLocalHoldings(local: Holding[], userId: string): Promise<void> {
-  if (local.length === 0) return;
-  const now = new Date().toISOString();
-  const rows: HoldingRow[] = await Promise.all(
-    local.map(async (h) => {
-      const whole = Number.isInteger(h.quantity) && h.quantity > 0;
-      const scale = whole ? 1 : h.quantity;
-      return {
-        id: await stableUuid(`${userId}:guest:${h.id}`),
-        user_id: userId,
-        metal: h.metal,
-        type: h.type,
-        weight: h.weight * scale,
-        weight_unit: h.weightUnit,
-        quantity: whole ? h.quantity : 1,
-        purchase_price: h.purchasePrice * scale,
-        purchase_date: h.purchaseDate || null,
-        notes: buildNotes(h.notesMeta, {
-          dealer: h.dealer,
-          taxes: h.taxes,
-          shipping: h.shipping,
-          spotAtPurchase: h.spotAtPurchase,
-          premium: h.premium,
-          note: h.note,
-        }),
-        created_at: h.createdAt || now,
-        updated_at: now,
-      };
+async function guestRow(h: Holding, userId: string, now: string): Promise<HoldingRow> {
+  const whole = Number.isInteger(h.quantity) && h.quantity > 0;
+  const scale = whole ? 1 : h.quantity;
+  return {
+    id: await guestRowId(userId, h.id),
+    user_id: userId,
+    metal: h.metal,
+    type: h.type,
+    weight: h.weight * scale,
+    weight_unit: h.weightUnit,
+    quantity: whole ? h.quantity : 1,
+    purchase_price: h.purchasePrice * scale,
+    purchase_date: h.purchaseDate || null,
+    notes: buildNotes(h.notesMeta, {
+      dealer: h.dealer,
+      taxes: h.taxes,
+      shipping: h.shipping,
+      spotAtPurchase: h.spotAtPurchase,
+      premium: h.premium == null ? undefined : h.premium * scale,
+      note: h.note,
     }),
-  );
+    created_at: h.createdAt || now,
+    updated_at: now,
+  };
+}
+
+/**
+ * Copies holdings saved in this browser into an account and returns them as
+ * the account holds them. Each row's id comes from the account and the
+ * browser holding, so a second copy, from another tab or a retry after a
+ * lost answer, finds the rows already there.
+ */
+export async function uploadLocalHoldings(local: Holding[], userId: string): Promise<Holding[]> {
+  if (local.length === 0) return [];
+  const now = new Date().toISOString();
+  const rows = await Promise.all(local.map((h) => guestRow(h, userId, now)));
   const { error, status } = await supabase.from('holdings').upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
   if (error) throw writeFailed(error, status, "The holdings in this browser didn't move into your account. Try again.");
+  return rows.map(fromRow);
 }

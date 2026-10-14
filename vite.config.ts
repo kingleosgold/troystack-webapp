@@ -5,6 +5,11 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // Names the build, so a tab can tell a deploy it already reloaded for
+    // from a newer one. Vercel sets the commit; local builds use the time.
+    __BUILD_ID__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA || `local-${Date.now()}`),
+  },
   test: {
     // Unit tests live next to the code; e2e/ is Playwright's.
     include: ['src/**/*.test.ts'],

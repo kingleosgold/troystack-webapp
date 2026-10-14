@@ -124,6 +124,22 @@ export interface AskResponse extends Quota {
   reply: string;
 }
 
+/**
+ * What a visitor's next question carries of the chat so far: each question
+ * Troy answered, with its answer. A question that failed or was stopped never
+ * got one, and sent along as if it had, it would leave Troy answering around
+ * a question he never saw.
+ */
+export function answeredTurns(messages: TroyMessage[]): VisitorTurn[] {
+  const turns: VisitorTurn[] = [];
+  for (let i = 0; i < messages.length - 1; i++) {
+    const q = messages[i];
+    const a = messages[i + 1];
+    if (q.role === 'user' && a.role === 'assistant') turns.push({ role: 'user', content: q.content }, { role: 'assistant', content: a.content });
+  }
+  return turns;
+}
+
 /** Thrown when the visitor endpoint isn't live on the API yet. */
 export class VisitorChatUnavailable extends Error {
   constructor() {

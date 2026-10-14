@@ -1,5 +1,5 @@
 import type { Holding, HoldingFormData } from '../types/holding';
-import { WEIGHT_TO_OZT } from '../types/holding';
+import { formOzt } from '../types/holding';
 import { isMetal } from '../lib/metals';
 
 /**
@@ -9,6 +9,9 @@ import { isMetal } from '../lib/metals';
  */
 
 const STORAGE_KEY = 'stacktracker_holdings';
+
+/** Where the guest stack is kept, for code that reads it with its own storage. */
+export const GUEST_STACK_KEY = STORAGE_KEY;
 
 function readRaw(): unknown[] {
   try {
@@ -75,7 +78,7 @@ function fromForm(form: HoldingFormData, base?: Holding): Holding {
     id: base?.id ?? crypto.randomUUID(),
     metal: form.metal,
     type: form.type.trim() || 'Other',
-    weight: form.weight * WEIGHT_TO_OZT[form.weightUnit],
+    weight: formOzt(form),
     weightUnit: form.weightUnit,
     quantity: form.quantity,
     purchasePrice: form.purchasePrice,
@@ -113,6 +116,22 @@ export function updateLocalHolding(existing: Holding, form: HoldingFormData): Ho
 
 export function deleteLocalHolding(id: string): void {
   save(getLocalHoldings().filter((h) => h.id !== id));
+}
+
+/** Takes holdings out of the guest stack, as once a read finds them in the account. */
+export function removeLocalHoldings(ids: Set<string>): void {
+  const left = getLocalHoldings().filter((h) => !ids.has(h.id));
+  if (left.length === 0) clearLocalHoldings();
+  else save(left);
+}
+
+/** The guest stack as stored, for noticing when it changes. */
+export function guestStackSnapshot(): string {
+  try {
+    return localStorage.getItem(STORAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
 }
 
 export function clearLocalHoldings(): void {

@@ -1,7 +1,10 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { syncSubscription } from '../services/api';
+import { setSignedInAs } from '../lib/account';
+import { clearStackCopies } from '../services/stackCopy';
+import { dropQueuedChanges } from '../services/pendingWrites';
 
 interface AuthContextType {
   user: User | null;
@@ -28,13 +31,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   // Without Supabase there's no session to wait for.
   const [loading, setLoading] = useState(isSupabaseConfigured);
-  const syncedUserRef = useRef<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) {
+      // No sign-in here, so nobody is signed in, and that's known from the start.
+      setSignedInAs(null);
+      return;
+    }
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      setSignedInAs(session?.user?.id ?? null);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -44,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSignedInAs(session?.user?.id ?? null);
       setSession(session);
       setUser(session?.user ?? null);
     });
@@ -51,14 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Auto-sync subscription on login (fire-and-forget, once per user)
-  useEffect(() => {
-    if (!user || syncedUserRef.current === user.id) return;
-    syncedUserRef.current = user.id;
-    syncSubscription(user.id).catch(() => {
-      // Ignored on purpose, the sync is best effort
-    });
-  }, [user]);
+  // The plan sync at sign-in lives with the plan, in SubscriptionProvider,
+  // which reads the plan again once the sync answers.
 
   const signUp = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({
@@ -97,9 +100,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  // Signing out goes through useSignOut, which first gives the account's
+  // waiting changes a few seconds to go and asks before any are dropped.
   const signOut = async () => {
+    const userId = user?.id;
     const { error } = await supabase.auth.signOut();
-    if (!error) {
+    try {
       // Clear app data on sign out (keep theme preference)
       localStorage.removeItem('stacktracker_holdings');
       localStorage.removeItem('stacktracker_pending_actions');
@@ -108,6 +114,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('stg_checkout_redirect');
       localStorage.removeItem('stg_checkout_campaign');
       localStorage.removeItem('stg_auth_next');
+      // The cached stacks go with the stored ones. A guest stack left cached
+      // after it was cleared here would keep showing, and the next guest add
+      // would write it back.
+      queryClient.removeQueries({ queryKey: ['holdings'] });
+      // So do the copies kept for reading the stack offline.
+      clearStackCopies();
+      // And this account's changes still waiting to be sent, with its count of
+      // refused ones, so a shared browser keeps no holding details and a later
+      // sign-in doesn't send stale changes.
+      if (userId) dropQueuedChanges(userId);
+      if (error) {
+        // The sign-out didn't reach the server, a dropped connection say, and
+        // the client keeps its session when that happens. This browser still
+        // signs out: the stored session goes and the page starts over, signed
+        // out. Other devices stay signed in until their session ends.
+        for (const key of Object.keys(localStorage)) {
+          if (/^sb-.+-auth-token/.test(key)) localStorage.removeItem(key);
+        }
+        window.location.assign('/');
+      }
+    } catch {
+      // storage blocked, nothing kept here to clear
     }
     return { error };
   };

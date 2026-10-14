@@ -49,7 +49,7 @@ export default function Signal() {
         title="Metals news, with Troy's read"
         subtitle="Troy reads the gold and silver news all day and writes what each story means for people who hold physical metal."
       />
-      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
         <div className="min-w-0">
           <DigestFeature />
           <div className="mt-6 flex gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 [mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]" role="tablist" aria-label="Topics">

@@ -4,9 +4,11 @@ import { Download, FileSpreadsheet, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { useHoldings } from '../hooks/useHoldings';
-import { useSpotMap } from '../hooks/queries';
+import { SPOT_LIVE_MS, spotIsLive, useSpotMap, type SpotMap } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { useAccountChange } from '../hooks/useAccountChange';
 import SEO from '../lib/seo.json';
+import { signedInAs, signedInOnceLoaded, stillSignedInAs } from '../lib/account';
 import { useSubscription } from '../hooks/useSubscription';
 import { METALS, METAL_LABEL, METAL_VAR, OZT_PER_GRAM, OZT_PER_KG } from '../lib/metals';
 import { lineCostBasis, lineOz, lineValue, stackTotals } from '../lib/stackMath';
@@ -17,13 +19,14 @@ import { holdingsToCSV } from '../services/holdings';
 import type { Holding, HoldingFormData, Metal } from '../types/holding';
 import { cx } from '../lib/cx';
 import { downloadText } from '../lib/download';
-import { formatDate } from '../lib/text';
+import { formatDate, whenET } from '../lib/text';
 import { HoldingEditor } from '../ui/HoldingEditor';
 import type { HoldingStart } from '../ui/HoldingEditor';
 import { ImportSheet, type ImportRow } from '../ui/ImportSheet';
 import { GoldLock } from '../ui/GoldLock';
 import { AppStoreButton } from '../ui/AppStore';
 import { Button, Card, EmptyState, ErrorNote, PageHeader, Segmented, Skeleton } from '../ui/primitives';
+import { SpotNotice } from '../ui/SpotNotice';
 import type { ChartPoint } from '../ui/PriceChart';
 
 const PriceChart = lazy(() => import('../ui/PriceChart'));
@@ -70,6 +73,8 @@ function StackHistory({ userId }: { userId: string }) {
       <GoldLock title="Your stack's value history" reason="Your stack's value over time is part of Gold." campaign="webapp-stack" teaser={<div className="h-[220px] rounded-xl bg-surface-2" />}>
         {q.isLoading ? (
           <Skeleton className="h-[220px] w-full" />
+        ) : q.isError ? (
+          <ErrorNote onRetry={() => void q.refetch()}>Your stack's history didn't load.</ErrorNote>
         ) : points.length < 2 ? (
           <p className="py-10 text-center text-[14px] text-fg-3">Your history fills in a day at a time from when you start tracking.</p>
         ) : (
@@ -82,20 +87,84 @@ function StackHistory({ userId }: { userId: string }) {
   );
 }
 
-/** Record today's value once a day, the way the app does, so history fills in for web users too. */
-function useDailySnapshot(userId: string | undefined, holdings: Holding[], prices: Record<Metal, number>, ready: boolean) {
-  const sent = useRef(false);
+/**
+ * The day a snapshot is filed under. The API files each one under the UTC
+ * date, and the app checks the same date before it sends, so the site does
+ * too and every day the API keeps gets one.
+ */
+function snapshotDay(now = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/** That day, kept current while the page stays open. */
+function useSnapshotDay(): string {
+  const [day, setDay] = useState(() => snapshotDay());
   useEffect(() => {
-    if (!userId || !ready || sent.current || holdings.length === 0 || !prices.gold || !prices.silver) return;
+    const check = () => setDay(snapshotDay());
+    const timer = window.setInterval(check, 60_000);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, []);
+  return day;
+}
+
+interface StackRead {
+  /** The stack came from the account, not the copy shown while it can't be reached. */
+  live: boolean;
+  /** When the account's stack was last read. */
+  readAt: number;
+  reading: boolean;
+  reread: () => unknown;
+}
+
+/**
+ * Record today's value once a day, the way the app does, so history fills in
+ * for web users too. It goes from prices that count as live everywhere else
+ * on the site, read on the same day and not being read again right now, and
+ * from a read of the account's stack made today within the same few minutes.
+ * A tab in the background or a laptop asleep past midnight still holds the
+ * day before's prices and stack, so the new day's waits for fresh prices and
+ * reads the stack again, which brings in changes made in the app or another
+ * tab since it was last read.
+ */
+function useDailySnapshot(userId: string | undefined, holdings: Holding[], spot: SpotMap, stack: StackRead) {
+  const day = useSnapshotDay();
+  // The account and day the last snapshot went for, so a page left open
+  // overnight sends the new day's.
+  const sentFor = useRef<string | null>(null);
+  // When the stack was last asked for again, so a read that keeps failing
+  // isn't asked for on every render.
+  const rereadAt = useRef(0);
+  const { prices, live, dataUpdatedAt, isFetching } = spot;
+  const { live: stackLive, readAt, reading, reread } = stack;
+  useEffect(() => {
+    // Every metal in the stack needs a price. One missing from the prices
+    // read would go into history at zero. Gold and silver also go in as the
+    // day's spot.
+    const priced = (m: Metal) => live && prices[m] > 0;
+    if (!userId || !stackLive || holdings.length === 0 || !priced('gold') || !priced('silver') || holdings.some((h) => !priced(h.metal))) return;
+    if (isFetching || snapshotDay(new Date(dataUpdatedAt)) !== day || snapshotDay() !== day) return;
+    const mark = `${userId}:${day}`;
+    if (sentFor.current === mark) return;
     const key = `troystack_snapshot_${userId}`;
-    const today = new Date().toISOString().slice(0, 10);
     try {
-      if (localStorage.getItem(key) === today) return;
+      if (localStorage.getItem(key) === day) return;
     } catch {
       // Storage is blocked. The stack lives in the account, so the snapshot
-      // still goes, and the ref keeps it to one post per visit.
+      // still goes, and the ref keeps it to one post a day.
     }
-    sent.current = true;
+    if (reading) return;
+    if (snapshotDay(new Date(readAt)) !== day || !spotIsLive(readAt)) {
+      if (Date.now() - rereadAt.current > SPOT_LIVE_MS) {
+        rereadAt.current = Date.now();
+        void reread();
+      }
+      return;
+    }
+    sentFor.current = mark;
     const totals = stackTotals(holdings, prices);
     postJson('/v1/snapshots', {
       userId,
@@ -115,15 +184,15 @@ function useDailySnapshot(userId: string | undefined, holdings: Holding[], price
     })
       .then(() => {
         try {
-          localStorage.setItem(key, today);
+          localStorage.setItem(key, day);
         } catch {
           // fine, it will just send again next visit
         }
       })
       .catch(() => {
-        sent.current = false;
+        if (sentFor.current === mark) sentFor.current = null;
       });
-  }, [userId, holdings, prices, ready]);
+  }, [userId, holdings, prices, stackLive, day, live, isFetching, dataUpdatedAt, readAt, reading, reread]);
 }
 
 function rowToForm(r: ImportRow): HoldingFormData | null {
@@ -157,7 +226,7 @@ function holdingDetail(h: Holding): string {
 export default function Stack() {
   usePageMeta({ ...SEO['/stack'], canonical: '/stack' });
   const { user, isConfigured } = useAuth();
-  const { holdings, loading, error, isGuest, add, addMany, update, remove, refresh, leftInBrowser, moveBrowserStackIn, clearBrowserStack, pendingCount, refused, dismissRefused } = useHoldings();
+  const { holdings, loading, error, isGuest, add, addMany, update, remove, refresh, readAt, reading, leftInBrowser, moveBrowserStackIn, clearBrowserStack, pendingCount, offlineSince, refused, dismissRefused } = useHoldings();
   const spot = useSpotMap();
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState<Holding | null>(null);
@@ -172,14 +241,29 @@ export default function Stack() {
     setEditorOpen(true);
   };
   const [filter, setFilter] = useState<'all' | Metal>('all');
-  const [importRows, setImportRows] = useState<{ rows: ImportRow[]; source: string } | null>(null);
+  // Rows from a spreadsheet waiting to be added, for the account, or the
+  // browser's own stack, that picked the file.
+  const [importRows, setImportRows] = useState<{ owner: string | null; rows: ImportRow[]; source: string } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // A holding open in the editor, rows waiting to be added and notes about
+  // them all belong to the account they came from. When another account
+  // signs in, here or in another tab, or this one signs out, they go, so
+  // nothing from one account is shown to or saved into another.
+  useAccountChange(() => {
+    setEditorOpen(false);
+    setEditing(null);
+    setImportRows(null);
+    setImportError(null);
+    setMoveError(null);
+    setMoving(false);
+  });
+
   const totals = useMemo(() => stackTotals(holdings, spot.prices, spot.changePct), [holdings, spot.prices, spot.changePct]);
-  useDailySnapshot(user?.id, holdings, spot.prices, Boolean(spot.data) && !loading);
+  useDailySnapshot(user?.id, holdings, spot, { live: !loading && !offlineSince, readAt, reading, reread: refresh });
 
   // Links from elsewhere on the site: /stack?add=1 and /stack?import=1. A
   // coin page adds &coin=<slug>, and the form starts filled in for that coin.
@@ -223,14 +307,22 @@ export default function Stack() {
   }, [holdings, filter, spot.prices]);
 
   const metalsHeld = METALS.filter((m) => totals.byMetal[m].count > 0);
+  // A metal with no live price would count at zero and read as a loss of
+  // everything paid for it, so totals wait until every metal held has one.
+  const valuesReady = spot.live && metalsHeld.every((m) => spot.priced(m));
+  const waiting = <span className="text-[14px] text-fg-3">Waiting for prices</span>;
 
   const onFile = async (file: File) => {
     setImportError(null);
+    // A file picked while sign-in is still loading at startup is for the
+    // account the loading finds.
+    const owner = signedInOnceLoaded();
     try {
-      const rows = await parseSpreadsheet(file);
-      setImportRows({ rows, source: file.name });
+      const [rows, who] = await Promise.all([parseSpreadsheet(file), owner]);
+      if (stillSignedInAs(who)) setImportRows({ owner: who, rows, source: file.name });
     } catch (e) {
-      setImportError(e instanceof Error ? e.message : "That file couldn't be read.");
+      const who = await owner;
+      if (stillSignedInAs(who)) setImportError(e instanceof Error ? e.message : "That file couldn't be read.");
     }
   };
 
@@ -279,14 +371,15 @@ export default function Stack() {
               size="sm"
               disabled={moving}
               onClick={async () => {
+                const owner = signedInAs();
                 setMoving(true);
                 setMoveError(null);
                 try {
                   await moveBrowserStackIn();
                 } catch (e) {
-                  setMoveError(e instanceof Error ? e.message : "The holdings in this browser didn't move into your account. Try again.");
+                  if (stillSignedInAs(owner)) setMoveError(e instanceof Error ? e.message : "The holdings in this browser didn't move into your account. Try again.");
                 } finally {
-                  setMoving(false);
+                  if (stillSignedInAs(owner)) setMoving(false);
                 }
               }}
             >
@@ -297,6 +390,12 @@ export default function Stack() {
         </div>
       )}
       {moveError && <div className="mb-4"><ErrorNote>{moveError}</ErrorNote></div>}
+      {!isGuest && offlineSince && (
+        <div role="status" className="mb-4 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg">
+          Your account can't be reached right now, so this is your stack as of{' '}
+          {whenET(offlineSince)}, with any changes you've made since on top.
+        </div>
+      )}
       {!isGuest && pendingCount > 0 && (
         <div role="status" className="mb-4 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg">
           {pendingCount === 1 ? 'One change is' : `${pendingCount} changes are`} saved in this browser and will reach your account when you're back online.
@@ -310,6 +409,7 @@ export default function Stack() {
       )}
       {importError && <div className="mb-4"><ErrorNote>{importError}</ErrorNote></div>}
       {error && <div className="mb-4"><ErrorNote onRetry={() => refresh()}>Your stack didn't load.</ErrorNote></div>}
+      {!loading && <SpotNotice spot={spot} metals={metalsHeld} className="mb-4" />}
 
       {loading ? (
         <div className="grid gap-4 lg:grid-cols-3">
@@ -335,10 +435,14 @@ export default function Stack() {
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="p-5 sm:p-6 lg:col-span-2">
               <div className="text-[13px] text-fg-3">Total value</div>
-              <div className="mt-1 text-[36px] sm:text-[42px] font-semibold tracking-tight text-fg tnum leading-tight">{spot.data ? money(totals.value) : <Skeleton className="h-11 w-56" />}</div>
-              <div className={cx('mt-1 text-[14px] font-semibold tnum', dayTone)}>
-                {signedMoney(totals.dayChange)} ({signedPercent(totals.dayChangePct)}) today
+              <div className="mt-1 text-[36px] sm:text-[42px] font-semibold tracking-tight text-fg tnum leading-tight">
+                {valuesReady ? money(totals.value) : spot.awaiting ? <Skeleton className="h-11 w-56" /> : <span className="text-[20px] text-fg-3">Waiting for prices</span>}
               </div>
+              {valuesReady && (
+                <div className={cx('mt-1 text-[14px] font-semibold tnum', dayTone)}>
+                  {signedMoney(totals.dayChange)} ({signedPercent(totals.dayChangePct)}) today
+                </div>
+              )}
               <dl className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-line pt-4">
                 <div>
                   <dt className="text-[12px] text-fg-3">Paid</dt>
@@ -346,8 +450,14 @@ export default function Stack() {
                 </div>
                 <div>
                   <dt className="text-[12px] text-fg-3">Gain</dt>
-                  <dd className={cx('text-[16px] font-semibold tnum', gainTone)}>{signedMoney(totals.gain)}</dd>
-                  <dd className={cx('text-[12px] tnum', gainTone)}>{signedPercent(totals.gainPct)}</dd>
+                  {valuesReady ? (
+                    <>
+                      <dd className={cx('text-[16px] font-semibold tnum', gainTone)}>{signedMoney(totals.gain)}</dd>
+                      <dd className={cx('text-[12px] tnum', gainTone)}>{signedPercent(totals.gainPct)}</dd>
+                    </>
+                  ) : (
+                    <dd className="pt-0.5">{waiting}</dd>
+                  )}
                 </div>
                 <div>
                   <dt className="text-[12px] text-fg-3">Premiums paid</dt>
@@ -369,7 +479,7 @@ export default function Stack() {
             <Card className="p-5">
               <h2 className="text-[15px] font-semibold text-fg">By metal</h2>
               <div className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
-                {metalsHeld.map((m) => (
+                {valuesReady && metalsHeld.map((m) => (
                   <div key={m} style={{ width: `${totals.value > 0 ? (totals.byMetal[m].value / totals.value) * 100 : 0}%`, background: METAL_VAR[m] }} />
                 ))}
               </div>
@@ -386,8 +496,16 @@ export default function Stack() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-[14px] font-semibold text-fg tnum">{money(t.value)}</div>
-                        <div className={cx('text-[12px] tnum', t.gain > 0 ? 'text-up' : t.gain < 0 ? 'text-down' : 'text-fg-3')}>{signedPercent(t.gainPct, 1)}</div>
+                        {spot.priced(m) ? (
+                          <>
+                            <div className="text-[14px] font-semibold text-fg tnum">{money(t.value)}</div>
+                            <div className={cx('text-[12px] tnum', t.gain > 0 ? 'text-up' : t.gain < 0 ? 'text-down' : 'text-fg-3')}>{signedPercent(t.gainPct, 1)}</div>
+                          </>
+                        ) : spot.awaiting ? (
+                          <Skeleton className="h-4 w-16" />
+                        ) : (
+                          <div className="text-[13px] text-fg-3">No price</div>
+                        )}
                       </div>
                     </li>
                   );
@@ -421,8 +539,16 @@ export default function Stack() {
                         <span className="block text-[12px] text-fg-3 truncate tnum">{holdingDetail(h)}</span>
                       </span>
                       <span className="text-right shrink-0">
-                        <span className="block text-[14px] font-semibold text-fg tnum">{money(value)}</span>
-                        {cost > 0 && <span className={cx('block text-[12px] tnum', gain > 0 ? 'text-up' : gain < 0 ? 'text-down' : 'text-fg-3')}>{signedMoney(gain)}</span>}
+                        {spot.priced(h.metal) ? (
+                          <>
+                            <span className="block text-[14px] font-semibold text-fg tnum">{money(value)}</span>
+                            {cost > 0 && <span className={cx('block text-[12px] tnum', gain > 0 ? 'text-up' : gain < 0 ? 'text-down' : 'text-fg-3')}>{signedMoney(gain)}</span>}
+                          </>
+                        ) : spot.awaiting ? (
+                          <Skeleton className="h-4 w-16" />
+                        ) : (
+                          <span className="block text-[13px] text-fg-3">No price</span>
+                        )}
                       </span>
                     </button>
                   </li>
@@ -465,7 +591,7 @@ export default function Stack() {
           onDelete={editing ? () => remove(editing.id) : undefined}
         />
       )}
-      {importRows && (
+      {importRows && importRows.owner === (user?.id ?? null) && (
         <ImportSheet
           rows={importRows.rows}
           source={importRows.source}

@@ -1,4 +1,4 @@
-import { postJson } from './apiClient';
+import { ApiError, postJson } from './apiClient';
 import type { Campaign } from './appStore';
 
 /**
@@ -25,8 +25,14 @@ export function isWebPlan(v: unknown): v is WebPlan {
   return v === 'monthly' || v === 'yearly' || v === 'lifetime';
 }
 
-export function webCheckoutReady(plan: WebPlan = 'yearly'): boolean {
-  return Boolean(PRICE_IDS[plan]);
+/** The plans this site can sell, the ones with a Stripe price set for it. */
+export function webPlans(): typeof WEB_PLANS {
+  return WEB_PLANS.filter((p) => Boolean(PRICE_IDS[p.id]));
+}
+
+/** Whether this plan can be bought here, or with no plan named, whether any can. */
+export function webCheckoutReady(plan?: WebPlan): boolean {
+  return plan ? Boolean(PRICE_IDS[plan]) : webPlans().length > 0;
 }
 
 // Signing in with Google or Apple leaves the site and comes back to the home
@@ -94,6 +100,15 @@ export function forgetCheckout(): void {
   }
 }
 
+/** Whether a plan picked before signing in is still waiting, without using it up. */
+export function hasCheckoutIntent(now = Date.now()): boolean {
+  try {
+    return readIntent(now) !== null;
+  } catch {
+    return false;
+  }
+}
+
 /** The plan picked before signing in, if it was picked in the last half hour. Reading it clears it. */
 export function takeCheckoutIntent(now = Date.now()): { plan: WebPlan; campaign?: CheckoutCampaign } | null {
   try {
@@ -147,8 +162,18 @@ export function takeNextPath(now = Date.now()): string | null {
   }
 }
 
-/** Sends the browser to Stripe Checkout. Resolves only if something goes wrong before that. */
-export async function startCheckout(userId: string, token: string | undefined, plan: WebPlan, campaign?: CheckoutCampaign): Promise<void> {
+/**
+ * Sends the browser to Stripe Checkout. True once it's on its way. False when
+ * `stillWanted` says no by the time checkout answers, as when another account
+ * signed in or the sheet it started from closed, so the page stays put.
+ */
+export async function startCheckout(
+  userId: string,
+  token: string | undefined,
+  plan: WebPlan,
+  campaign?: CheckoutCampaign,
+  stillWanted: () => boolean = () => true,
+): Promise<boolean> {
   const priceId = PRICE_IDS[plan];
   if (!priceId) throw new Error('Web checkout is not set up here yet.');
   const origin = window.location.origin;
@@ -160,19 +185,92 @@ export async function startCheckout(userId: string, token: string | undefined, p
     cancel_url: `${origin}${window.location.pathname}`,
   }, { token });
   if (!url) throw new Error('Checkout did not start.');
+  if (!stillWanted()) return false;
   window.location.assign(url);
+  return true;
 }
 
-export function verifyCheckout(sessionId: string): Promise<{ success: boolean; tier?: string }> {
+/**
+ * What's in the way when checkout answers 409, as the API says in `reason`.
+ *   - has_plan: the account already has Gold or Lifetime.
+ *   - payment_issue: a Gold renewal didn't go through and Stripe is still
+ *     trying the card, so the fix is a new card on the billing page, not a
+ *     second plan.
+ *   - app_store_renewing: App Store Gold that Apple may still renew, which is
+ *     handled on the iPhone.
+ *   - checkout_in_progress: another checkout for the account is opening.
+ * A reason it doesn't know, or none, as from an older API, counts as has_plan.
+ */
+export type CheckoutBlock = 'has_plan' | 'payment_issue' | 'app_store_renewing' | 'checkout_in_progress';
+
+/** What checkout said was in the way, or null when it wasn't a 409. */
+export function checkoutBlock(err: unknown): CheckoutBlock | null {
+  if (!(err instanceof ApiError) || err.status !== 409) return null;
+  const reason = err.body.reason;
+  return reason === 'payment_issue' || reason === 'app_store_renewing' || reason === 'checkout_in_progress' ? reason : 'has_plan';
+}
+
+/** How long checkout waits before asking again while another one for the account is opening. */
+export const CHECKOUT_RETRY_MS = 3000;
+
+/** What the page says during that wait. */
+export const CHECKOUT_WAIT = 'A checkout for this account is already opening. Trying again in a few seconds.';
+
+/**
+ * Sends the browser to Stripe Checkout, as startCheckout does. When another
+ * checkout for the account is still opening, `onWait` hears about it and
+ * checkout is asked for once more after a few seconds, if it's still wanted.
+ */
+export async function openCheckout(
+  userId: string,
+  token: string | undefined,
+  plan: WebPlan,
+  campaign?: CheckoutCampaign,
+  { onWait, stillWanted = () => true }: { onWait?: () => void; stillWanted?: () => boolean } = {},
+): Promise<boolean> {
+  try {
+    return await startCheckout(userId, token, plan, campaign, stillWanted);
+  } catch (err) {
+    if (checkoutBlock(err) !== 'checkout_in_progress' || !stillWanted()) throw err;
+    onWait?.();
+    await new Promise((resolve) => setTimeout(resolve, CHECKOUT_RETRY_MS));
+    if (!stillWanted()) return false;
+    return startCheckout(userId, token, plan, campaign, stillWanted);
+  }
+}
+
+/** Where Settings picks up after a checkout that didn't open, by what was in the way. */
+export function settingsAfterCheckout(err: unknown): string {
+  const block = checkoutBlock(err);
+  const at =
+    block === 'has_plan'
+      ? 'have-gold'
+      : block === 'payment_issue'
+        ? 'payment-issue'
+        : block === 'app_store_renewing'
+          ? 'app-store'
+          : block === 'checkout_in_progress'
+            ? 'in-progress'
+            : 'failed';
+  return `/settings?checkout=${at}`;
+}
+
+/** `status` is the subscription's, 'trialing' during the free week. Older API versions leave it out. */
+export function verifyCheckout(sessionId: string): Promise<{ success: boolean; tier?: string; status?: string }> {
   return postJson('/v1/stripe/verify-session', { session_id: sessionId });
 }
 
-/** Stripe's billing page, where web subscribers change plans or cancel. */
-export async function openBillingPortal(userId: string, token: string | undefined): Promise<void> {
+/**
+ * Stripe's billing page, where web subscribers change plans or cancel. True
+ * once the browser is on its way, false when `stillWanted` says no by then.
+ */
+export async function openBillingPortal(userId: string, token: string | undefined, stillWanted: () => boolean = () => true): Promise<boolean> {
   const { url } = await postJson<{ url: string }>(
     '/v1/stripe/customer-portal',
     { user_id: userId, return_url: `${window.location.origin}/settings` },
     { token },
   );
+  if (!stillWanted()) return false;
   window.location.assign(url);
+  return true;
 }

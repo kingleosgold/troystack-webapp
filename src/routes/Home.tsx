@@ -9,7 +9,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { METALS } from '../lib/metals';
 import { stackTotals } from '../lib/stackMath';
 import { money, signedMoney, signedPercent } from '../lib/format';
-import { formatDate, formatShortDate, formatTimeET, greeting, leadParagraphs, minutesLabel } from '../lib/text';
+import { formatDate, formatShortDate, formatTimeET, greeting, leadParagraphs, minutesLabel, whenET } from '../lib/text';
 import { Markdown } from '../lib/markdown';
 import { GOLD, PODCAST_APPLE_URL } from '../lib/appStore';
 import { cx } from '../lib/cx';
@@ -18,6 +18,7 @@ import { ArticleCard, ArticleRowSkeleton } from '../ui/Signal';
 import { EpisodePlayer, EpisodeMeta } from '../ui/Podcast';
 import { InstallPath } from '../ui/AppStore';
 import { Card, ErrorNote, Img, LinkButton, SectionHeader, Skeleton } from '../ui/primitives';
+import { SpotNotice } from '../ui/SpotNotice';
 
 const ASK_CHIPS = [
   { label: 'What moved metals today?', q: 'What moved gold and silver today?' },
@@ -145,15 +146,30 @@ function AskTroyCard({ hasStack }: { hasStack: boolean }) {
 }
 
 function StackCard() {
-  const { holdings, loading, isGuest } = useHoldings();
-  const { prices, changePct, data } = useSpotMap();
+  const { holdings, loading, isGuest, error, refresh } = useHoldings();
+  const spot = useSpotMap();
+  const { prices, changePct } = spot;
   const totals = useMemo(() => stackTotals(holdings, prices, changePct), [holdings, prices, changePct]);
+  const held = METALS.filter((m) => holdings.some((h) => h.metal === m));
+  // A metal held with no live price would count at zero, so the totals wait.
+  const ready = spot.live && held.every((m) => spot.priced(m));
 
   if (loading) {
     return (
       <Card className="p-5">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-8 w-40 mt-3" />
+      </Card>
+    );
+  }
+  // A stack that didn't load isn't an empty one, so it isn't offered a fresh start.
+  if (error && holdings.length === 0) {
+    return (
+      <Card className="p-5">
+        <h2 className="text-[15px] font-semibold text-fg">Your stack</h2>
+        <div className="mt-3">
+          <ErrorNote onRetry={() => void refresh()}>Your stack didn't load.</ErrorNote>
+        </div>
       </Card>
     );
   }
@@ -177,15 +193,21 @@ function StackCard() {
         <h2 className="text-[15px] font-semibold text-fg">Your stack</h2>
         <Link to="/stack" className="text-[13px] font-semibold text-gold hover:text-gold-2">Open</Link>
       </div>
-      <div className="mt-2 text-[28px] font-semibold tracking-tight text-fg tnum">{data ? money(totals.value) : <Skeleton className="h-8 w-40" />}</div>
-      <div className="mt-1 space-y-0.5 text-[13px]">
-        <div className={cx('tnum font-semibold', dayTone)}>
-          {signedMoney(totals.dayChange)} ({signedPercent(totals.dayChangePct)}) today
-        </div>
-        <div className="text-fg-3">
-          <span className={cx('tnum font-semibold', gainTone)}>{signedMoney(totals.gain)}</span> on what you paid
-        </div>
+      <div className="mt-2 text-[28px] font-semibold tracking-tight text-fg tnum">
+        {ready ? money(totals.value) : spot.awaiting ? <Skeleton className="h-8 w-40" /> : <span className="text-[17px] text-fg-3">Waiting for prices</span>}
       </div>
+      {ready && (
+        <div className="mt-1 space-y-0.5 text-[13px]">
+          <div className={cx('tnum font-semibold', dayTone)}>
+            {signedMoney(totals.dayChange)} ({signedPercent(totals.dayChangePct)}) today
+          </div>
+          <div className="text-fg-3">
+            <span className={cx('tnum font-semibold', gainTone)}>{signedMoney(totals.gain)}</span> on what you paid
+          </div>
+        </div>
+      )}
+      {/* Without live prices, the note above the tiles already says so. */}
+      {spot.live && <SpotNotice spot={spot} metals={held} className="mt-3" />}
       {isGuest && <p className="mt-3 text-[12px] text-fg-3">Saved in this browser. <Link to="/auth" className="font-semibold text-gold">Sign in</Link> to keep it with your account and the app.</p>}
     </Card>
   );
@@ -222,8 +244,10 @@ function PodcastCard() {
       <div className="flex items-start gap-4">
         {podcast.data ? (
           <Img src={podcast.data.imageUrl} alt="The Stack Signal podcast artwork" className="h-20 w-20 rounded-xl object-cover shrink-0" loading="lazy" />
-        ) : (
+        ) : podcast.isLoading ? (
           <Skeleton className="h-20 w-20 rounded-xl" />
+        ) : (
+          <div className="h-20 w-20 shrink-0 rounded-xl bg-surface-2" aria-hidden="true" />
         )}
         <div className="min-w-0">
           <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-gold">Podcast</div>
@@ -237,6 +261,10 @@ function PodcastCard() {
         </div>
       ) : podcast.isLoading ? (
         <Skeleton className="h-12 w-full mt-4" />
+      ) : podcast.isError ? (
+        <div className="mt-4">
+          <ErrorNote onRetry={() => void podcast.refetch()}>Episodes didn't load.</ErrorNote>
+        </div>
       ) : null}
       {(podcast.data?.episodes.length ?? 0) > 1 && (
         <ul className="mt-4 divide-y divide-line border-t border-line">
@@ -268,7 +296,7 @@ const TOOLS = [
 ];
 
 function GetAppSection() {
-  const { isGold } = useSubscription();
+  const { isGold, loading: planLoading } = useSubscription();
   const features = [
     { icon: <Bell size={17} />, text: 'Price alerts the minute metal crosses your number' },
     { icon: <Camera size={17} />, text: 'Snap a dealer receipt and it lands in your stack' },
@@ -277,7 +305,7 @@ function GetAppSection() {
   ];
   return (
     <Card className="overflow-hidden">
-      <div className="grid lg:grid-cols-[1.2fr_1fr]">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr]">
         <div className="p-6 sm:p-8">
           <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-gold">TroyStack for iPhone</div>
           <h2 className="mt-2 text-[24px] sm:text-[28px] font-semibold tracking-tight text-fg leading-tight">Your stack and Troy, in your pocket</h2>
@@ -290,7 +318,8 @@ function GetAppSection() {
               </li>
             ))}
           </ul>
-          {!isGold && (
+          {/* A plan that hasn't loaded may be Gold, so the free week waits for it. */}
+          {!isGold && !planLoading && (
             <p className="mt-5 text-[13px] text-fg-3">
               Gold starts with a free week, then {GOLD.monthly} a month or {GOLD.yearly} a year.
             </p>
@@ -320,8 +349,10 @@ export default function Home() {
         <p className="mt-1.5 text-[15px] text-fg-2 max-w-2xl">Live spot for all four metals, Troy's read on what moved them, and your stack at today's prices.</p>
       </header>
 
-      {spot.isError && !spot.data ? (
-        <ErrorNote onRetry={() => spot.refetch()}>Live prices didn't load.</ErrorNote>
+      {!spot.live && !spot.isLoading && !spot.refreshing ? (
+        <ErrorNote onRetry={() => spot.refetch()}>
+          {spot.stale ? `Prices haven't updated since ${whenET(spot.dataUpdatedAt)}.` : "Live prices didn't load."}
+        </ErrorNote>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {METALS.map((m) => (
@@ -332,14 +363,15 @@ export default function Home() {
               pct={spot.data?.changePct[m]}
               amount={spot.data?.changeAmt[m]}
               spark={sparks.data?.series[m]}
-              loading={spot.isLoading}
+              sparkTimes={sparks.data?.times[m]}
+              loading={!spot.live}
               to={`/prices/${m}`}
             />
           ))}
         </div>
       )}
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <TroysTake />
         </div>
@@ -349,7 +381,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <SignalList />
         </div>

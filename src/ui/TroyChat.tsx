@@ -8,6 +8,7 @@ import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { TroyCard } from './TroyCards';
 import { Button, Sheet } from './primitives';
 import { saveTroyConsent } from '../lib/consent';
+import { stillSignedInAs } from '../lib/account';
 
 function timeLabel(iso: string): string {
   const d = new Date(iso);
@@ -20,14 +21,18 @@ function ListenButton({ text, userId }: { text: string; userId: string }) {
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
+  // Off the screen, as when the chat goes because another account signed in,
+  // audio still on its way isn't played.
+  const shown = useRef(true);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    shown.current = true;
+    return () => {
+      shown.current = false;
       audioRef.current?.pause();
       if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-    },
-    [],
-  );
+    };
+  }, []);
 
   const onClick = async () => {
     setError(null);
@@ -44,6 +49,10 @@ function ListenButton({ text, userId }: { text: string; userId: string }) {
     try {
       setState('loading');
       const blob = await speak(text, userId);
+      if (!shown.current || !stillSignedInAs(userId)) {
+        if (shown.current) setState('idle');
+        return;
+      }
       const url = URL.createObjectURL(blob);
       urlRef.current = url;
       const audio = new Audio(url);

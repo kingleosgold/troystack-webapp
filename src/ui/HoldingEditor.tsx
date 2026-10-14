@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { Holding, HoldingFormData, Metal, WeightUnit } from '../types/holding';
 import { PRODUCT_PRESETS, WEIGHT_TO_OZT } from '../types/holding';
@@ -40,6 +40,8 @@ function initialForm(h?: Holding | null, start?: HoldingStart | null): Record<st
     type: h.type,
     weight: String(+shownWeight.toFixed(5)),
     weightUnit: h.weightUnit,
+    // The weight as the account has it, exactly. The field shows it rounded.
+    ozt: String(h.weight),
     quantity: String(h.quantity),
     purchasePrice: h.purchasePrice ? String(h.purchasePrice) : '',
     purchaseDate: h.purchaseDate,
@@ -58,7 +60,14 @@ const num = (v: string) => {
 export function HoldingEditor({ open, onClose, holding, start, onSave, onDelete }: Props) {
   const [f, setF] = useState<Record<string, string>>(() => initialForm(holding, start));
   const [more, setMore] = useState(Boolean(holding?.dealer || holding?.taxes || holding?.shipping || holding?.note));
+  // A weight that came with the form is saved exactly as it came while the
+  // field still shows it and the unit is the same, so editing anything else,
+  // or nothing, never rounds it. Changing the weight or the unit saves what's entered.
+  const [kept] = useState(() => ({ weight: f.weight, unit: f.weightUnit, ozt: f.ozt ? Number(f.ozt) : null }));
   const [saving, setSaving] = useState(false);
+  // Set the moment a save or a delete starts, so a second tap, or a close
+  // that lands before the editor redraws, is held back too.
+  const busy = useRef(false);
   const [error, setError] = useState<string | null>(null);
   // Spot on the purchase date, for the premium the app records with each
   // holding. It only counts while the form still shows the date and metal it
@@ -96,7 +105,8 @@ export function HoldingEditor({ open, onClose, holding, start, onSave, onDelete 
     };
   }, [open, f.purchaseDate, metal, spotThen]);
 
-  const ozPerPiece = (num(f.weight) || 0) * WEIGHT_TO_OZT[f.weightUnit as WeightUnit];
+  const keptOzt = kept.ozt !== null && f.weight === kept.weight && f.weightUnit === kept.unit ? kept.ozt : null;
+  const ozPerPiece = keptOzt ?? (num(f.weight) || 0) * WEIGHT_TO_OZT[f.weightUnit as WeightUnit];
   const price = num(f.purchasePrice);
   const premium = useMemo(() => (spotThen && price > 0 && ozPerPiece > 0 ? premiumPerPiece(price, spotThen, ozPerPiece) : undefined), [spotThen, price, ozPerPiece]);
 
@@ -108,7 +118,32 @@ export function HoldingEditor({ open, onClose, holding, start, onSave, onDelete 
     }
   };
 
+  // While a save or a delete is going, the editor stays open. Closed, it
+  // would finish out of sight, and adding the holding again would make a
+  // second one.
+  const close = () => {
+    if (!busy.current) onClose();
+  };
+
+  // Runs a save or a delete once at a time, and closes once it's done.
+  const run = async (work: () => Promise<void>, failed: string) => {
+    if (busy.current) return;
+    busy.current = true;
+    setSaving(true);
+    try {
+      await work();
+      busy.current = false;
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : failed);
+    } finally {
+      busy.current = false;
+      setSaving(false);
+    }
+  };
+
   const submit = async () => {
+    if (busy.current) return;
     setError(null);
     const weight = num(f.weight);
     const quantity = num(f.quantity);
@@ -122,6 +157,7 @@ export function HoldingEditor({ open, onClose, holding, start, onSave, onDelete 
       type: f.type.trim() || `${METAL_LABEL[metal]} ${weight} ${f.weightUnit}`,
       weight,
       weightUnit: f.weightUnit as WeightUnit,
+      weightOzt: keptOzt ?? undefined,
       quantity,
       purchasePrice,
       purchaseDate: f.purchaseDate,
@@ -132,19 +168,11 @@ export function HoldingEditor({ open, onClose, holding, start, onSave, onDelete 
       premium,
       note: f.note.trim() || undefined,
     };
-    try {
-      setSaving(true);
-      await onSave(form);
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "That didn't save. Try again.");
-    } finally {
-      setSaving(false);
-    }
+    await run(() => onSave(form), "That didn't save. Try again.");
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title={holding ? 'Edit holding' : 'Add a holding'}>
+    <Sheet open={open} onClose={close} title={holding ? 'Edit holding' : 'Add a holding'}>
       <form
         className="space-y-4"
         onSubmit={(e) => {
@@ -228,24 +256,15 @@ export function HoldingEditor({ open, onClose, holding, start, onSave, onDelete 
                   variant="outline"
                   size="sm"
                   className="!text-down"
-                  onClick={async () => {
-                    try {
-                      setSaving(true);
-                      await onDelete();
-                      onClose();
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : "That didn't delete. Try again.");
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
+                  disabled={saving}
+                  onClick={() => void run(onDelete, "That didn't delete. Try again.")}
                 >
                   Delete it
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>Keep</Button>
+                <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)} disabled={saving}>Keep</Button>
               </span>
             ) : (
-              <Button variant="ghost" size="sm" className="!text-down" onClick={() => setConfirmDelete(true)}>
+              <Button variant="ghost" size="sm" className="!text-down" onClick={() => setConfirmDelete(true)} disabled={saving}>
                 Delete
               </Button>
             )
@@ -253,7 +272,7 @@ export function HoldingEditor({ open, onClose, holding, start, onSave, onDelete 
             <span />
           )}
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose}>Cancel</Button>
+            <Button variant="secondary" onClick={close} disabled={saving}>Cancel</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Saving' : holding ? 'Save' : 'Add to stack'}</Button>
           </div>
         </div>

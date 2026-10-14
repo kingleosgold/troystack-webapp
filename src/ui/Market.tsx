@@ -5,25 +5,19 @@ import type { Metal } from '../types/holding';
 import { METAL_LABEL, METAL_SYMBOL, METAL_VAR } from '../lib/metals';
 import { changeTone, money, signedMoney, signedPercent } from '../lib/format';
 import { cx } from '../lib/cx';
+import { sparklineShape } from '../lib/sparkline';
 import { Skeleton } from './primitives';
 
-/** A small line with a soft fill, drawn in SVG so it costs nothing to render. */
-export function Sparkline({ values, color, className, height = 40 }: { values: number[]; color: string; className?: string; height?: number }) {
+/**
+ * A small line with a soft fill, drawn in SVG so it costs nothing to render.
+ * With `times`, each price sits at the time it was taken.
+ */
+export function Sparkline({ values, times, color, className, height = 40 }: { values: number[]; times?: number[]; color: string; className?: string; height?: number }) {
   const gid = useId();
   const shape = useMemo(() => {
-    const pts = values.filter((v) => Number.isFinite(v) && v > 0);
-    if (pts.length < 2) return null;
-    const min = Math.min(...pts);
-    const max = Math.max(...pts);
-    const span = max - min || max * 0.001 || 1;
-    const w = 100;
-    const h = height;
-    const step = w / (pts.length - 1);
-    const coords = pts.map((v, i) => [i * step, h - 2 - ((v - min) / span) * (h - 4)] as const);
-    const line = coords.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(2)} ${y.toFixed(2)}`).join(' ');
-    const area = `${line} L${w} ${h} L0 ${h} Z`;
-    return { line, area, w, h };
-  }, [values, height]);
+    const drawn = sparklineShape(values, times, 100, height);
+    return drawn && { ...drawn, w: 100, h: height };
+  }, [values, times, height]);
 
   if (!shape) return <div className={cx('w-full', className)} style={{ height }} aria-hidden="true" />;
   return (
@@ -59,19 +53,23 @@ interface MetalTileProps {
   pct?: number;
   amount?: number;
   spark?: number[];
+  /** When each price in `spark` was taken, one for one. */
+  sparkTimes?: number[];
   loading?: boolean;
   to?: string;
 }
 
 /** One metal's spot, move and 24-hour line. */
-export function MetalTile({ metal, price, pct = 0, amount, spark = [], loading, to }: MetalTileProps) {
+export function MetalTile({ metal, price, pct = 0, amount, spark = [], sparkTimes, loading, to }: MetalTileProps) {
+  // The day's move only means something next to a price.
+  const priced = !loading && price != null && price > 0;
   const body = (
     <>
       <div className="flex items-center gap-2 min-w-0">
         <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: METAL_VAR[metal] }} aria-hidden="true" />
         <span className="text-[13px] font-semibold text-fg">{METAL_LABEL[metal]}</span>
         <span className="hidden text-[11px] font-medium text-fg-3 sm:inline">{METAL_SYMBOL[metal]}</span>
-        {!loading && (
+        {priced && (
           <span className="ml-auto hidden sm:inline-flex">
             <ChangeBadge pct={pct} size="sm" />
           </span>
@@ -79,18 +77,21 @@ export function MetalTile({ metal, price, pct = 0, amount, spark = [], loading, 
       </div>
       {loading || price == null ? (
         <Skeleton className="h-7 w-28 mt-2" />
-      ) : (
+      ) : price > 0 ? (
         <div className="mt-1.5 text-[21px] sm:text-[24px] font-semibold tracking-tight text-fg tnum">{money(price)}</div>
+      ) : (
+        // The feed left this metal out. A zero would read as a price.
+        <div className="mt-2.5 text-[14px] text-fg-3">No price right now</div>
       )}
       <div className="mt-0.5 h-4 text-[12px] text-fg-3 tnum">
-        {!loading && amount != null && <span className="hidden sm:inline">{`${signedMoney(amount)} today`}</span>}
-        {!loading && (
+        {priced && amount != null && <span className="hidden sm:inline">{`${signedMoney(amount)} today`}</span>}
+        {priced && (
           <span className="sm:hidden">
             <ChangeBadge pct={pct} amount={amount} size="sm" showIcon={false} />
           </span>
         )}
       </div>
-      <Sparkline values={spark} color={METAL_VAR[metal]} className="mt-2" height={36} />
+      <Sparkline values={spark} times={sparkTimes} color={METAL_VAR[metal]} className="mt-2" height={36} />
     </>
   );
   const cls = 'block rounded-2xl border border-line bg-surface p-4 transition-colors';

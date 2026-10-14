@@ -98,7 +98,7 @@ function EndpointList({ rows }: { rows: Array<[string, string, string]> }) {
   return (
     <div className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
       {rows.map(([method, path, what]) => (
-        <div key={`${method} ${path}`} className="grid gap-1 px-4 py-3 sm:grid-cols-[4.5rem_minmax(14rem,1fr)_2fr] sm:items-baseline sm:gap-3">
+        <div key={`${method} ${path}`} className="grid grid-cols-1 gap-1 px-4 py-3 sm:grid-cols-[4.5rem_minmax(14rem,1fr)_2fr] sm:items-baseline sm:gap-3">
           <span className={cx('font-mono text-[11px] font-semibold', method === 'GET' ? 'text-gold' : 'text-fg-2')}>{method}</span>
           <code className="break-all font-mono text-[13px] text-fg">{path}</code>
           <span className="text-[13px] text-fg-2">{what}</span>
@@ -126,7 +126,7 @@ export default function Developers() {
 
       <section className="mt-8 space-y-4">
         <SectionHeader title="Add TroyStack to Claude or Cursor" subtitle={`The MCP server lives at ${MCP_URL}. Public tools work without a key.`} />
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <p className="text-[13px] text-fg-2">Claude Desktop, in claude_desktop_config.json</p>
             <CodeBlock label="JSON" code={CLAUDE_CONFIG} />

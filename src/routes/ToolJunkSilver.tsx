@@ -6,6 +6,7 @@ import SEO from '../lib/seo.json';
 import { money, num } from '../lib/format';
 import { coinsInGroup } from '../lib/coins';
 import { Card, Field, Input, PageHeader, Segmented } from '../ui/primitives';
+import { SpotNotice } from '../ui/SpotNotice';
 import { AppStoreButton } from '../ui/AppStore';
 
 /** Silver per coin in troy ounces, the same figures the API's calculator uses. */
@@ -25,7 +26,8 @@ type Mode = 'coins' | 'face';
 
 export default function ToolJunkSilver() {
   usePageMeta({ ...SEO['/tools/junk-silver'], canonical: '/tools/junk-silver' });
-  const { prices } = useSpotMap();
+  const spotMap = useSpotMap();
+  const { prices, awaiting } = spotMap;
   const [mode, setMode] = useState<Mode>('coins');
   const [counts, setCounts] = useState<Record<string, string>>({});
   const [face, setFace] = useState('10');
@@ -38,11 +40,14 @@ export default function ToolJunkSilver() {
   const faceTotal =
     mode === 'face' ? parseFloat(face) || 0 : COINS.reduce((sum, c) => sum + (parseFloat(counts[c.id] || '') || 0) * c.face, 0);
   const value = oz * spot;
+  // Without a live silver price the answer would read $0.00, so it says so instead.
+  const hasPrice = spotMap.priced('silver');
+  const shown = (n: number) => (awaiting ? '...' : hasPrice ? money(n) : 'No price');
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8">
       <PageHeader eyebrow="Tools" title="Junk silver calculator" subtitle="US dimes, quarters and halves from 1964 and earlier are 90% silver. Here's what they're worth at today's spot." />
-      <div className="grid gap-4 md:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_320px]">
         <Card className="p-5">
           <Segmented<Mode>
             label="How to count"
@@ -77,7 +82,7 @@ export default function ToolJunkSilver() {
         </Card>
         <Card className="p-5">
           <div className="text-[13px] text-fg-3">Melt value</div>
-          <div className="mt-1 text-[34px] font-semibold tracking-tight text-fg tnum">{money(value)}</div>
+          <div className={hasPrice || awaiting ? 'mt-1 text-[34px] font-semibold tracking-tight text-fg tnum' : 'mt-1 text-[22px] font-semibold tracking-tight text-fg-3'}>{shown(value)}</div>
           <dl className="mt-4 space-y-2 text-[14px]">
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Silver</dt>
@@ -89,13 +94,14 @@ export default function ToolJunkSilver() {
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Per $1 face (90%)</dt>
-              <dd className="text-fg tnum">{money(OZ_PER_DOLLAR_FACE * spot)}</dd>
+              <dd className="text-fg tnum">{shown(OZ_PER_DOLLAR_FACE * spot)}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Silver spot</dt>
-              <dd className="text-fg tnum">{money(spot)}</dd>
+              <dd className="text-fg tnum">{shown(spot)}</dd>
             </div>
           </dl>
+          <SpotNotice spot={spotMap} metals={['silver']} className="mt-4" />
           <p className="mt-4 text-[12px] text-fg-3">Worn coins can come in a little under these figures. Dealers often quote junk silver as a multiple of face value.</p>
         </Card>
       </div>

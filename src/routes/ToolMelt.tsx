@@ -10,6 +10,8 @@ import { PURITIES, purityPercent } from '../lib/purity';
 import { money, num } from '../lib/format';
 import type { Metal } from '../types/holding';
 import { Card, Field, Input, PageHeader, Segmented, Select } from '../ui/primitives';
+import { SpotNotice } from '../ui/SpotNotice';
+import { cx } from '../lib/cx';
 import { AppStoreButton } from '../ui/AppStore';
 
 /** Every coin and bar with a page of its own, grouped by metal. */
@@ -20,7 +22,8 @@ const UNIT_TO_OZT: Record<Unit, number> = { oz: 1, g: OZT_PER_GRAM, kg: OZT_PER_
 
 export default function ToolMelt() {
   usePageMeta({ ...SEO['/tools/melt'], canonical: '/tools/melt' });
-  const { prices, isLoading } = useSpotMap();
+  const spotMap = useSpotMap();
+  const { prices, awaiting } = spotMap;
   const [metal, setMetal] = useState<Metal>('gold');
   const [preset, setPreset] = useState<string>(PRESETS.gold[0].slug);
   const [qty, setQty] = useState('1');
@@ -40,11 +43,14 @@ export default function ToolMelt() {
   const fine = finePerPiece * pieces;
   const spot = prices[metal] || 0;
   const value = fine * spot;
+  // Without a live price the answer would read $0.00, so it says so instead.
+  const hasPrice = spotMap.priced(metal);
+  const shown = (n: number) => (awaiting ? '...' : hasPrice ? money(n) : 'No price');
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8">
       <PageHeader eyebrow="Tools" title="Melt value calculator" subtitle="What the metal in a coin, round or bar is worth at live spot." />
-      <div className="grid gap-4 md:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_320px]">
         <Card className="p-5 space-y-4">
           <Segmented<Metal>
             label="Metal"
@@ -109,7 +115,7 @@ export default function ToolMelt() {
         </Card>
         <Card className="p-5">
           <div className="text-[13px] text-fg-3">Melt value</div>
-          <div className="mt-1 text-[34px] font-semibold tracking-tight text-fg tnum">{isLoading ? '...' : money(value)}</div>
+          <div className={cx('mt-1 font-semibold tracking-tight tnum', hasPrice || awaiting ? 'text-[34px] text-fg' : 'text-[22px] text-fg-3')}>{shown(value)}</div>
           <dl className="mt-4 space-y-2 text-[14px]">
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Pure {METAL_LABEL[metal].toLowerCase()}</dt>
@@ -117,13 +123,14 @@ export default function ToolMelt() {
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Per piece</dt>
-              <dd className="text-fg tnum">{money(finePerPiece * spot)}</dd>
+              <dd className="text-fg tnum">{shown(finePerPiece * spot)}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">{METAL_LABEL[metal]} spot</dt>
-              <dd className="text-fg tnum">{money(spot)}</dd>
+              <dd className="text-fg tnum">{shown(spot)}</dd>
             </div>
           </dl>
+          <SpotNotice spot={spotMap} metals={[metal]} className="mt-4" />
           <p className="mt-4 text-[12px] text-fg-3">Dealers sell above melt and usually buy back near it. Collectible coins can be worth well over melt.</p>
           {!custom && (
             <Link to={`/coins/${preset}`} className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-gold hover:underline">

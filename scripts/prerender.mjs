@@ -102,9 +102,18 @@ for (const [route, meta] of Object.entries(pages)) {
   count += 1;
 }
 
+// /prices shows the gold page, so it is the gold page under a shorter
+// address: its file is the gold page's, canonical address and all, the same
+// one the app sets, and the sitemap lists the gold page alone.
+const SAME_AS = { '/prices': '/prices/gold' };
+for (const [alias, page] of Object.entries(SAME_AS)) {
+  writeFileSync(path.join(dist, `${alias.slice(1)}.html`), readFileSync(path.join(dist, `${page.slice(1)}.html`)));
+}
+
 // The sitemap lists the same public pages.
 const today = new Date().toISOString().slice(0, 10);
 const urls = Object.keys(pages)
+  .filter((route) => !(route in SAME_AS))
   .map((route) => `  <url><loc>${SITE}${route === '/' ? '/' : route}</loc><lastmod>${today}</lastmod></url>`)
   .join('\n');
 writeFileSync(path.join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);

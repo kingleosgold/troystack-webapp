@@ -83,7 +83,7 @@ interface SegmentedProps<T extends string> {
 
 export function Segmented<T extends string>({ value, options, onChange, label, className, size = 'md' }: SegmentedProps<T>) {
   return (
-    <div role="tablist" aria-label={label} className={cx('inline-flex rounded-xl bg-surface-2 p-1 border border-line', className)}>
+    <div role="tablist" aria-label={label} className={cx('inline-flex max-w-full overflow-x-auto scrollbar-none rounded-xl bg-surface-2 p-1 border border-line', className)}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -94,7 +94,7 @@ export function Segmented<T extends string>({ value, options, onChange, label, c
             aria-selected={active}
             onClick={() => onChange(o.value)}
             className={cx(
-              'rounded-lg font-semibold transition-colors',
+              'shrink-0 rounded-lg font-semibold transition-colors',
               size === 'sm' ? 'px-2.5 py-1 text-[12px]' : 'px-3 py-1.5 text-[13px]',
               active ? 'bg-surface text-fg shadow-sm' : 'text-fg-3 hover:text-fg',
             )}
@@ -146,26 +146,43 @@ interface SheetProps {
 }
 
 /** A dialog that docks to the bottom on phones and centers on larger screens. */
+// Sheets open now, newest last. Only the top one answers Escape, and the page
+// stays locked from scrolling until the last one closes.
+const openSheets: symbol[] = [];
+let overflowBeforeSheets = '';
+
 export function Sheet({ open, onClose, title, children, width = 'md', label }: SheetProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // The latest onClose, so a parent that passes a new function on every
+  // render doesn't rerun the open effect and pull focus out of a field.
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
+    const me = Symbol('sheet');
     const prev = document.activeElement as HTMLElement | null;
+    if (openSheets.length === 0) {
+      overflowBeforeSheets = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+    openSheets.push(me);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && openSheets[openSheets.length - 1] === me) closeRef.current();
     };
     document.addEventListener('keydown', onKey);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     requestAnimationFrame(() => ref.current?.focus());
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = overflow;
+      const at = openSheets.indexOf(me);
+      if (at >= 0) openSheets.splice(at, 1);
+      if (openSheets.length === 0) document.body.style.overflow = overflowBeforeSheets;
       prev?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   const widths = { sm: 'sm:max-w-sm', md: 'sm:max-w-lg', lg: 'sm:max-w-2xl' };

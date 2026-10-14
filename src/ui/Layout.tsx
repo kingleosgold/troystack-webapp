@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Calculator,
   ChevronsLeft,
@@ -19,6 +19,7 @@ import {
   Warehouse,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSignOut } from '../contexts/SignOutContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { useSpotMap } from '../hooks/queries';
 import { useTheme } from '../hooks/useTheme';
@@ -91,9 +92,9 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
 }
 
 function AccountRow({ collapsed }: { collapsed: boolean }) {
-  const { user, isConfigured, signOut } = useAuth();
-  const { tier } = useSubscription();
-  const navigate = useNavigate();
+  const { user, isConfigured } = useAuth();
+  const { requestSignOut, signingOut } = useSignOut();
+  const { tier, loading: planLoading } = useSubscription();
   if (!isConfigured) return null;
   if (!user) {
     return (
@@ -117,17 +118,16 @@ function AccountRow({ collapsed }: { collapsed: boolean }) {
         {!collapsed && (
           <span className="min-w-0">
             <span className="block text-[13px] text-fg truncate">{user.email}</span>
-            <span className="block text-[11px] text-fg-3">{tier === 'lifetime' ? 'Lifetime' : tier === 'gold' ? 'Gold' : 'Free'}</span>
+            {/* No plan is named until it's known, so a Gold account is never shown as Free. */}
+            <span className="block text-[11px] text-fg-3">{planLoading ? '\u00a0' : tier === 'lifetime' ? 'Lifetime' : tier === 'gold' ? 'Gold' : 'Free'}</span>
           </span>
         )}
       </Link>
       <button
         type="button"
-        onClick={async () => {
-          await signOut();
-          navigate('/');
-        }}
-        className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg text-fg-3 hover:text-fg hover:bg-surface-2"
+        onClick={requestSignOut}
+        disabled={signingOut}
+        className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg text-fg-3 hover:text-fg hover:bg-surface-2 disabled:opacity-40"
         title="Sign out"
         aria-label="Sign out"
       >
@@ -138,7 +138,9 @@ function AccountRow({ collapsed }: { collapsed: boolean }) {
 }
 
 function SidebarAppCard() {
-  const { isGold } = useSubscription();
+  const { isGold, loading: planLoading } = useSubscription();
+  // The free week is only mentioned once the plan is known to be Free.
+  const offerWeek = !planLoading && !isGold;
   return (
     <div className="rounded-2xl border border-line bg-surface p-3.5">
       <div className="flex items-start gap-3">
@@ -146,7 +148,7 @@ function SidebarAppCard() {
         <div className="min-w-0">
           <p className="text-[13px] font-semibold text-fg leading-snug">TroyStack for iPhone</p>
           <p className="text-[12px] text-fg-3 mt-0.5 leading-snug">
-            {isGold ? 'Alerts, widgets and Troy on your lock screen.' : 'Alerts, widgets, and a free week of Gold.'}
+            {offerWeek ? 'Alerts, widgets, and a free week of Gold.' : 'Alerts, widgets and Troy on your lock screen.'}
           </p>
         </div>
       </div>
@@ -196,8 +198,13 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 
 /** Live spot for all four metals and the ratio, always in view. */
 function Ticker({ className, withStatus = false }: { className?: string; withStatus?: boolean }) {
-  const { data, isLoading, marketsClosed } = useSpotMap();
-  const ratio = data && data.prices.silver > 0 ? data.prices.gold / data.prices.silver : null;
+  const spot = useSpotMap();
+  const { marketsClosed } = spot;
+  const ratio = spot.priced('gold') && spot.priced('silver') ? spot.prices.gold / spot.prices.silver : null;
+  // No live prices and none on the way, as when the read failed, the
+  // connection is down or the last good read is too old: one short line that
+  // asks again when tapped.
+  const unavailable = !spot.live && !spot.isLoading && !spot.refreshing;
   return (
     <div
       className={cx(
@@ -208,24 +215,32 @@ function Ticker({ className, withStatus = false }: { className?: string; withSta
       )}
       aria-label="Live spot prices"
     >
-      {METALS.map((m) => {
-        const pct = data?.changePct[m] ?? 0;
-        const tone = changeTone(pct);
-        return (
-          <Link key={m} to={`/prices/${m}`} className="flex items-center gap-1.5 text-[13px] hover:opacity-80">
-            <span className="h-2 w-2 rounded-full" style={{ background: METAL_VAR[m] }} aria-hidden="true" />
-            <span className="text-fg-2">{METAL_LABEL[m]}</span>
-            {isLoading || !data ? (
-              <span className="skeleton inline-block h-3.5 w-14 rounded" />
-            ) : (
-              <>
-                <span className="font-semibold text-fg tnum">{money(data.prices[m])}</span>
-                <span className={cx('tnum text-[12px] font-semibold', tone === 'up' ? 'text-up' : tone === 'down' ? 'text-down' : 'text-fg-3')}>{signedPercent(pct)}</span>
-              </>
-            )}
-          </Link>
-        );
-      })}
+      {unavailable ? (
+        <button type="button" onClick={() => void spot.refetch()} className="text-[13px] text-fg-3 hover:text-fg">
+          {spot.stale ? 'Prices out of date, tap to retry' : 'Prices unavailable, tap to retry'}
+        </button>
+      ) : (
+        METALS.map((m) => {
+          const pct = spot.changePct[m] ?? 0;
+          const tone = changeTone(pct);
+          return (
+            <Link key={m} to={`/prices/${m}`} className="flex items-center gap-1.5 text-[13px] hover:opacity-80">
+              <span className="h-2 w-2 rounded-full" style={{ background: METAL_VAR[m] }} aria-hidden="true" />
+              <span className="text-fg-2">{METAL_LABEL[m]}</span>
+              {!spot.live ? (
+                <span className="skeleton inline-block h-3.5 w-14 rounded" />
+              ) : !spot.priced(m) ? (
+                <span className="text-fg-3">no price</span>
+              ) : (
+                <>
+                  <span className="font-semibold text-fg tnum">{money(spot.prices[m])}</span>
+                  <span className={cx('tnum text-[12px] font-semibold', tone === 'up' ? 'text-up' : tone === 'down' ? 'text-down' : 'text-fg-3')}>{signedPercent(pct)}</span>
+                </>
+              )}
+            </Link>
+          );
+        })
+      )}
       {ratio && (
         <Link to="/tools/ratio" className="flex items-center gap-1.5 text-[13px] hover:opacity-80 pr-6 2xl:pr-0">
           <span className="text-fg-2">Gold/silver</span>
@@ -303,9 +318,9 @@ function BottomTabs() {
 }
 
 function MenuSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, isConfigured, signOut } = useAuth();
+  const { user, isConfigured } = useAuth();
+  const { requestSignOut, signingOut } = useSignOut();
   const { resolvedTheme, setTheme } = useTheme();
-  const navigate = useNavigate();
   return (
     <Sheet open={open} onClose={onClose} title="TroyStack">
       <ul className="grid grid-cols-2 gap-2">
@@ -344,12 +359,12 @@ function MenuSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           (user ? (
             <button
               type="button"
-              onClick={async () => {
-                await signOut();
+              onClick={() => {
                 onClose();
-                navigate('/');
+                requestSignOut();
               }}
-              className="h-10 px-3 rounded-xl text-[14px] font-medium text-fg-2 hover:text-fg"
+              disabled={signingOut}
+              className="h-10 px-3 rounded-xl text-[14px] font-medium text-fg-2 hover:text-fg disabled:opacity-40"
             >
               Sign out
             </button>
@@ -409,7 +424,7 @@ function PageLoading() {
     <div className="mx-auto max-w-6xl space-y-4 px-4 py-8 sm:px-6" aria-busy="true" aria-label="Loading">
       <div className="skeleton h-8 w-56 rounded-lg" />
       <div className="skeleton h-4 w-80 max-w-full rounded" />
-      <div className="grid gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="skeleton h-28 rounded-2xl" />
         ))}

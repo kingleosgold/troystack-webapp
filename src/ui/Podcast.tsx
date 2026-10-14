@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Pause, Play } from 'lucide-react';
 import type { Episode } from '../lib/podcastApi';
 import { formatDate, minutesLabel } from '../lib/text';
@@ -18,6 +18,9 @@ const SPEEDS = [1, 1.25, 1.5, 2];
 /** Plays one episode. Starting any player pauses the others on the page. */
 export function EpisodePlayer({ episode, compact = false, className }: { episode: Episode; compact?: boolean; className?: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  // Which player started, by instance, since the same episode can be on the
+  // page twice and both copies share its audio address.
+  const playerId = useId();
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(episode.durationSec || 0);
@@ -26,11 +29,11 @@ export function EpisodePlayer({ episode, compact = false, className }: { episode
 
   useEffect(() => {
     const onOtherPlay = (e: Event) => {
-      if ((e as CustomEvent<string>).detail !== episode.audioUrl) audioRef.current?.pause();
+      if ((e as CustomEvent<string>).detail !== playerId) audioRef.current?.pause();
     };
     window.addEventListener(PLAY_EVENT, onOtherPlay);
     return () => window.removeEventListener(PLAY_EVENT, onOtherPlay);
-  }, [episode.audioUrl]);
+  }, [playerId]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = speed;
@@ -40,7 +43,7 @@ export function EpisodePlayer({ episode, compact = false, className }: { episode
     const a = audioRef.current;
     if (!a) return;
     if (a.paused) {
-      window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: episode.audioUrl }));
+      window.dispatchEvent(new CustomEvent(PLAY_EVENT, { detail: playerId }));
       try {
         setError(false);
         await a.play();

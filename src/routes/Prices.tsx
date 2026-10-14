@@ -6,7 +6,7 @@ import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { isMetal, METALS, METAL_LABEL, METAL_SYMBOL, METAL_VAR } from '../lib/metals';
 import { money, signedMoney, signedPercent } from '../lib/format';
-import { formatTimeET } from '../lib/text';
+import { formatTimeET, whenET } from '../lib/text';
 import type { HistoryRange } from '../lib/marketApi';
 import type { Metal } from '../types/holding';
 import { cx } from '../lib/cx';
@@ -41,22 +41,20 @@ function useChartData(metal: Metal, range: Range) {
   const history = useHistory(range === '24H' ? '1M' : range, range === 'ALL' || range === '5Y' ? 600 : 260, range !== '24H');
   return useMemo(() => {
     if (range === '24H') {
+      // Each price comes with the time it was taken, so the chart shows each move when it happened.
       const values = sparks.data?.series[metal] ?? [];
-      const times = sparks.data?.timestamps ?? [];
-      // Without per-point times, space the points over the 24 hours before the fetch.
-      const now = sparks.dataUpdatedAt;
-      const aligned = values.length === times.length;
-      const points: ChartPoint[] = values.map((v, i) => ({
-        t: aligned ? Date.parse(times[i]) : now - (values.length - 1 - i) * ((24 * 3600_000) / Math.max(1, values.length - 1)),
-        v,
-      }));
-      return { points: points.filter((p) => Number.isFinite(p.t)), loading: sparks.isLoading, error: sparks.isError, refetch: sparks.refetch };
+      const times = sparks.data?.times[metal] ?? [];
+      const points: ChartPoint[] = values.map((v, i) => ({ t: times[i], v }));
+      return { points, startsLate: false, loading: sparks.isLoading, error: sparks.isError, refetch: sparks.refetch };
     }
-    const points: ChartPoint[] = (history.data ?? [])
+    const all = history.data ?? [];
+    const points: ChartPoint[] = all
       .map((p) => ({ t: Date.parse(`${p.date}T12:00:00Z`), v: p[metal] }))
       .filter((p) => Number.isFinite(p.t) && p.v > 0);
-    return { points, loading: history.isLoading, error: history.isError, refetch: history.refetch };
-  }, [range, metal, sparks.data, sparks.dataUpdatedAt, sparks.isLoading, sparks.isError, sparks.refetch, history.data, history.isLoading, history.isError, history.refetch]);
+    // True when the metal's prices begin after the range does, as platinum and palladium's do.
+    const startsLate = points.length > 1 && all.length > 0 && points[0].t > Date.parse(`${all[0].date}T12:00:00Z`);
+    return { points, startsLate, loading: history.isLoading, error: history.isError, refetch: history.refetch };
+  }, [range, metal, sparks.data, sparks.isLoading, sparks.isError, sparks.refetch, history.data, history.isLoading, history.isError, history.refetch]);
 }
 
 export default function Prices() {
@@ -82,7 +80,13 @@ export default function Prices() {
   if (params.metal && !isMetal(params.metal)) return <Navigate to="/prices" replace />;
 
   const price = spot.data?.prices[metal];
-  const ratio = spot.data && spot.data.prices.silver > 0 ? spot.data.prices.gold / spot.data.prices.silver : null;
+  const priced = spot.priced(metal);
+  // Platinum and palladium history only goes back to early 2025, so their
+  // longest ranges are measured from there.
+  const historyStart = chart.startsLate
+    ? new Date(chart.points[0].t).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+    : null;
+  const ratio = spot.priced('gold') && spot.priced('silver') ? spot.prices.gold / spot.prices.silver : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 sm:pt-8">
@@ -107,16 +111,29 @@ export default function Prices() {
         <h1 className="text-[15px] font-semibold text-fg-2">
           {label} spot price <span className="text-fg-3 font-medium">· {METAL_SYMBOL[metal]} · USD per troy ounce</span>
         </h1>
-        {price == null ? (
+        {!spot.live && !spot.isLoading && !spot.refreshing ? (
+          <div className="max-w-md">
+            <ErrorNote onRetry={() => void spot.refetch()}>
+              {spot.stale ? `Prices haven't updated since ${whenET(spot.dataUpdatedAt)}.` : "Live prices didn't load."}
+            </ErrorNote>
+          </div>
+        ) : !spot.live ? (
           <Skeleton className="h-11 w-56" />
-        ) : (
+        ) : price != null && price > 0 ? (
           <div className="text-[40px] sm:text-[48px] font-semibold tracking-tight text-fg tnum leading-none">{money(price)}</div>
+        ) : (
+          <div className="max-w-md"><ErrorNote onRetry={() => void spot.refetch()}>There's no live {label.toLowerCase()} price right now.</ErrorNote></div>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
-          {spot.data && <ChangeBadge pct={spot.data.changePct[metal]} amount={spot.data.changeAmt[metal]} />}
-          <span className="text-[13px] text-fg-3">since the last close</span>
+          {/* A move needs a price to move from, so a metal with none shows none. */}
+          {priced && spot.data && (
+            <>
+              <ChangeBadge pct={spot.data.changePct[metal]} amount={spot.data.changeAmt[metal]} />
+              <span className="text-[13px] text-fg-3">since the last close</span>
+            </>
+          )}
           <MarketStatus closed={spot.marketsClosed} />
-          {spot.data && <span className="text-[12px] text-fg-3">Updated {formatTimeET(spot.data.timestamp)}</span>}
+          {spot.live && spot.data && <span className="text-[12px] text-fg-3">Updated {formatTimeET(spot.data.timestamp)}</span>}
         </div>
       </header>
 
@@ -128,19 +145,24 @@ export default function Prices() {
               <span className={cx('font-semibold', stats.change > 0 ? 'text-up' : stats.change < 0 ? 'text-down' : 'text-fg-3')}>
                 {signedMoney(stats.change)} ({signedPercent(stats.pct)})
               </span>
-              <span className="text-fg-3"> over {range === 'ALL' ? 'the full history' : range === '24H' ? '24 hours' : range}</span>
+              <span className="text-fg-3">{historyStart ? ` since ${historyStart}` : ` over ${range === 'ALL' ? 'the full history' : range === '24H' ? '24 hours' : range}`}</span>
             </div>
           )}
         </div>
         {chart.error ? (
           <ErrorNote onRetry={() => chart.refetch()}>The chart didn't load.</ErrorNote>
-        ) : chart.loading || chart.points.length < 2 ? (
+        ) : chart.loading ? (
           <Skeleton className="h-[280px] w-full" />
+        ) : chart.points.length < 2 ? (
+          <div className="flex h-[280px] items-center justify-center px-6 text-center text-[14px] text-fg-3">
+            There aren't enough {label.toLowerCase()} prices in this range to draw a chart.
+          </div>
         ) : (
           <Suspense fallback={<Skeleton className="h-[280px] w-full" />}>
             <PriceChart data={chart.points} color={METAL_VAR[metal]} height={280} granularity={range === '24H' ? 'intraday' : 'daily'} valueLabel={label} />
           </Suspense>
         )}
+        {historyStart && <p className="mt-2 text-[12px] text-fg-3">{label} prices on TroyStack go back to {historyStart}.</p>}
         {stats && (
           <dl className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-line pt-4">
             <div>
@@ -159,10 +181,10 @@ export default function Prices() {
                 </dd>
               </div>
             )}
-            {spot.data && (
+            {priced && (
               <div>
                 <dt className="text-[12px] text-fg-3">Per gram</dt>
-                <dd className="text-[15px] font-semibold text-fg tnum">{money((spot.data.prices[metal] || 0) * 0.0321507466)}</dd>
+                <dd className="text-[15px] font-semibold text-fg tnum">{money(spot.prices[metal] * 0.0321507466)}</dd>
               </div>
             )}
           </dl>

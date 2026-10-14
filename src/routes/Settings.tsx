@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSignOut } from '../contexts/SignOutContext';
 import { useTrial } from '../contexts/TrialContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { useHoldings } from '../hooks/useHoldings';
 import { useTheme, type Theme } from '../hooks/useTheme';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { useAccountChange } from '../hooks/useAccountChange';
+import { signedInAs, stillSignedInAs } from '../lib/account';
 import { holdingsToCSV } from '../services/holdings';
 import { syncSubscription } from '../services/api';
 import { ApiError } from '../lib/apiClient';
@@ -17,6 +20,9 @@ import { cx } from '../lib/cx';
 import { downloadText } from '../lib/download';
 import { InstallPath } from '../ui/AppStore';
 import { Button, Field, Input, PageHeader, Segmented, Sheet } from '../ui/primitives';
+
+/** What a checkout that didn't open leaves in the address for this page to say. */
+const CHECKOUT_NOTES = ['failed', 'have-gold', 'payment-issue', 'app-store', 'in-progress'];
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -62,15 +68,18 @@ function Row({ title, detail, right, onClick, href, tone }: { title: ReactNode; 
 
 export default function Settings() {
   usePageMeta({ title: 'Settings', canonical: '/settings', noindex: true });
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const { user, session, loading: authLoading, isConfigured, signOut, linkWithGoogle, linkWithApple, updateEmailPassword, getLinkedProviders, hasEmailPassword } = useAuth();
-  const { tier, isTrial, trialEnd, refetch } = useSubscription();
+  const { user, session, loading: authLoading, isConfigured, linkWithGoogle, linkWithApple, updateEmailPassword, getLinkedProviders, hasEmailPassword } = useAuth();
+  const { requestSignOut } = useSignOut();
+  const { tier, isTrial, trialEnd, refetch, loading: planLoading } = useSubscription();
   const { openTrial } = useTrial();
-  const { holdings, isGuest, clearBrowserStack } = useHoldings();
+  const { holdings, isGuest, clearBrowserStack, loading: stackLoading, error: stackError, refresh: reloadStack } = useHoldings();
   const { theme, setTheme } = useTheme();
 
-  const [banner, setBanner] = useState<{ tone: 'up' | 'down' | 'neutral'; text: string } | null>(null);
+  // A note at the top. One from a checkout that didn't open can come with
+  // what to do: a card to update, or nothing to buy while the App Store plan
+  // may still renew.
+  const [banner, setBanner] = useState<{ tone: 'up' | 'down' | 'neutral'; text: string; kind?: 'payment-issue' | 'app-store' } | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
@@ -79,21 +88,80 @@ export default function Settings() {
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [credsError, setCredsError] = useState<string | null>(null);
+  // Set the moment a change of email or password starts, so a close that
+  // lands before the sheet redraws is held back too.
+  const credsSaving = useRef(false);
+  const [savingCreds, setSavingCreds] = useState(false);
   const handledSession = useRef(false);
 
-  // Back from Stripe Checkout. It waits for the sign-in to load, so the plan
-  // read after verifying is the account's own.
+  // Everything here that was about one account goes when another signs in,
+  // or this one signs out: notes, and sheets open for it.
+  useAccountChange(() => {
+    setBanner(null);
+    setSignOutOpen(false);
+    setClearOpen(false);
+    setCredsOpen(false);
+    setNewEmail('');
+    setNewPassword('');
+    setCredsError(null);
+    credsSaving.current = false;
+    setSavingCreds(false);
+    setBillingBusy(false);
+    setRefreshing(false);
+  });
+
+  // Back from Stripe Checkout, or from a checkout that didn't open. It waits
+  // for the sign-in to load, so the plan read after verifying is the account's own.
   useEffect(() => {
     const sessionId = params.get('session_id');
-    const failed = params.get('checkout') === 'failed';
-    if (!sessionId && !failed) return;
+    const checkout = params.get('checkout');
+    const note = checkout && CHECKOUT_NOTES.includes(checkout) ? checkout : null;
+    if (!sessionId && !note) {
+      // Once one is handled and cleared, the next is handled too, as when the
+      // Gold sheet on this page finds the account already has a plan.
+      handledSession.current = false;
+      return;
+    }
     if (authLoading) return;
     if (handledSession.current) return;
     handledSession.current = true;
     params.delete('session_id');
     params.delete('checkout');
     setParams(params, { replace: true });
-    if (failed) {
+    if (note === 'payment-issue') {
+      setBanner({ tone: 'down', kind: 'payment-issue', text: "Your last Gold payment didn't go through. Update your card on the billing page to keep Gold." });
+      return;
+    }
+    if (note === 'app-store') {
+      setBanner({
+        tone: 'neutral',
+        kind: 'app-store',
+        text: "Your App Store subscription may still be renewing, so there's nothing to buy here. On your iPhone, open Settings, tap your name, then Subscriptions.",
+      });
+      return;
+    }
+    if (note === 'in-progress') {
+      setBanner({ tone: 'neutral', text: "Another checkout for this account was already opening, so this one didn't start. If it didn't go through, start it again from Plan below." });
+      return;
+    }
+    // What comes back from here on is for the account signed in now, and
+    // isn't shown if another account signs in, or this one signs out, first.
+    const owner = signedInAs();
+    if (note === 'have-gold') {
+      setBanner({ tone: 'up', text: 'This account already has Gold, so there was nothing to buy. If Plan below still says Free, tap Refresh my plan.' });
+      // The API knew about Gold the site's plan read may not have, as when the
+      // app wrote Free over a web plan. The same sync Refresh my plan runs puts
+      // it right, then the plan is read again.
+      if (owner) {
+        void syncSubscription(owner)
+          .catch(() => undefined)
+          .then(() => {
+            if (stillSignedInAs(owner)) void refetch({ force: true });
+          });
+      }
+      return;
+    }
+    if (note === 'failed') {
       setBanner({ tone: 'down', text: "Checkout didn't open. You can start it again from Plan below." });
       return;
     }
@@ -102,23 +170,31 @@ export default function Settings() {
     // verifying the session is what writes Gold to the profile.
     verifyCheckout(sessionId!)
       .then(async (res) => {
+        if (!stillSignedInAs(owner)) return;
         await refetch({ force: true });
+        if (!stillSignedInAs(owner)) return;
         if (!res.success) setBanner({ tone: 'neutral', text: confirming });
         else if (res.tier === 'lifetime') setBanner({ tone: 'up', text: 'Lifetime is yours. Thanks for backing TroyStack.' });
+        // The free week is for a first subscription. Someone coming back pays from day one.
+        else if (res.status && res.status !== 'trialing') setBanner({ tone: 'up', text: 'Gold is on. Thanks for coming back.' });
         else setBanner({ tone: 'up', text: "Gold is on. Your free week has started, and you won't be charged until it ends." });
       })
       .catch(async () => {
+        if (!stillSignedInAs(owner)) return;
         await refetch({ force: true });
-        setBanner({ tone: 'neutral', text: confirming });
+        if (stillSignedInAs(owner)) setBanner({ tone: 'neutral', text: confirming });
       });
   }, [params, setParams, refetch, authLoading]);
 
   const providers = user ? getLinkedProviders() : [];
   const hasEmail = user ? hasEmailPassword() : false;
   const trialDays = trialEnd ? Math.max(0, Math.ceil((new Date(trialEnd).getTime() - Date.now()) / 86400000)) : 0;
-  const planName = tier === 'lifetime' ? 'Lifetime' : tier === 'gold' ? (isTrial ? 'Gold, free week' : 'Gold') : 'Free';
-  const planDetail =
-    tier === 'lifetime'
+  // Until a signed-in account's plan loads it isn't Free, it's unknown.
+  const planUnknown = Boolean(user) && planLoading;
+  const planName = planUnknown ? 'Checking your plan' : tier === 'lifetime' ? 'Lifetime' : tier === 'gold' ? (isTrial ? 'Gold, free week' : 'Gold') : 'Free';
+  const planDetail = planUnknown
+    ? 'It keeps trying if the connection dropped.'
+    : tier === 'lifetime'
       ? 'Gold for good.'
       : tier === 'gold'
         ? isTrial && trialEnd
@@ -128,13 +204,22 @@ export default function Settings() {
 
   const manageBilling = async () => {
     if (!user) return;
+    const owner = user.id;
     setBillingBusy(true);
     try {
-      await openBillingPortal(user.id, session?.access_token);
+      // The billing page opens for the account that asked, or not at all.
+      if (!(await openBillingPortal(owner, session?.access_token, () => stillSignedInAs(owner)))) setBillingBusy(false);
     } catch (e) {
       setBillingBusy(false);
+      if (!stillSignedInAs(owner)) return;
       if (e instanceof ApiError && e.status === 404) {
-        setBanner({ tone: 'neutral', text: "Your Gold is through Apple. On your iPhone, open Settings, tap your name, then Subscriptions." });
+        setBanner({
+          tone: 'neutral',
+          text:
+            tier === 'lifetime'
+              ? "Your Lifetime came through Apple, so there's no web billing to manage."
+              : 'Your Gold is through Apple. On your iPhone, open Settings, tap your name, then Subscriptions.',
+        });
       } else {
         setBanner({ tone: 'down', text: "The billing page didn't open. Try again in a moment." });
       }
@@ -143,27 +228,53 @@ export default function Settings() {
 
   const refreshPlan = async () => {
     if (!user) return;
+    const owner = user.id;
     setRefreshing(true);
     try {
-      await syncSubscription(user.id).catch(() => undefined);
-      await refetch({ force: true });
-      setBanner({ tone: 'neutral', text: 'Your plan is up to date.' });
+      const synced = await syncSubscription(owner).then(
+        () => true,
+        () => false,
+      );
+      if (!stillSignedInAs(owner)) return;
+      const read = await refetch({ force: true });
+      if (!stillSignedInAs(owner)) return;
+      if (synced && read) setBanner({ tone: 'neutral', text: 'Your plan is up to date.' });
+      else setBanner({ tone: 'down', text: "Your plan couldn't be checked just now. Try again in a minute." });
     } finally {
       setRefreshing(false);
     }
   };
 
+  // While a change is saving, the sheet stays open, so it can't finish out of
+  // sight and leave nothing saying whether it went through.
+  const closeCreds = () => {
+    if (!credsSaving.current) setCredsOpen(false);
+  };
+
   const saveCreds = async (e: FormEvent) => {
     e.preventDefault();
+    if (credsSaving.current) return;
     setCredsError(null);
     if (!newEmail.trim() && !newPassword) return setCredsError('Enter a new email, a new password, or both.');
     if (newPassword && newPassword.length < 6) return setCredsError('Use at least 6 characters for the password.');
-    const { error } = await updateEmailPassword(newEmail.trim(), newPassword);
-    if (error) return setCredsError(error.message);
-    setCredsOpen(false);
-    setNewEmail('');
-    setNewPassword('');
-    setBanner({ tone: 'up', text: newEmail.trim() ? 'Check both inboxes to confirm the new email.' : 'Your password is updated.' });
+    const owner = signedInAs();
+    const emailChanged = Boolean(newEmail.trim());
+    credsSaving.current = true;
+    setSavingCreds(true);
+    try {
+      const { error } = await updateEmailPassword(newEmail.trim(), newPassword);
+      // Another account signed in while it saved, and the sheet went with the last one.
+      if (!stillSignedInAs(owner)) return;
+      if (error) return setCredsError(error.message);
+      credsSaving.current = false;
+      setCredsOpen(false);
+      setNewEmail('');
+      setNewPassword('');
+      setBanner({ tone: 'up', text: emailChanged ? 'Check both inboxes to confirm the new email.' : 'Your password is updated.' });
+    } finally {
+      credsSaving.current = false;
+      setSavingCreds(false);
+    }
   };
 
   const themeOptions: Array<{ value: Theme; label: string }> = [
@@ -178,7 +289,7 @@ export default function Settings() {
       <PageHeader title="Settings" />
 
       {banner && (
-        <p
+        <div
           role="status"
           className={cx(
             'mt-5 rounded-xl border px-4 py-3 text-[14px]',
@@ -187,8 +298,13 @@ export default function Settings() {
             banner.tone === 'neutral' && 'border-line bg-surface-2 text-fg',
           )}
         >
-          {banner.text}
-        </p>
+          <p>{banner.text}</p>
+          {banner.kind === 'payment-issue' && user && (
+            <Button size="sm" className="mt-3" onClick={() => void manageBilling()} disabled={billingBusy}>
+              {billingBusy ? 'Opening the billing page' : 'Update your card'}
+            </Button>
+          )}
+        </div>
       )}
 
       {isConfigured && (
@@ -241,23 +357,29 @@ export default function Settings() {
           title={planName}
           detail={planDetail}
           right={
-            <span className={cx('rounded-full px-2.5 py-1 text-[12px] font-semibold', tier === 'free' ? 'bg-surface-2 text-fg-2' : 'bg-gold-soft text-gold')}>
-              {tier === 'free' ? 'Free' : tier === 'lifetime' ? 'Lifetime' : 'Gold'}
-            </span>
+            planUnknown ? undefined : (
+              <span className={cx('rounded-full px-2.5 py-1 text-[12px] font-semibold', tier === 'free' ? 'bg-surface-2 text-fg-2' : 'bg-gold-soft text-gold')}>
+                {tier === 'free' ? 'Free' : tier === 'lifetime' ? 'Lifetime' : 'Gold'}
+              </span>
+            )
           }
         />
-        {tier === 'free' ? (
+        {/* No new plan is offered while a payment is past due, and nothing to buy or bill while an App Store plan may still renew. */}
+        {planUnknown || banner?.kind === 'app-store' || (banner?.kind === 'payment-issue' && tier === 'free') ? null : tier === 'free' ? (
           <Row
             title={<span className="font-semibold text-gold">Try Gold free for a week</span>}
             detail="30 questions a day with Troy, your morning brief, full vault data and more"
             onClick={() => openTrial({ campaign: 'webapp-settings' })}
           />
         ) : (
-          tier === 'gold' &&
           user && (
             <Row
-              title={billingBusy ? 'Opening the billing page' : 'Change plan or cancel'}
-              detail="Bought on the web? This opens Stripe. Bought in the app? Your iPhone's settings handle it."
+              title={billingBusy ? 'Opening the billing page' : tier === 'lifetime' ? 'Billing and receipts' : 'Change plan or cancel'}
+              detail={
+                tier === 'lifetime'
+                  ? 'Bought on the web? This opens Stripe, with your receipt and any older subscription still billing.'
+                  : "Bought on the web? This opens Stripe. Bought in the app? Your iPhone's settings handle it."
+              }
               onClick={() => void manageBilling()}
             />
           )
@@ -285,8 +407,22 @@ export default function Settings() {
       <Section title="Your stack">
         <Row
           title="Download as a spreadsheet"
-          detail={holdings.length ? `${holdings.length} ${holdings.length === 1 ? 'holding' : 'holdings'}, as CSV` : 'Nothing to download yet'}
-          onClick={holdings.length ? () => downloadText(`troystack-stack-${todayET()}.csv`, holdingsToCSV(holdings), 'text/csv') : undefined}
+          detail={
+            holdings.length
+              ? `${holdings.length} ${holdings.length === 1 ? 'holding' : 'holdings'}, as CSV`
+              : stackLoading
+                ? 'Loading your stack'
+                : stackError
+                  ? "Your stack didn't load. Tap to try again."
+                  : 'Nothing to download yet'
+          }
+          onClick={
+            holdings.length
+              ? () => downloadText(`troystack-stack-${todayET()}.csv`, holdingsToCSV(holdings), 'text/csv')
+              : stackError && !stackLoading
+                ? () => void reloadStack()
+                : undefined
+          }
         />
         <Row title="Import a spreadsheet" detail="CSV or Excel, from another tracker or your own sheet" href="/stack?import=1" />
         {isGuest && holdings.length > 0 && (
@@ -316,10 +452,9 @@ export default function Settings() {
           </Button>
           <Button
             variant="danger"
-            onClick={async () => {
-              await signOut();
+            onClick={() => {
               setSignOutOpen(false);
-              navigate('/');
+              requestSignOut();
             }}
           >
             Sign out
@@ -346,7 +481,7 @@ export default function Settings() {
         </div>
       </Sheet>
 
-      <Sheet open={credsOpen} onClose={() => setCredsOpen(false)} title={hasEmail ? 'Change email or password' : 'Add an email and password'} width="sm">
+      <Sheet open={credsOpen} onClose={closeCreds} title={hasEmail ? 'Change email or password' : 'Add an email and password'} width="sm">
         <form onSubmit={(e) => void saveCreds(e)} className="space-y-4">
           <Field label="New email" hint={user?.email ? `Now ${user.email}` : undefined} htmlFor="s-email">
             <Input id="s-email" type="email" autoComplete="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
@@ -359,11 +494,18 @@ export default function Settings() {
               {credsError}
             </p>
           )}
+          {savingCreds && (
+            <p className="text-[13px] text-fg-2" role="status">
+              Saving. This closes once it's done.
+            </p>
+          )}
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setCredsOpen(false)}>
+            <Button variant="secondary" onClick={closeCreds} disabled={savingCreds}>
               Cancel
             </Button>
-            <Button type="submit">Save</Button>
+            <Button type="submit" disabled={savingCreds}>
+              {savingCreds ? 'Saving' : 'Save'}
+            </Button>
           </div>
         </form>
       </Sheet>

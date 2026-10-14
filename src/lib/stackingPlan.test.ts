@@ -49,6 +49,24 @@ describe('stacking plan', () => {
     expect(result.ounces).toBeCloseTo(4 * (110 / 11), 6);
   });
 
+  it('has no value for today without a live price, instead of using an old sample', () => {
+    const points = [point('2020-01-01', 20), point('2020-04-01', 10)];
+    for (const spot of [0, null]) {
+      const result = runPlan(points, 'silver', 100, 2020, 0, spot, now)!;
+      expect(result.value).toBeNull();
+      expect(result.months).toBe(4);
+      // The chart ends on the first of this month at that day's price.
+      expect(result.series[result.series.length - 1].v).toBeCloseTo(result.ounces * 10, 6);
+    }
+  });
+
+  it('values the last point at the live price when there is one', () => {
+    const points = [point('2020-01-01', 20), point('2020-04-01', 10)];
+    const result = runPlan(points, 'silver', 100, 2020, 0, 12, now)!;
+    expect(result.value).toBeCloseTo(result.ounces * 12, 6);
+    expect(result.series[result.series.length - 1].v).toBeCloseTo(result.ounces * 12, 6);
+  });
+
   it('has nothing to show without history or an amount', () => {
     expect(runPlan([], 'silver', 100, 2020, 0, 10, now)).toBeNull();
     expect(runPlan([point('2020-01-01', 10)], 'silver', 0, 2020, 0, 10, now)).toBeNull();

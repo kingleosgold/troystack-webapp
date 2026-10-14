@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Copy, KeyRound } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { useAccountChange } from '../hooks/useAccountChange';
+import { stillSignedInAs } from '../lib/account';
 import { generateApiKey, listApiKeys, revokeApiKey, type ApiKey, type GeneratedApiKey } from '../services/api';
 import { SUPPORT_EMAIL } from '../lib/appStore';
 import { formatShortDate } from '../lib/text';
@@ -50,7 +52,8 @@ export default function DeveloperKeys() {
   const { user, session, isConfigured } = useAuth();
   const token = session?.access_token;
   const qc = useQueryClient();
-  const [created, setCreated] = useState<GeneratedApiKey | null>(null);
+  // A new key, shown once, and only to the account it was made for.
+  const [created, setCreated] = useState<{ owner: string; key: GeneratedApiKey } | null>(null);
   const [revoking, setRevoking] = useState<ApiKey | null>(null);
 
   const keys = useQuery({
@@ -59,20 +62,41 @@ export default function DeveloperKeys() {
     enabled: Boolean(user && token),
   });
 
-  const generate = useMutation({
+  // A key made for one account isn't shown once another has signed in, here
+  // or in another tab. It's on the first account's list, where it can be revoked.
+  const generate = useMutation<GeneratedApiKey, Error, string>({
     mutationFn: () => generateApiKey(token!),
-    onSuccess: (k) => {
-      setCreated(k);
-      void qc.invalidateQueries({ queryKey: ['api-keys', user?.id] });
+    onSuccess: (k, owner) => {
+      void qc.invalidateQueries({ queryKey: ['api-keys', owner] });
+      if (stillSignedInAs(owner)) setCreated({ owner, key: k });
     },
   });
 
+  // Set the moment a revoke starts, so a close that lands before the sheet
+  // redraws is held back too. The sheet stays open until the answer says how it went.
+  const revokingNow = useRef(false);
   const revoke = useMutation({
-    mutationFn: (id: string) => revokeApiKey(token!, id),
-    onSuccess: (_d, id) => {
-      qc.setQueryData<ApiKey[]>(['api-keys', user?.id], (prev) => (prev ?? []).filter((k) => k.id !== id));
-      setRevoking(null);
+    mutationFn: ({ id }: { id: string; owner: string }) => revokeApiKey(token!, id),
+    onSuccess: (_d, { id, owner }) => {
+      qc.setQueryData<ApiKey[]>(['api-keys', owner], (prev) => (prev ?? []).filter((k) => k.id !== id));
+      revokingNow.current = false;
+      if (stillSignedInAs(owner)) setRevoking(null);
     },
+    onSettled: () => {
+      revokingNow.current = false;
+    },
+  });
+  const closeRevoke = () => {
+    if (!revokingNow.current) setRevoking(null);
+  };
+
+  // Sheets and notes about one account's keys go when another account signs in.
+  useAccountChange(() => {
+    revokingNow.current = false;
+    setCreated(null);
+    setRevoking(null);
+    generate.reset();
+    revoke.reset();
   });
 
   return (
@@ -106,7 +130,7 @@ export default function DeveloperKeys() {
               </a>
               .
             </p>
-            <Button onClick={() => generate.mutate()} disabled={generate.isPending}>
+            <Button onClick={() => user && generate.mutate(user.id)} disabled={generate.isPending}>
               {generate.isPending ? 'Making a key' : 'New key'}
             </Button>
           </div>
@@ -165,18 +189,26 @@ export default function DeveloperKeys() {
         </div>
       )}
 
-      {created && <NewKeySheet created={created} onClose={() => setCreated(null)} />}
+      {created && created.owner === user?.id && <NewKeySheet created={created.key} onClose={() => setCreated(null)} />}
       {revoking && (
-        <Sheet open onClose={() => setRevoking(null)} title="Revoke this key?" width="sm">
+        <Sheet open onClose={closeRevoke} title="Revoke this key?" width="sm">
           <p className="text-[14px] text-fg-2">
             Anything using the key ending in <span className="font-mono text-fg">{revoking.key_preview}</span> stops working right away. This can't be undone.
           </p>
           {revoke.error && <p className="mt-3 text-[13px] text-down">{(revoke.error as Error).message}</p>}
           <div className="mt-5 flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setRevoking(null)} disabled={revoke.isPending}>
+            <Button variant="secondary" onClick={closeRevoke} disabled={revoke.isPending}>
               Keep it
             </Button>
-            <Button variant="danger" onClick={() => revoke.mutate(revoking.id)} disabled={revoke.isPending}>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (!user || revokingNow.current) return;
+                revokingNow.current = true;
+                revoke.mutate({ id: revoking.id, owner: user.id });
+              }}
+              disabled={revoke.isPending}
+            >
               {revoke.isPending ? 'Revoking' : 'Revoke'}
             </Button>
           </div>
