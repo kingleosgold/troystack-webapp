@@ -2,30 +2,46 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>TroyStack | Gold and silver prices, your stack, and Troy</title>
+    <meta name="description" content="Live gold and silver prices, the day's metals news, and Troy, an AI analyst you can ask anything. Track your stack free on the web and on iPhone." />
+    <link rel="canonical" href="https://troystack.ai/" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="apple-itunes-app" content="app-id=6757343766" />
-    <meta name="theme-color" content="#0A0A0E" />
-    <title>TroyStack</title>
-    <meta name="description" content="Track your precious metals portfolio — gold, silver, platinum, palladium." />
+    <link rel="preconnect" href="https://api.troystack.ai" crossorigin />
+    <meta name="apple-itunes-app" content="app-id=6757343766, affiliate-data=pt=96487801&amp;ct=webapp-smartbanner" />
+    <meta name="theme-color" content="#0b0b0d" />
+    <meta name="color-scheme" content="dark light" />
     <meta property="og:site_name" content="TroyStack" />
-    <meta property="og:title" content="TroyStack" />
-    <meta property="og:description" content="Track your precious metals portfolio — gold, silver, platinum, palladium." />
-    <meta property="og:image" content="/troy-avatar.png" />
     <meta property="og:type" content="website" />
-    <!-- Prevent flash of wrong theme -->
+    <meta property="og:url" content="https://troystack.ai/" />
+    <meta property="og:title" content="TroyStack | Gold and silver prices, your stack, and Troy" />
+    <meta property="og:description" content="Live gold and silver prices, the day's metals news, and Troy, an AI analyst you can ask anything." />
+    <meta property="og:image" content="https://troystack.ai/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TroyStack | Gold and silver prices, your stack, and Troy" />
+    <meta name="twitter:description" content="Live gold and silver prices, the day's metals news, and Troy, an AI analyst you can ask anything." />
+    <meta name="twitter:image" content="https://troystack.ai/og-image.png" />
+    <!-- Set the theme before first paint so there's no flash -->
     <script>
-      (function() {
-        var t = localStorage.getItem('stacktracker_theme') || 'system';
-        var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        if (!dark) document.documentElement.classList.remove('dark');
+      (function () {
+        try {
+          var t = localStorage.getItem('stacktracker_theme') || 'dark';
+          var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (!dark) {
+            document.documentElement.classList.remove('dark');
+            document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f6f4ee');
+          }
+        } catch (e) {}
       })();
     </script>
   </head>
   <body>
+    <noscript>TroyStack needs JavaScript to show live prices and talk to Troy.</noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

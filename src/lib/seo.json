@@ -1,0 +1,78 @@
+{
+  "/": {
+    "title": "TroyStack: live gold and silver prices, with Troy",
+    "description": "Live spot for gold, silver, platinum and palladium, Troy's daily read on the market, the Stack Signal podcast, and your stack at today's prices."
+  },
+  "/troy": {
+    "title": "Ask Troy, the AI analyst for gold and silver stackers",
+    "description": "Ask Troy what moved gold and silver today, what a coin is worth, or how your stack is doing. Three free questions a day."
+  },
+  "/stack": {
+    "title": "My stack",
+    "description": "Your gold, silver, platinum and palladium at live spot, with cost basis and gain. Free, and it syncs with the TroyStack app."
+  },
+  "/signal": {
+    "title": "The Signal: gold and silver news with Troy's read",
+    "description": "Troy reads the precious metals news all day and writes what each story means for people who hold physical gold and silver."
+  },
+  "/podcast": {
+    "title": "The Stack Signal podcast: a daily gold and silver brief",
+    "description": "Troy's morning brief on gold and silver, a few minutes long, every day. Listen here or on Apple Podcasts."
+  },
+  "/vault": {
+    "title": "COMEX Vault Watch: registered and eligible gold and silver",
+    "description": "Daily COMEX warehouse stocks for gold, silver, platinum and palladium: registered metal ready for delivery, eligible metal in storage, and the day's change."
+  },
+  "/tools": {
+    "title": "Precious metals calculators and tools",
+    "description": "Free melt value and junk silver calculators, a what-if tool for your stack, monthly stacking history since 1970, and the gold/silver ratio."
+  },
+  "/tools/melt": {
+    "title": "Melt value calculator for gold and silver coins",
+    "description": "Work out the melt value of any gold, silver, platinum or palladium coin, round or bar at live spot, including pre-1933 US gold and pre-1965 silver."
+  },
+  "/tools/junk-silver": {
+    "title": "Junk silver calculator, pre-1965 coin melt value",
+    "description": "Melt value of pre-1965 US silver dimes, quarters and halves, 40% Kennedys, war nickels and Morgan dollars at live silver spot, by the coin or by face value."
+  },
+  "/tools/what-if": {
+    "title": "What if gold or silver hit your number",
+    "description": "Pick a price for gold, silver, platinum and palladium and see what your stack, or any amount of metal, would be worth."
+  },
+  "/tools/stacking-history": {
+    "title": "Stacking history: monthly gold and silver buying since 1970",
+    "description": "See what buying a set dollar amount of gold or silver every month from any year since 1970 would be worth today, at spot or with a dealer premium."
+  },
+  "/tools/ratio": {
+    "title": "Gold to silver ratio today, with history",
+    "description": "How many ounces of silver one ounce of gold buys at live spot, with the ratio charted over one year, five years and back to 1915."
+  },
+  "/dealers": {
+    "title": "Where to buy gold and silver online",
+    "description": "Bullion dealers TroyStack links to, and what to compare before you order: premium per ounce, payment method, shipping and buyback."
+  },
+  "/app": {
+    "title": "TroyStack for iPhone",
+    "description": "Track your gold and silver at live spot, set price alerts, scan dealer receipts, and talk to Troy. Free to download, with a free week of Gold."
+  },
+  "/developers": {
+    "title": "TroyStack API and MCP server for precious metals data",
+    "description": "Live gold and silver prices, history, COMEX vault data and Stack Signal stories, over a REST API or an MCP server you can add to Claude or Cursor."
+  },
+  "/prices/gold": {
+    "title": "Gold price today, live spot and charts",
+    "description": "Live gold spot price per troy ounce with today's move and charts from 24 hours back to the long-run history."
+  },
+  "/prices/silver": {
+    "title": "Silver price today, live spot and charts",
+    "description": "Live silver spot price per troy ounce with today's move and charts from 24 hours back to the long-run history."
+  },
+  "/prices/platinum": {
+    "title": "Platinum price today, live spot and charts",
+    "description": "Live platinum spot price per troy ounce with today's move and charts from 24 hours back to the long-run history."
+  },
+  "/prices/palladium": {
+    "title": "Palladium price today, live spot and charts",
+    "description": "Live palladium spot price per troy ounce with today's move and charts from 24 hours back to the long-run history."
+  }
+}
