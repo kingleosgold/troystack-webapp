@@ -85,3 +85,34 @@ test("a deletion still going when another account signs in leaves nothing typed 
   await expect(page.getByRole('dialog', { name: 'Delete your account?' }).getByRole('button', { name: 'Delete my account' })).toBeDisabled();
   expect(api.accountDeletes).toHaveLength(1);
 });
+
+test('choosing to keep the account clears what was typed, so deleting needs it typed again', async ({ page }) => {
+  await signIn(page);
+  const api = await mockBackends(page);
+  await page.goto('/delete-account');
+  await page.getByRole('button', { name: 'Delete my account' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Delete your account?' });
+  await sheet.getByLabel('Type DELETE').fill('DELETE');
+  await sheet.getByRole('button', { name: 'Keep my account' }).click();
+  await expect(sheet).toHaveCount(0);
+  await page.getByRole('button', { name: 'Delete my account' }).click();
+  await expect(page.getByLabel('Type DELETE')).toHaveValue('');
+  await expect(page.getByRole('dialog', { name: 'Delete your account?' }).getByRole('button', { name: 'Delete my account' })).toBeDisabled();
+  expect(api.accountDeletes).toHaveLength(0);
+});
+
+test('a deletion that never answers gives up, says so, and lets the sheet close', async ({ page }) => {
+  test.setTimeout(60_000);
+  await signIn(page);
+  await mockBackends(page);
+  await page.goto('/delete-account');
+  await page.getByRole('button', { name: 'Delete my account' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Delete your account?' });
+  await sheet.getByLabel('Type DELETE').fill('DELETE');
+  await holdRequests(page, (u) => u.pathname === '/v1/account', 'DELETE');
+  await sheet.getByRole('button', { name: 'Delete my account' }).click();
+  await expect(sheet.getByRole('button', { name: 'Deleting' })).toBeVisible();
+  await expect(sheet.getByText("Your account couldn't be deleted just now.")).toBeVisible({ timeout: 30_000 });
+  await sheet.getByRole('button', { name: 'Keep my account' }).click();
+  await expect(sheet).toHaveCount(0);
+});

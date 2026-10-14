@@ -34,6 +34,14 @@ export default function DeleteAccount() {
     setError(null);
   });
 
+  // Closing the sheet drops what was typed, so it's typed again to delete.
+  const close = () => {
+    if (busy) return;
+    setOpen(false);
+    setTyped('');
+    setError(null);
+  };
+
   const confirm = async () => {
     const token = session?.access_token;
     const userId = user?.id;
@@ -126,7 +134,7 @@ export default function DeleteAccount() {
         )}
       </section>
 
-      <Sheet open={open} onClose={() => !busy && setOpen(false)} title="Delete your account?" width="sm">
+      <Sheet open={open} onClose={close} title="Delete your account?" width="sm">
         <p className="text-[14px] text-fg-2">
           This deletes {user?.email ?? 'your account'} and everything it holds. Type {CONFIRM_WORD} to confirm.
         </p>
@@ -139,7 +147,7 @@ export default function DeleteAccount() {
           </p>
         )}
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setOpen(false)} disabled={busy}>
+          <Button variant="secondary" onClick={close} disabled={busy}>
             Keep my account
           </Button>
           <Button variant="danger" onClick={confirm} disabled={busy || typed.trim() !== CONFIRM_WORD}>
