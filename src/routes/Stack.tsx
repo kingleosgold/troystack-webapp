@@ -233,7 +233,8 @@ export default function Stack() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [start, setStart] = useState<HoldingStart | null>(null);
   // A coin page's hand-off whose lookup is still loading. Opening or closing
-  // the form by hand cancels it, so a late lookup never reopens the form.
+  // the form by hand, or another account signing in, cancels it, so a late
+  // lookup never reopens the form.
   const pendingCoinRef = useRef<string | null>(null);
   const openEditor = (holding: Holding | null) => {
     pendingCoinRef.current = null;
@@ -254,6 +255,7 @@ export default function Stack() {
   // signs in, here or in another tab, or this one signs out, they go, so
   // nothing from one account is shown to or saved into another.
   useAccountChange(() => {
+    pendingCoinRef.current = null;
     setEditorOpen(false);
     setEditing(null);
     setImportRows(null);

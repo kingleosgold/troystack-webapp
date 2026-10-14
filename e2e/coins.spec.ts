@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { mockBackends, signIn } from './mock';
+import { mockBackends, signIn, signInElsewhere } from './mock';
 
 // Coin and bar values, gram and karat prices. Split from site.spec.ts so the
 // two files' tests don't collide when branches add to them.
@@ -276,6 +276,27 @@ test('the count on a coin page starts at one on the next coin', async ({ page })
   await page.getByRole('link', { name: /Peace silver dollar/ }).first().click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Peace silver dollar');
   await expect(page.getByLabel('How many')).toHaveValue('1');
+});
+
+test("a coin's add form that loads late doesn't open once another account has signed in", async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page);
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  let asked = false;
+  await page.route(/\/assets\/coins-[^/]+\.js$/, async (route) => {
+    asked = true;
+    await gate;
+    await route.fallback();
+  });
+  await page.goto('/stack?add=1&coin=morgan-silver-dollar');
+  await expect.poll(() => asked).toBe(true);
+  await signInElsewhere(page);
+  release();
+  await page.waitForTimeout(800);
+  await expect(page.getByRole('dialog', { name: 'Add a holding' })).toHaveCount(0);
 });
 
 test("a coin's add form that loads late doesn't reopen after the form was used by hand", async ({ page }) => {
