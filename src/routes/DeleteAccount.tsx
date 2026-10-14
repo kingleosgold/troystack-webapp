@@ -26,9 +26,9 @@ export default function DeleteAccount() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  // The sheet belongs to the account that opened it.
+  // The sheet and what was typed in it belong to the account that opened it,
+  // so another account signing in closes it, even mid-request.
   useAccountChange(() => {
-    if (busy) return;
     setOpen(false);
     setTyped('');
     setError(null);
@@ -42,11 +42,14 @@ export default function DeleteAccount() {
     setError(null);
     try {
       await deleteAccount(token);
+      // Another account signed in meanwhile. The page is that account's now.
+      if (!stillSignedInAs(userId)) return;
       setDone(true);
       setOpen(false);
-      // The account is gone, so the browser lets go of it and what it kept here.
-      if (stillSignedInAs(userId)) await signOut();
+      // The account is gone, so the browser signs out as it does from Settings.
+      await signOut();
     } catch (e) {
+      if (!stillSignedInAs(userId)) return;
       if (e instanceof ApiError && e.status === 409) {
         setError(typeof e.body.message === 'string' ? e.body.message : 'Cancel your Gold plan in Settings first, then delete your account.');
       } else if (e instanceof ApiError && e.status === 401) {
@@ -82,7 +85,8 @@ export default function DeleteAccount() {
         <h2 className="pt-3 text-[17px] font-semibold text-fg">What's kept</h2>
         <p>
           If you paid on troystack.ai, Stripe keeps its record of the payments, as the law requires. A report you filed on one of Troy's replies
-          stays for review without your account on it. A stack saved only in this browser stays in this browser until you clear it in Settings.
+          stays for review without your account on it. This browser then signs out the way it does from Settings, which clears the stack it
+          kept here.
         </p>
 
         <h2 className="pt-3 text-[17px] font-semibold text-fg">Subscriptions</h2>

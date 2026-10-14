@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { mockBackends, signIn, signInElsewhere } from './mock';
+import { holdRequests, mockBackends, signIn, signInElsewhere } from './mock';
 
 test('the deletion page explains itself to someone who is not signed in, and offers sign-in', async ({ page }) => {
   await mockBackends(page);
   await page.goto('/delete-account');
   await expect(page.getByRole('heading', { name: 'Delete your TroyStack account' })).toBeVisible();
+  await expect(page.getByText('This browser then signs out the way it does from Settings')).toBeVisible();
   await expect(page.getByText("Deleting your account doesn't cancel a subscription you bought through the App Store or Google Play")).toBeVisible();
   await expect(page.getByRole('link', { name: 'support@troystack.com' })).toHaveAttribute('href', /^mailto:support@troystack\.com/);
   await expect(page.getByRole('link', { name: 'Sign in' }).last()).toHaveAttribute('href', '/auth?next=/delete-account');
@@ -61,4 +62,26 @@ test('Settings links to the deletion page', async ({ page }) => {
   await page.goto('/settings');
   await page.getByRole('link', { name: 'Delete account' }).click();
   await expect(page).toHaveURL(/\/delete-account$/);
+});
+
+test("a deletion still going when another account signs in leaves nothing typed for that account to confirm", async ({ page }) => {
+  await signIn(page);
+  const api = await mockBackends(page, { deleteAccount: { status: 500, body: { error: 'failed' } } });
+  await page.goto('/delete-account');
+  await page.getByRole('button', { name: 'Delete my account' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Delete your account?' });
+  await sheet.getByLabel('Type DELETE').fill('DELETE');
+  const pending = await holdRequests(page, (u) => u.pathname === '/v1/account', 'DELETE');
+  await sheet.getByRole('button', { name: 'Delete my account' }).click();
+  await expect.poll(() => pending.seen.length).toBe(1);
+  await signInElsewhere(page);
+  await expect(sheet).toHaveCount(0);
+  pending.release();
+  await page.waitForTimeout(800);
+  await expect(sheet).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Delete my account' }).click();
+  await expect(page.getByLabel('Type DELETE')).toHaveValue('');
+  await expect(page.getByRole('dialog', { name: 'Delete your account?' }).getByRole('button', { name: 'Delete my account' })).toBeDisabled();
+  expect(api.accountDeletes).toHaveLength(1);
 });
