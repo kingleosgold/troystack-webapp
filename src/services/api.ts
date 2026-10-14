@@ -1,4 +1,4 @@
-import { ApiError, getJson, postJson, API_BASE } from '../lib/apiClient';
+import { ApiError, deleteJson, getJson, postJson, API_BASE } from '../lib/apiClient';
 
 /** Asks the API for this account's plan. Best effort, called once after sign-in. */
 export async function syncSubscription(userId: string): Promise<{ subscription_tier?: string; subscription_status?: string | null }> {
@@ -50,14 +50,11 @@ export async function revokeApiKey(token: string, id: string): Promise<void> {
   }
 }
 
-/** Deletes the signed-in account and everything kept for it. */
+/**
+ * Deletes the signed-in account and everything kept for it. Like every API
+ * call it gives up after 20 seconds, so a stalled connection can't hold the
+ * page busy.
+ */
 export async function deleteAccount(token: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/v1/account`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new ApiError(body.message || body.error || `Delete failed (${res.status})`, res.status, body);
-  }
+  await deleteJson('/v1/account', { token });
 }

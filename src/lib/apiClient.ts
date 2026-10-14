@@ -69,3 +69,7 @@ export function postJson<T>(path: string, body: unknown, opts?: RequestOptions):
     opts,
   );
 }
+
+export function deleteJson<T>(path: string, opts?: RequestOptions): Promise<T> {
+  return request<T>(path, { method: 'DELETE' }, opts);
+}
