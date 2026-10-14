@@ -21,6 +21,7 @@ export type Campaign =
   | 'webapp-alerts'
   | 'webapp-stack'
   | 'webapp-tools'
+  | 'webapp-coins'
   | 'webapp-vault'
   | 'webapp-getapp'
   | 'webapp-footer'

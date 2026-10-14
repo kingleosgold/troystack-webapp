@@ -400,6 +400,7 @@ export function Footer() {
             <Link to="/signal" className="text-fg-2 hover:text-fg">The Signal</Link>
             <Link to="/podcast" className="text-fg-2 hover:text-fg">Podcast</Link>
             <Link to="/tools" className="text-fg-2 hover:text-fg">Tools</Link>
+            <Link to="/coins" className="text-fg-2 hover:text-fg">Coin values</Link>
             <Link to="/vault" className="text-fg-2 hover:text-fg">Vault Watch</Link>
             <Link to="/dealers" className="text-fg-2 hover:text-fg">Where to Buy</Link>
             <Link to="/app" className="text-fg-2 hover:text-fg">iPhone app</Link>

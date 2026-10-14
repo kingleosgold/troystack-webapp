@@ -18,6 +18,8 @@ const ToolJunkSilver = lazy(() => import('./routes/ToolJunkSilver'));
 const ToolWhatIf = lazy(() => import('./routes/ToolWhatIf'));
 const ToolStackingHistory = lazy(() => import('./routes/ToolStackingHistory'));
 const ToolRatio = lazy(() => import('./routes/ToolRatio'));
+const Coins = lazy(() => import('./routes/Coins'));
+const Coin = lazy(() => import('./routes/Coin'));
 const Dealers = lazy(() => import('./routes/Dealers'));
 const GetApp = lazy(() => import('./routes/GetApp'));
 const Settings = lazy(() => import('./routes/Settings'));
@@ -63,6 +65,8 @@ export default function App() {
           <Route path="tools/what-if" element={<ToolWhatIf />} />
           <Route path="tools/stacking-history" element={<ToolStackingHistory />} />
           <Route path="tools/ratio" element={<ToolRatio />} />
+          <Route path="coins" element={<Coins />} />
+          <Route path="coins/:slug" element={<Coin />} />
           <Route path="dealers" element={<Dealers />} />
           <Route path="app" element={<GetApp />} />
           <Route path="settings" element={<Settings />} />
