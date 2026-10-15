@@ -14,6 +14,7 @@ import { METALS, METAL_LABEL, METAL_VAR, OZT_PER_GRAM, OZT_PER_KG } from '../lib
 import { lineCostBasis, lineOz, lineValue, stackTotals } from '../lib/stackMath';
 import { money, num, oz as fmtOz, signedMoney, signedPercent } from '../lib/format';
 import { getJson, postJson } from '../lib/apiClient';
+import { sessionToken } from '../lib/supabase';
 import { parseSpreadsheet } from '../lib/parseSpreadsheet';
 import { holdingsToCSV } from '../services/holdings';
 import type { Holding, HoldingFormData, Metal } from '../types/holding';
@@ -44,7 +45,8 @@ function StackHistory({ userId }: { userId: string }) {
   const { isGold } = useSubscription();
   const q = useQuery({
     queryKey: ['snapshots', userId, range],
-    queryFn: ({ signal }) => getJson<{ snapshots?: Snapshot[] }>(`/v1/snapshots/${userId}?range=${range}`, { signal }),
+    queryFn: async ({ signal }) =>
+      getJson<{ snapshots?: Snapshot[] }>(`/v1/snapshots/${userId}?range=${range}`, { signal, token: await sessionToken() }),
     enabled: isGold,
     staleTime: 10 * 60_000,
   });
@@ -166,22 +168,29 @@ function useDailySnapshot(userId: string | undefined, holdings: Holding[], spot:
     }
     sentFor.current = mark;
     const totals = stackTotals(holdings, prices);
-    postJson('/v1/snapshots', {
-      userId,
-      totalValue: totals.value,
-      goldValue: totals.byMetal.gold.value,
-      silverValue: totals.byMetal.silver.value,
-      platinumValue: totals.byMetal.platinum.value,
-      palladiumValue: totals.byMetal.palladium.value,
-      goldOz: totals.byMetal.gold.oz,
-      silverOz: totals.byMetal.silver.oz,
-      platinumOz: totals.byMetal.platinum.oz,
-      palladiumOz: totals.byMetal.palladium.oz,
-      goldSpot: prices.gold,
-      silverSpot: prices.silver,
-      platinumSpot: prices.platinum,
-      palladiumSpot: prices.palladium,
-    })
+    sessionToken()
+      .then((token) =>
+        postJson(
+          '/v1/snapshots',
+          {
+            userId,
+            totalValue: totals.value,
+            goldValue: totals.byMetal.gold.value,
+            silverValue: totals.byMetal.silver.value,
+            platinumValue: totals.byMetal.platinum.value,
+            palladiumValue: totals.byMetal.palladium.value,
+            goldOz: totals.byMetal.gold.oz,
+            silverOz: totals.byMetal.silver.oz,
+            platinumOz: totals.byMetal.platinum.oz,
+            palladiumOz: totals.byMetal.palladium.oz,
+            goldSpot: prices.gold,
+            silverSpot: prices.silver,
+            platinumSpot: prices.platinum,
+            palladiumSpot: prices.palladium,
+          },
+          { token },
+        ),
+      )
       .then(() => {
         try {
           localStorage.setItem(key, day);
