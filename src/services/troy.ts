@@ -1,9 +1,12 @@
 import { ApiError, getJson, postJson, API_BASE } from '../lib/apiClient';
+import { sessionToken } from '../lib/supabase';
 
 /**
  * Troy chat. Signed-in calls use the same endpoints and the same Supabase
  * user id as the iPhone app, so conversations are shared between the two.
  * Visitors who haven't signed in use /v1/troy/ask, which keeps nothing.
+ * Signed-in calls carry the session token, so the API can check the user id
+ * is the account that sent it.
  */
 
 export interface TroyMessage {
@@ -70,25 +73,32 @@ function quotaFrom(err: ApiError): Quota {
   };
 }
 
+function authHeader(token: string | undefined): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function createConversation(userId: string): Promise<TroyConversationSummary> {
-  return postJson('/v1/troy/conversations', { userId });
+  return postJson('/v1/troy/conversations', { userId }, { token: await sessionToken() });
 }
 
 export async function listConversations(userId: string): Promise<TroyConversationSummary[]> {
   const res = await getJson<{ conversations?: TroyConversationSummary[] } | TroyConversationSummary[]>(
     `/v1/troy/conversations?userId=${encodeURIComponent(userId)}`,
+    { token: await sessionToken() },
   );
   return Array.isArray(res) ? res : res.conversations ?? [];
 }
 
 export async function getConversation(conversationId: string, userId: string): Promise<TroyConversation> {
-  return getJson(`/v1/troy/conversations/${encodeURIComponent(conversationId)}?userId=${encodeURIComponent(userId)}`);
+  return getJson(`/v1/troy/conversations/${encodeURIComponent(conversationId)}?userId=${encodeURIComponent(userId)}`, {
+    token: await sessionToken(),
+  });
 }
 
 export async function deleteConversation(conversationId: string, userId: string): Promise<void> {
   const res = await fetch(
     `${API_BASE}/v1/troy/conversations/${encodeURIComponent(conversationId)}?userId=${encodeURIComponent(userId)}`,
-    { method: 'DELETE' },
+    { method: 'DELETE', headers: authHeader(await sessionToken()) },
   );
   if (!res.ok) throw new ApiError(`Delete failed (${res.status})`, res.status);
 }
@@ -103,7 +113,7 @@ export async function sendMessage(
     return await postJson<SendMessageResponse>(
       `/v1/troy/conversations/${encodeURIComponent(conversationId)}/messages`,
       { userId, message },
-      { signal, timeoutMs: 90000 },
+      { signal, timeoutMs: 90000, token: await sessionToken() },
     );
   } catch (err) {
     if (err instanceof ApiError && err.status === 403 && err.body.questionsLimit != null) {
