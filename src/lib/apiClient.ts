@@ -32,6 +32,10 @@ async function request<T>(path: string, init: RequestInit, { signal, timeoutMs =
   const onAbort = () => controller.abort();
   signal?.addEventListener('abort', onAbort);
   try {
+    // A caller may have stopped while it was still getting ready, such as
+    // while a session token refreshed, and an abort listener added now
+    // wouldn't hear that, so the request would still go out.
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     const res = await fetch(path.startsWith('http') ? path : `${API_BASE}${path}`, { ...init, signal: controller.signal });
     const isJson = (res.headers.get('content-type') || '').includes('application/json');
     const body = isJson ? await res.json().catch(() => ({})) : await res.text();
