@@ -18,7 +18,7 @@ const PRICE_IDS: Record<WebPlan, string> = {
 export const WEB_PLANS: Array<{ id: WebPlan; label: string; price: string; per: string; note?: string }> = [
   { id: 'yearly', label: 'Yearly', price: '$39.99', per: 'a year', note: 'Save 33%' },
   { id: 'monthly', label: 'Monthly', price: '$4.99', per: 'a month' },
-  { id: 'lifetime', label: 'Lifetime', price: '$149.99', per: 'once' },
+  { id: 'lifetime', label: 'Lifetime', price: '$99.99', per: 'once' },
 ];
 
 export function isWebPlan(v: unknown): v is WebPlan {
