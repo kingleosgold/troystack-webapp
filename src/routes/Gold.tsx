@@ -5,7 +5,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { useTrial } from '../contexts/TrialContext';
 import SEO from '../lib/seo.json';
 import { GOLD } from '../lib/appStore';
-import { WEB_PLANS, type WebPlan } from '../lib/checkout';
+import { goldPagePlans, type WebPlan } from '../lib/checkout';
 import { GOLD_FEATURES } from '../lib/gold';
 import { cx } from '../lib/cx';
 import { Button, Card } from '../ui/primitives';
@@ -33,6 +33,7 @@ export default function Gold() {
   const { isGold, tier, loading } = useSubscription();
   const { openTrial } = useTrial();
   const start = (plan?: WebPlan) => openTrial({ campaign: 'webapp-gold', plan });
+  const plans = goldPagePlans();
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-10">
@@ -51,8 +52,8 @@ export default function Gold() {
         </Card>
       ) : (
         <>
-          <div className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Plans">
-            {WEB_PLANS.map((p) => (
+          <div className={cx('mt-6 grid gap-3', plans.length >= 3 ? 'sm:grid-cols-3' : plans.length === 2 ? 'sm:grid-cols-2' : '')} aria-label="Plans">
+            {plans.map((p) => (
               <Card key={p.id} as="div" className={cx('p-5 flex flex-col', p.id === 'yearly' && 'border-gold')}>
                 <div className="flex items-center justify-between">
                   <span className="text-[14px] font-semibold text-fg">{p.label}</span>

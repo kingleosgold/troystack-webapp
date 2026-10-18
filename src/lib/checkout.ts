@@ -30,6 +30,16 @@ export function webPlans(): typeof WEB_PLANS {
   return WEB_PLANS.filter((p) => Boolean(PRICE_IDS[p.id]));
 }
 
+/**
+ * The plans the Gold page lists. Where checkout runs here, only the ones it
+ * can sell, so the plan clicked is the plan bought. Without web checkout
+ * every plan shows at its App Store price and the sheet sends people to the app.
+ */
+export function goldPagePlans(): typeof WEB_PLANS {
+  const sellable = webPlans();
+  return sellable.length > 0 ? sellable : WEB_PLANS;
+}
+
 /** Whether this plan can be bought here, or with no plan named, whether any can. */
 export function webCheckoutReady(plan?: WebPlan): boolean {
   return plan ? Boolean(PRICE_IDS[plan]) : webPlans().length > 0;
