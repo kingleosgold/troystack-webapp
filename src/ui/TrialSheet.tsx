@@ -139,9 +139,11 @@ function WebCheckout({
             type="button"
             role="radio"
             aria-checked={plan === p.id}
+            // Checkout already left with the plan it was given, so the pick holds until it answers.
+            disabled={busy}
             onClick={() => setPlan(p.id)}
             className={cx(
-              'relative rounded-xl border px-3 py-2.5 text-left transition-colors',
+              'relative rounded-xl border px-3 py-2.5 text-left transition-colors disabled:opacity-60',
               plan === p.id ? 'border-gold bg-gold-soft' : 'border-line bg-surface hover:border-line-strong',
             )}
           >

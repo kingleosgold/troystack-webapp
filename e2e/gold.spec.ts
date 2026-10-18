@@ -51,6 +51,23 @@ test('switching plans in the sheet moves its title with the plan', async ({ page
   await expect(sheet.getByRole('button', { name: 'Start my free week' })).toBeVisible();
 });
 
+test('the plans hold still while a checkout is opening', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page);
+  // Checkout answers slowly, so the sheet stays up while it opens.
+  await page.route('**/v1/stripe/create-checkout-session', async (route) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/slow' }) });
+  });
+  await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
+  await page.goto('/gold');
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet.getByRole('button', { name: 'Opening checkout' })).toBeVisible();
+  await expect(sheet.getByRole('radio', { name: /Yearly/ })).toBeDisabled();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+});
+
 test('an account with Gold sees its plan instead of prices', async ({ page }) => {
   await signIn(page);
   await mockBackends(page, { tier: 'gold' });
