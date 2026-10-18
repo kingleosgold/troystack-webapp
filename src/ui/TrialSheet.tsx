@@ -41,7 +41,20 @@ function useStillWanted(): (owner: string) => () => boolean {
   return (owner) => () => open.current && stillSignedInAs(owner);
 }
 
-function WebCheckout({ campaign, initialPlan, onClose, onBlocked }: { campaign: Campaign; initialPlan?: WebPlan; onClose: () => void; onBlocked: (block: Blocked) => void }) {
+function WebCheckout({
+  campaign,
+  initialPlan,
+  onClose,
+  onBlocked,
+  onPlanChange,
+}: {
+  campaign: Campaign;
+  initialPlan?: WebPlan;
+  onClose: () => void;
+  onBlocked: (block: Blocked) => void;
+  /** Hears the picked plan, so the sheet's title and copy can follow it */
+  onPlanChange?: (plan: WebPlan) => void;
+}) {
   const { user, session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -58,6 +71,9 @@ function WebCheckout({ campaign, initialPlan, onClose, onBlocked }: { campaign: 
   const stillWantedFor = useStillWanted();
   const chosen = plans.find((p) => p.id === plan) ?? plans[0];
   const lifetime = plan === 'lifetime';
+  useEffect(() => {
+    onPlanChange?.(plan);
+  }, [plan, onPlanChange]);
 
   const go = async () => {
     setError(null);
@@ -186,6 +202,11 @@ export function TrialSheet({ open, onClose, reason, campaign, plan }: Props) {
   const android = isAndroid();
   const web = webCheckoutReady();
   const [showWebOnIphone, setShowWebOnIphone] = useState(false);
+  // The plan picked in checkout, or the one asked for on the way in.
+  const [picked, setPicked] = useState<WebPlan | undefined>(plan);
+  // A plan picked on the way in, like a button on the Gold page, opens card
+  // checkout on that plan on an iPhone too, with the app as the other door.
+  const cardFirst = web && (!iphone || Boolean(plan));
   // What checkout said is in the way, for the account it said it about. It
   // stays until the sheet closes.
   const [blocked, setBlocked] = useState<{ userId: string; block: Blocked } | null>(null);
@@ -205,7 +226,9 @@ export function TrialSheet({ open, onClose, reason, campaign, plan }: Props) {
         ? "Your last Gold payment didn't go through"
         : block === 'app_store_renewing'
           ? 'Your App Store plan may still be renewing'
-          : 'Try Gold free for a week';
+          : picked === 'lifetime'
+            ? 'Get Gold for life'
+            : 'Try Gold free for a week';
 
   return (
     <Sheet open={open} onClose={close} title={title}>
@@ -236,7 +259,7 @@ export function TrialSheet({ open, onClose, reason, campaign, plan }: Props) {
             ))}
           </ul>
 
-          {iphone || !web ? (
+          {!cardFirst ? (
             <div className="space-y-3">
               <div className="rounded-2xl border border-line bg-surface-2 p-4">
                 <p className="text-[14px] text-fg">
@@ -248,7 +271,7 @@ export function TrialSheet({ open, onClose, reason, campaign, plan }: Props) {
               {iphone && web && (
                 showWebOnIphone ? (
                   <div className="pt-1">
-                    <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} />
+                    <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} onPlanChange={setPicked} />
                   </div>
                 ) : (
                   <button type="button" onClick={() => setShowWebOnIphone(true)} className="text-[13px] font-semibold text-gold hover:text-gold-2">
@@ -259,10 +282,14 @@ export function TrialSheet({ open, onClose, reason, campaign, plan }: Props) {
             </div>
           ) : (
             <div className="space-y-5">
-              <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} />
+              <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} onPlanChange={setPicked} />
               {!android && (
                 <div className="rounded-2xl border border-line bg-surface-2 p-4">
-                  <p className="mb-3 text-[13px] text-fg-2">Have an iPhone? Start the same free week in the app instead, and your Gold follows your account.</p>
+                  <p className="mb-3 text-[13px] text-fg-2">
+                    {picked === 'lifetime'
+                      ? `${iphone ? 'Rather use the app?' : 'Have an iPhone?'} Lifetime is in the app too, and your Gold follows your account.`
+                      : `${iphone ? 'Rather use the app?' : 'Have an iPhone?'} Start the same free week in the app instead, and your Gold follows your account.`}
+                  </p>
                   <InstallPath campaign={campaign} compact />
                 </div>
               )}
