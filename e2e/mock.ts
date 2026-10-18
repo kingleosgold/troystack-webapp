@@ -405,6 +405,8 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (url.pathname.startsWith('/auth/v1/user')) return fulfillJson(route, sessionUser());
     // Email and password sign-in on the page itself, with no reload.
     if (url.pathname === '/auth/v1/token' && req.method() === 'POST') return fulfillJson(route, sessionFor());
+    // A new email account gets its session at once, as production confirms email sign-ups.
+    if (url.pathname === '/auth/v1/signup' && req.method() === 'POST') return fulfillJson(route, sessionFor());
     if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204, headers: CORS });
     return fulfillJson(route, {});
   });

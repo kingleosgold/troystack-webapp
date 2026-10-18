@@ -58,3 +58,35 @@ test('an account with Gold sees its plan instead of prices', async ({ page }) =>
   await expect(page.getByText('You have Gold on this account.')).toBeVisible();
   await expect(page.getByLabel('Plans')).toHaveCount(0);
 });
+
+test('a new visitor goes from a plan on the Gold page through one sign-up form to Stripe', async ({ page }) => {
+  await mockBackends(page);
+  const checkouts: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/stripe/create-checkout-session') && r.method() === 'POST') checkouts.push(r.postDataJSON());
+  });
+  await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
+  await page.goto('/gold');
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Get Lifetime for $99.99' }).click();
+  // The sign-up form opens first, with one password field.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your free account');
+  await expect(page.getByLabel('Password again')).toHaveCount(0);
+  await page.getByLabel('Email').fill('new@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('a-long-password');
+  await page.getByRole('button', { name: 'Show password' }).click();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'text');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  expect(checkouts).toHaveLength(1);
+  expect(checkouts[0].price_id).toBe('price_e2e_lifetime');
+  expect(checkouts[0].campaign).toBe('webapp-gold');
+});
+
+test('someone with an account can still sign in from the checkout form', async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/auth?redirect=checkout&plan=yearly');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your free account');
+  await page.getByRole('button', { name: 'Have an account? Sign in' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to TroyStack');
+});
