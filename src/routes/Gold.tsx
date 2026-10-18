@@ -5,7 +5,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { useTrial } from '../contexts/TrialContext';
 import SEO from '../lib/seo.json';
 import { GOLD } from '../lib/appStore';
-import { goldPagePlans, type WebPlan } from '../lib/checkout';
+import { goldPagePlans, webCheckoutReady, type WebPlan } from '../lib/checkout';
 import { GOLD_FEATURES } from '../lib/gold';
 import { cx } from '../lib/cx';
 import { Button, Card } from '../ui/primitives';
@@ -32,7 +32,9 @@ export default function Gold() {
   usePageMeta({ ...SEO['/gold'], canonical: '/gold' });
   const { isGold, tier, loading } = useSubscription();
   const { openTrial } = useTrial();
-  const start = (plan?: WebPlan) => openTrial({ campaign: 'webapp-gold', plan });
+  // The card already showed the plan and its price, so where it can be bought
+  // here the button goes on to sign-up or Stripe without a second pick.
+  const start = (plan: WebPlan) => openTrial({ campaign: 'webapp-gold', plan, start: webCheckoutReady(plan) });
   const plans = goldPagePlans();
 
   return (

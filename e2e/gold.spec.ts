@@ -15,7 +15,7 @@ test('the Gold page shows the three plans at their checkout prices', async ({ pa
   await expect(page).toHaveTitle(/TroyStack Gold/);
 });
 
-test('picking Lifetime on the Gold page opens checkout with Lifetime picked', async ({ page }) => {
+test('picking Lifetime on the Gold page goes straight to Stripe on Lifetime', async ({ page }) => {
   await signIn(page);
   await mockBackends(page);
   const checkouts: Array<Record<string, unknown>> = [];
@@ -24,31 +24,31 @@ test('picking Lifetime on the Gold page opens checkout with Lifetime picked', as
   });
   await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
   await page.goto('/gold');
+  // The card already showed the plan and price, so there's no second pick.
   await page.getByRole('button', { name: 'Get Lifetime' }).click();
-  const sheet = page.getByRole('dialog');
-  // On an iPhone too, a plan picked here opens card checkout on that plan.
-  const buy = sheet.getByRole('button', { name: 'Get Lifetime for $99.99' });
-  await expect(buy).toBeVisible();
-  await expect(sheet.getByRole('button', { name: 'Rather start it here with a card?' })).toHaveCount(0);
-  await expect(sheet).toHaveAccessibleName('Get Gold for life');
-  await expect(sheet.getByText(/Lifetime is in the app too/)).toBeVisible();
-  await expect(sheet.getByRole('radio', { name: /Lifetime/ })).toHaveAttribute('aria-checked', 'true');
-  await buy.click();
   await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  expect(checkouts).toHaveLength(1);
   expect(checkouts[0].price_id).toBe('price_e2e_lifetime');
   expect(checkouts[0].campaign).toBe('webapp-gold');
 });
 
 test('switching plans in the sheet moves its title with the plan', async ({ page }) => {
+  await signIn(page);
   await mockBackends(page);
-  await page.goto('/gold');
-  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  // Settings opens the sheet with no plan picked, so it asks for one.
+  await page.goto('/settings');
+  await page.getByRole('button', { name: /Try Gold free for a week/ }).click();
   const sheet = page.getByRole('dialog');
+  await expect(sheet).toHaveAccessibleName('Try Gold free for a week');
+  // An iPhone sees the app first, with card checkout one tap away.
+  const card = sheet.getByRole('button', { name: 'Rather start it here with a card?' });
+  if (await card.isVisible()) await card.click();
+  await sheet.getByRole('radio', { name: /Lifetime/ }).click();
   await expect(sheet).toHaveAccessibleName('Get Gold for life');
+  await expect(sheet.getByRole('button', { name: 'Get Lifetime for $99.99' })).toBeVisible();
   await sheet.getByRole('radio', { name: /Yearly/ }).click();
   await expect(sheet).toHaveAccessibleName('Try Gold free for a week');
   await expect(sheet.getByRole('button', { name: 'Start my free week' })).toBeVisible();
-  await expect(sheet.getByText(/Start the same free week in the app instead/)).toBeVisible();
 });
 
 test('an account with Gold sees its plan instead of prices', async ({ page }) => {
@@ -68,8 +68,7 @@ test('a new visitor goes from a plan on the Gold page through one sign-up form t
   await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
   await page.goto('/gold');
   await page.getByRole('button', { name: 'Get Lifetime' }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Get Lifetime for $99.99' }).click();
-  // The sign-up form opens first, with one password field.
+  // The sign-up form opens next, with one password field.
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your free account');
   await expect(page.getByLabel('Password again')).toHaveCount(0);
   await page.getByLabel('Email').fill('new@example.com');
@@ -81,6 +80,15 @@ test('a new visitor goes from a plan on the Gold page through one sign-up form t
   expect(checkouts).toHaveLength(1);
   expect(checkouts[0].price_id).toBe('price_e2e_lifetime');
   expect(checkouts[0].campaign).toBe('webapp-gold');
+});
+
+test('a new visitor who picks monthly lands on sign-up with monthly kept', async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/gold');
+  await page.getByLabel('Plans').getByRole('button', { name: 'Start free week' }).nth(1).click();
+  await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=monthly/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your free account');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('someone with an account can still sign in from the checkout form', async ({ page }) => {

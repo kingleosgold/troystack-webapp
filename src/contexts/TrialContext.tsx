@@ -9,6 +9,8 @@ interface TrialRequest {
   campaign?: Campaign;
   /** The plan to have picked when the sheet opens */
   plan?: WebPlan;
+  /** The plan was already picked, so checkout starts without asking again */
+  start?: boolean;
 }
 
 interface TrialContextValue {
@@ -37,7 +39,7 @@ export function TrialProvider({ children }: { children: ReactNode }) {
   return (
     <TrialContext.Provider value={value}>
       {children}
-      <TrialSheet key={opened} open={req !== null} onClose={close} reason={req?.reason} campaign={req?.campaign ?? 'webapp-trial'} plan={req?.plan} />
+      <TrialSheet key={opened} open={req !== null} onClose={close} reason={req?.reason} campaign={req?.campaign ?? 'webapp-trial'} plan={req?.plan} start={req?.start} />
     </TrialContext.Provider>
   );
 }
