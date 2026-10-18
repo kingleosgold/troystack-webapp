@@ -6,24 +6,19 @@ import { InstallPath } from './AppStore';
 import { GOLD, isAndroid, isAppleMobile, type Campaign } from '../lib/appStore';
 import { CHECKOUT_WAIT, checkoutBlock, openBillingPortal, openCheckout, rememberCheckout, webCheckoutReady, webPlans, type WebPlan } from '../lib/checkout';
 import { cx } from '../lib/cx';
+import { GOLD_FEATURES } from '../lib/gold';
 import { stillSignedInAs } from '../lib/account';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
 
-const GOLD_FEATURES = [
-  '30 questions a day with Troy, and he keeps every conversation',
-  'A morning brief written around your stack',
-  'Your stack value history, day by day',
-  'The full COMEX vault picture with the 30-day trend',
-  'Unlimited receipt scans',
-  'Troy reads his answers aloud',
-];
 
 interface Props {
   open: boolean;
   onClose: () => void;
   reason?: string;
   campaign: Campaign;
+  /** The plan to have picked when the sheet opens, if it can be bought here */
+  plan?: WebPlan;
 }
 
 /** What checkout said is in the way that the sheet shows instead of the plans. */
@@ -46,14 +41,16 @@ function useStillWanted(): (owner: string) => () => boolean {
   return (owner) => () => open.current && stillSignedInAs(owner);
 }
 
-function WebCheckout({ campaign, onClose, onBlocked }: { campaign: Campaign; onClose: () => void; onBlocked: (block: Blocked) => void }) {
+function WebCheckout({ campaign, initialPlan, onClose, onBlocked }: { campaign: Campaign; initialPlan?: WebPlan; onClose: () => void; onBlocked: (block: Blocked) => void }) {
   const { user, session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  // Only plans with a Stripe price set here are offered. Yearly comes first
-  // when it's one of them.
+  // Only plans with a Stripe price set here are offered. The plan picked on
+  // the way in comes first, then yearly when it's one of them.
   const plans = webPlans();
-  const [plan, setPlan] = useState<WebPlan>(() => (plans.some((p) => p.id === 'yearly') ? 'yearly' : plans[0].id));
+  const [plan, setPlan] = useState<WebPlan>(() =>
+    initialPlan && plans.some((p) => p.id === initialPlan) ? initialPlan : plans.some((p) => p.id === 'yearly') ? 'yearly' : plans[0].id,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Another checkout for this account is opening, and this one asks again shortly.
@@ -179,7 +176,7 @@ function PaymentIssue() {
   );
 }
 
-export function TrialSheet({ open, onClose, reason, campaign }: Props) {
+export function TrialSheet({ open, onClose, reason, campaign, plan }: Props) {
   const { user } = useAuth();
   const { isGold, loading: planLoading } = useSubscription();
   // A signed-in account whose plan hasn't loaded may already have Gold, so
@@ -251,7 +248,7 @@ export function TrialSheet({ open, onClose, reason, campaign }: Props) {
               {iphone && web && (
                 showWebOnIphone ? (
                   <div className="pt-1">
-                    <WebCheckout campaign={campaign} onClose={close} onBlocked={onBlocked} />
+                    <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} />
                   </div>
                 ) : (
                   <button type="button" onClick={() => setShowWebOnIphone(true)} className="text-[13px] font-semibold text-gold hover:text-gold-2">
@@ -262,7 +259,7 @@ export function TrialSheet({ open, onClose, reason, campaign }: Props) {
             </div>
           ) : (
             <div className="space-y-5">
-              <WebCheckout campaign={campaign} onClose={close} onBlocked={onBlocked} />
+              <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} />
               {!android && (
                 <div className="rounded-2xl border border-line bg-surface-2 p-4">
                   <p className="mb-3 text-[13px] text-fg-2">Have an iPhone? Start the same free week in the app instead, and your Gold follows your account.</p>

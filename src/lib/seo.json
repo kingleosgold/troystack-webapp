@@ -59,6 +59,10 @@
     "title": "TroyStack for iPhone",
     "description": "Track your gold and silver at live spot, set price alerts, scan dealer receipts, and talk to Troy. Free to download, with a free week of Gold."
   },
+  "/gold": {
+    "title": "TroyStack Gold: plans and the free week",
+    "description": "Gold gives you 30 questions a day with Troy, a morning brief around your stack and unlimited receipt scans. $4.99 a month or $39.99 a year after a free week, or $99.99 once."
+  },
   "/delete-account": {
     "title": "Delete your TroyStack account",
     "description": "How to delete your TroyStack account and what it holds, what's kept, and what happens to an App Store, Google Play or troystack.ai subscription."

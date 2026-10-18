@@ -26,7 +26,8 @@ export type Campaign =
   | 'webapp-getapp'
   | 'webapp-footer'
   | 'webapp-settings'
-  | 'webapp-auth';
+  | 'webapp-auth'
+  | 'webapp-gold';
 
 export function appStoreUrl(campaign: Campaign, qr = false): string {
   const ct = qr ? `${campaign}-qr` : campaign;

@@ -2,6 +2,7 @@ import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Calculator,
+  Crown,
   ChevronsLeft,
   ChevronsRight,
   Headphones,
@@ -49,6 +50,7 @@ const NAV: NavItem[] = [
   { to: '/vault', label: 'Vault Watch', icon: <Warehouse size={18} /> },
   { to: '/tools', label: 'Tools', icon: <Calculator size={18} /> },
   { to: '/dealers', label: 'Where to Buy', icon: <Store size={18} /> },
+  { to: '/gold', label: 'Gold', icon: <Crown size={18} /> },
 ];
 
 const COLLAPSE_KEY = 'troystack_sidebar_collapsed';
@@ -404,6 +406,7 @@ export function Footer() {
             <Link to="/vault" className="text-fg-2 hover:text-fg">Vault Watch</Link>
             <Link to="/dealers" className="text-fg-2 hover:text-fg">Where to Buy</Link>
             <Link to="/app" className="text-fg-2 hover:text-fg">iPhone app</Link>
+            <Link to="/gold" className="text-fg-2 hover:text-fg">Gold plans</Link>
             <Link to="/developers" className="text-fg-2 hover:text-fg">API</Link>
             <a href={`mailto:${SUPPORT_EMAIL}`} className="text-fg-2 hover:text-fg">Support</a>
             <a href={PRIVACY_URL} className="text-fg-2 hover:text-fg">Privacy</a>

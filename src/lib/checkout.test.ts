@@ -30,6 +30,22 @@ describe('the plans offered on the web', () => {
   });
 });
 
+describe('the plans the Gold page lists', () => {
+  it('are only the sellable ones when checkout runs here, so a click never buys another plan', async () => {
+    const c = await withPrices({ monthly: 'price_m', yearly: 'price_y' });
+    expect(c.goldPagePlans().map((p) => p.id)).toEqual(['yearly', 'monthly']);
+  });
+
+  it('are all three at their prices when nothing can be bought here', async () => {
+    const c = await withPrices({});
+    expect(c.goldPagePlans().map((p) => [p.id, p.price])).toEqual([
+      ['yearly', '$39.99'],
+      ['monthly', '$4.99'],
+      ['lifetime', '$99.99'],
+    ]);
+  });
+});
+
 describe('what checkout says is in the way', () => {
   afterEach(() => {
     vi.useRealTimers();
