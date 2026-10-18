@@ -29,8 +29,9 @@ import {
 import { ApiError, getJson } from '../lib/apiClient';
 import { signedInAs, stillSignedInAs } from '../lib/account';
 import { parseSpreadsheet } from '../lib/parseSpreadsheet';
-import { formatDate, formatTimeET, todayET } from '../lib/text';
+import { formatDate } from '../lib/text';
 import { Markdown } from '../lib/markdown';
+import { troyLimitCopy, type LimitAudience } from '../lib/troyLimit';
 import { cx } from '../lib/cx';
 import { Composer, ConsentDialog, MessageBubble, TypingIndicator } from '../ui/TroyChat';
 import { hasTroyConsent } from '../lib/consent';
@@ -80,16 +81,6 @@ function saveVisitorChat(messages: TroyMessage[]) {
   } catch {
     // private browsing, fine
   }
-}
-
-function resetLabel(iso: string, now = new Date()): string {
-  const t = new Date(iso);
-  if (!Number.isFinite(t.getTime())) return 'tomorrow';
-  const day = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-  const time = formatTimeET(iso);
-  if (day(t) === todayET(now)) return `at ${time}`;
-  if (day(t) === day(new Date(now.getTime() + 86400000))) return `tomorrow at ${time}`;
-  return `${t.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/New_York' })} at ${time}`;
 }
 
 function groupConversations(list: TroyConversationSummary[]) {
@@ -177,25 +168,27 @@ function ConversationList({ conversations, activeId, isGold, planKnown, onSelect
   );
 }
 
-function LimitCard({ quota, signedIn, signUpHref = '/auth?next=/troy' }: { quota: Quota; signedIn: boolean; signUpHref?: string }) {
+function LimitCard({ quota, audience, signUpHref = '/auth?next=/troy' }: { quota: Quota; audience: LimitAudience; signUpHref?: string }) {
   const { openTrial } = useTrial();
+  const copy = troyLimitCopy(quota, audience);
   return (
     <div className="rounded-2xl border border-line bg-surface p-5 animate-fade-up">
-      <p className="text-[15px] font-semibold text-fg">That's today's {quota.questionsLimit} free questions.</p>
-      <p className="mt-1 text-[14px] text-fg-2">
-        They come back {resetLabel(quota.resetsAt)}.{' '}
-        {signedIn ? 'Gold gives you 30 a day, and the first week is free in the app.' : 'A free account gets you three more a day, with your stack in context.'}
-      </p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {!signedIn && (
-          <Link to={signUpHref} className="inline-flex h-10 items-center rounded-xl bg-btn px-4 text-sm font-semibold text-btn-fg hover:bg-btn-hover">
-            Create a free account
-          </Link>
-        )}
-        <Button variant={signedIn ? 'primary' : 'secondary'} onClick={() => openTrial({ reason: `You've used today's ${quota.questionsLimit} free questions.`, campaign: 'webapp-troy-limit' })}>
-          Try Gold free for a week
-        </Button>
-      </div>
+      <p className="text-[15px] font-semibold text-fg">{copy.headline}</p>
+      <p className="mt-1 text-[14px] text-fg-2">{copy.body}</p>
+      {(audience === 'visitor' || copy.offerGold) && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {audience === 'visitor' && (
+            <Link to={signUpHref} className="inline-flex h-10 items-center rounded-xl bg-btn px-4 text-sm font-semibold text-btn-fg hover:bg-btn-hover">
+              Create a free account
+            </Link>
+          )}
+          {copy.offerGold && (
+            <Button variant={audience === 'free' ? 'primary' : 'secondary'} onClick={() => openTrial({ reason: `You've used today's ${quota.questionsLimit} free questions.`, campaign: 'webapp-troy-limit' })}>
+              Try Gold free for a week
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -845,7 +838,7 @@ export default function Troy() {
               <MessageBubble key={m.id} message={m} userId={user?.id} canListen={isGold && m.role === 'assistant'} />
             ))}
             {busy && <TypingIndicator />}
-            {limit && <LimitCard quota={limit} signedIn={signedIn} signUpHref={signInHref} />}
+            {limit && <LimitCard quota={limit} audience={!signedIn ? 'visitor' : !planLoading && !isGold ? 'free' : 'other'} signUpHref={signInHref} />}
             {error && (
               <div className="rounded-xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg-2" role="alert">
                 {error}

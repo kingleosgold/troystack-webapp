@@ -766,9 +766,24 @@ test('a free account at its daily limit is told so, and no empty chat is left be
   await page.goto('/troy');
   await page.getByRole('textbox').fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
-  await expect(page.getByText(/That's today's 3 free questions/)).toBeVisible();
+  await expect(page.getByText("That's today's 3 free questions.")).toBeVisible();
+  // The same words the app uses at the limit.
+  await expect(page.getByText('Gold gives you 30 a day, and you can try it free for 7 days.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
   await expect.poll(() => mock.calls.filter((c) => c === 'DELETE /v1/troy/conversations/conv-new').length).toBe(1);
   await expect(page).toHaveURL(/\/troy$/);
+});
+
+test("a Gold account at its daily limit is told when they come back and isn't sold Gold", async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { tier: 'gold', chatLimitReached: true });
+  await page.goto('/troy');
+  await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(page.getByText("That's today's 30 questions to Troy.")).toBeVisible();
+  await expect(page.getByText(/They come back/)).toBeVisible();
+  await expect(page.getByText(/free questions/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toHaveCount(0);
 });
 
 /** Opens the chat list, which sits behind a button on a phone. */
@@ -949,12 +964,11 @@ test("a Gold account whose plan didn't load isn't sold Gold again", async ({ pag
   // A plan that isn't known isn't Free, so Troy shows no Free label to sell from.
   await expect(page.getByRole('heading', { name: 'Ask Troy anything' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Free plan, 3 a day' })).toHaveCount(0);
-  // If the API turns a question away at the free limit, the Gold sheet still waits for the plan.
+  // If the API turns a question away, the limit note sells nothing until the plan is known.
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
-  await page.getByRole('button', { name: 'Try Gold free for a week' }).click();
-  await expect(page.getByRole('dialog', { name: 'Checking your plan' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Start my free week' })).toHaveCount(0);
+  await expect(page.getByText("That's today's 30 questions to Troy.")).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toHaveCount(0);
   expect(api.calls).not.toContain('POST /v1/stripe/create-checkout-session');
 });
 

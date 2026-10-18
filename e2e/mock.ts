@@ -264,7 +264,8 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     }
     if (/^\/v1\/troy\/conversations\/[^/]+\/messages$/.test(p)) {
       if (opts.chatLimitReached) {
-        return fulfillJson(route, { error: 'Daily question limit reached', questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' }, 403);
+        const limit = (opts.tier ?? 'free') === 'free' ? 3 : 30;
+        return fulfillJson(route, { error: 'Daily question limit reached', questionsUsed: limit, questionsLimit: limit, resetsAt: '2026-10-10T04:00:00Z' }, 403);
       }
       const id = p.split('/')[4];
       const now = new Date().toISOString();
