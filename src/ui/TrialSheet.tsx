@@ -19,6 +19,8 @@ interface Props {
   campaign: Campaign;
   /** The plan to have picked when the sheet opens, if it can be bought here */
   plan?: WebPlan;
+  /** Start checkout on that plan as soon as the sheet can, with no second tap */
+  start?: boolean;
 }
 
 /** What checkout said is in the way that the sheet shows instead of the plans. */
@@ -47,9 +49,12 @@ function WebCheckout({
   onClose,
   onBlocked,
   onPlanChange,
+  autoStart = false,
 }: {
   campaign: Campaign;
   initialPlan?: WebPlan;
+  /** Go on to sign-up or Stripe on mount, when initialPlan can be bought here */
+  autoStart?: boolean;
   onClose: () => void;
   onBlocked: (block: Blocked) => void;
   /** Hears the picked plan, so the sheet's title and copy can follow it */
@@ -115,6 +120,16 @@ function WebCheckout({
     }
   };
 
+  // Once per sheet, and only on the plan that was asked for, so a plan that
+  // can't be sold here never turns into a checkout for a different one.
+  const started = useRef(false);
+  useEffect(() => {
+    if (!autoStart || started.current || !initialPlan || plan !== initialPlan) return;
+    started.current = true;
+    void go();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on mount
+  }, []);
+
   return (
     <div className="space-y-3">
       <div role="radiogroup" aria-label="Plan" className={cx('grid gap-2', plans.length >= 3 ? 'grid-cols-3' : plans.length === 2 ? 'grid-cols-2' : 'grid-cols-1')}>
@@ -124,9 +139,11 @@ function WebCheckout({
             type="button"
             role="radio"
             aria-checked={plan === p.id}
+            // Checkout already left with the plan it was given, so the pick holds until it answers.
+            disabled={busy}
             onClick={() => setPlan(p.id)}
             className={cx(
-              'relative rounded-xl border px-3 py-2.5 text-left transition-colors',
+              'relative rounded-xl border px-3 py-2.5 text-left transition-colors disabled:opacity-60',
               plan === p.id ? 'border-gold bg-gold-soft' : 'border-line bg-surface hover:border-line-strong',
             )}
           >
@@ -192,7 +209,7 @@ function PaymentIssue() {
   );
 }
 
-export function TrialSheet({ open, onClose, reason, campaign, plan }: Props) {
+export function TrialSheet({ open, onClose, reason, campaign, plan, start = false }: Props) {
   const { user } = useAuth();
   const { isGold, loading: planLoading } = useSubscription();
   // A signed-in account whose plan hasn't loaded may already have Gold, so
@@ -282,7 +299,7 @@ export function TrialSheet({ open, onClose, reason, campaign, plan }: Props) {
             </div>
           ) : (
             <div className="space-y-5">
-              <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} onPlanChange={setPicked} />
+              <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} onPlanChange={setPicked} autoStart={start} />
               {!android && (
                 <div className="rounded-2xl border border-line bg-surface-2 p-4">
                   <p className="mb-3 text-[13px] text-fg-2">
