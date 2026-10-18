@@ -25,13 +25,19 @@ const TrialContext = createContext<TrialContextValue | null>(null);
  */
 export function TrialProvider({ children }: { children: ReactNode }) {
   const [req, setReq] = useState<TrialRequest | null>(null);
-  const openTrial = useCallback((r: TrialRequest = {}) => setReq(r), []);
+  // Each opening starts the sheet fresh, so a plan or choice from the last
+  // time doesn't carry over.
+  const [opened, setOpened] = useState(0);
+  const openTrial = useCallback((r: TrialRequest = {}) => {
+    setReq(r);
+    setOpened((n) => n + 1);
+  }, []);
   const close = useCallback(() => setReq(null), []);
   const value = useMemo(() => ({ openTrial }), [openTrial]);
   return (
     <TrialContext.Provider value={value}>
       {children}
-      <TrialSheet open={req !== null} onClose={close} reason={req?.reason} campaign={req?.campaign ?? 'webapp-trial'} plan={req?.plan} />
+      <TrialSheet key={opened} open={req !== null} onClose={close} reason={req?.reason} campaign={req?.campaign ?? 'webapp-trial'} plan={req?.plan} />
     </TrialContext.Provider>
   );
 }

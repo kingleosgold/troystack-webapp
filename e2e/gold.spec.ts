@@ -26,15 +26,29 @@ test('picking Lifetime on the Gold page opens checkout with Lifetime picked', as
   await page.goto('/gold');
   await page.getByRole('button', { name: 'Get Lifetime' }).click();
   const sheet = page.getByRole('dialog');
-  const byCard = sheet.getByRole('button', { name: 'Rather start it here with a card?' });
+  // On an iPhone too, a plan picked here opens card checkout on that plan.
   const buy = sheet.getByRole('button', { name: 'Get Lifetime for $99.99' });
-  await expect(buy.or(byCard)).toBeVisible();
-  if (await byCard.isVisible()) await byCard.click();
+  await expect(buy).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Rather start it here with a card?' })).toHaveCount(0);
+  await expect(sheet).toHaveAccessibleName('Get Gold for life');
+  await expect(sheet.getByText(/Lifetime is in the app too/)).toBeVisible();
   await expect(sheet.getByRole('radio', { name: /Lifetime/ })).toHaveAttribute('aria-checked', 'true');
   await buy.click();
   await expect(page).toHaveURL(/checkout\.stripe\.com/);
   expect(checkouts[0].price_id).toBe('price_e2e_lifetime');
   expect(checkouts[0].campaign).toBe('webapp-gold');
+});
+
+test('switching plans in the sheet moves its title with the plan', async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/gold');
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet).toHaveAccessibleName('Get Gold for life');
+  await sheet.getByRole('radio', { name: /Yearly/ }).click();
+  await expect(sheet).toHaveAccessibleName('Try Gold free for a week');
+  await expect(sheet.getByRole('button', { name: 'Start my free week' })).toBeVisible();
+  await expect(sheet.getByText(/Start the same free week in the app instead/)).toBeVisible();
 });
 
 test('an account with Gold sees its plan instead of prices', async ({ page }) => {
