@@ -22,6 +22,7 @@ const Coins = lazy(() => import('./routes/Coins'));
 const Coin = lazy(() => import('./routes/Coin'));
 const Dealers = lazy(() => import('./routes/Dealers'));
 const GetApp = lazy(() => import('./routes/GetApp'));
+const Gold = lazy(() => import('./routes/Gold'));
 const Settings = lazy(() => import('./routes/Settings'));
 const DeleteAccount = lazy(() => import('./routes/DeleteAccount'));
 const Auth = lazy(() => import('./routes/Auth'));
@@ -70,6 +71,7 @@ export default function App() {
           <Route path="coins/:slug" element={<Coin />} />
           <Route path="dealers" element={<Dealers />} />
           <Route path="app" element={<GetApp />} />
+          <Route path="gold" element={<Gold />} />
           <Route path="settings" element={<Settings />} />
           <Route path="delete-account" element={<DeleteAccount />} />
           <Route path="auth" element={<Auth />} />

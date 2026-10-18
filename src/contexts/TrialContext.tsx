@@ -1,11 +1,14 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import type { Campaign } from '../lib/appStore';
+import type { WebPlan } from '../lib/checkout';
 import { TrialSheet } from '../ui/TrialSheet';
 
 interface TrialRequest {
   /** One line on why Gold came up, shown above the features */
   reason?: string;
   campaign?: Campaign;
+  /** The plan to have picked when the sheet opens */
+  plan?: WebPlan;
 }
 
 interface TrialContextValue {
@@ -28,7 +31,7 @@ export function TrialProvider({ children }: { children: ReactNode }) {
   return (
     <TrialContext.Provider value={value}>
       {children}
-      <TrialSheet open={req !== null} onClose={close} reason={req?.reason} campaign={req?.campaign ?? 'webapp-trial'} />
+      <TrialSheet open={req !== null} onClose={close} reason={req?.reason} campaign={req?.campaign ?? 'webapp-trial'} plan={req?.plan} />
     </TrialContext.Provider>
   );
 }
