@@ -36,13 +36,16 @@ const HEADINGS: Record<Mode, { title: string; sub: string }> = {
 export default function Auth() {
   const [params] = useSearchParams();
   const { user, loading, isConfigured, signIn, signUp, signInWithGoogle, signInWithApple, resetPasswordForEmail } = useAuth();
+  // Someone sent here to buy Gold is usually new, so the form they'd fill
+  // in opens first and signing in is one tap away.
   const [mode, setMode] = useState<Mode>(() => {
     const m = params.get('mode');
-    return m === 'signup' || m === 'forgot' ? m : 'signin';
+    if (m === 'signup' || m === 'forgot' || m === 'signin') return m;
+    return params.get('redirect') === 'checkout' && isWebPlan(params.get('plan')) ? 'signup' : 'signin';
   });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -87,17 +90,12 @@ export default function Auth() {
     setMode(m);
     setError(null);
     setNotice(null);
-    setConfirm('');
   };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setNotice(null);
-    if (mode === 'signup' && password !== confirm) {
-      setError("Those passwords don't match.");
-      return;
-    }
     setBusy(true);
     try {
       if (mode === 'forgot') {
@@ -114,7 +112,6 @@ export default function Auth() {
               : 'Check your email and tap the link to confirm your account.',
           );
           setPassword('');
-          setConfirm('');
         }
       } else {
         const { error: err } = await signIn(email.trim(), password);
@@ -183,21 +180,27 @@ export default function Auth() {
             <Input id="auth-email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
           {mode !== 'forgot' && (
-            <Field label="Password" htmlFor="auth-password">
-              <Input
-                id="auth-password"
-                type="password"
-                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </Field>
-          )}
-          {mode === 'signup' && (
-            <Field label="Password again" htmlFor="auth-confirm">
-              <Input id="auth-confirm" type="password" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-            </Field>
+            <div className="relative">
+              <Field label="Password" htmlFor="auth-password">
+                <Input
+                  id="auth-password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-16"
+                />
+              </Field>
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute bottom-0 right-0 h-11 px-3 text-[13px] font-semibold text-fg-2 hover:text-fg"
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           )}
           {error && (
             <p className="text-[13px] text-down" role="alert">
