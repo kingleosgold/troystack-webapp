@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { Check } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { useSubscription } from '../hooks/useSubscription';
 import { useTrial } from '../contexts/TrialContext';
 import SEO from '../lib/seo.json';
 import { GOLD } from '../lib/appStore';
-import { goldPagePlans, webCheckoutReady, type WebPlan } from '../lib/checkout';
+import { goldPagePlans, siteCampaign, webCheckoutReady, type WebPlan } from '../lib/checkout';
 import { countStep } from '../lib/funnel';
 import { GOLD_FEATURES } from '../lib/gold';
 import { cx } from '../lib/cx';
@@ -34,13 +34,18 @@ export default function Gold() {
   usePageMeta({ ...SEO['/gold'], canonical: '/gold' });
   const { isGold, tier, loading } = useSubscription();
   const { openTrial } = useTrial();
+  // A visitor from one of troystack.com's links keeps that page's site-* token
+  // through the counts and checkout, so the funnel shows which page sent them.
+  const [params] = useSearchParams();
+  const campaign = siteCampaign(params.get('campaign')) ?? 'webapp-gold';
   // The card already showed the plan and its price, so where it can be bought
   // here the button goes on to sign-up or Stripe without a second pick.
   const start = (plan: WebPlan) => {
-    countStep('plan_tap', plan, 'webapp-gold');
-    openTrial({ campaign: 'webapp-gold', plan, start: webCheckoutReady(plan) });
+    countStep('plan_tap', plan, campaign);
+    openTrial({ campaign, plan, start: webCheckoutReady(plan) });
   };
-  useEffect(() => countStep('gold_view', null, 'webapp-gold'), []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- one view per visit, under the token it landed with
+  useEffect(() => countStep('gold_view', null, campaign), []);
   const plans = goldPagePlans();
 
   return (

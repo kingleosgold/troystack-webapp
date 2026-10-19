@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { Button, Sheet } from './primitives';
 import { InstallPath } from './AppStore';
-import { GOLD, isAndroid, isAppleMobile, type Campaign } from '../lib/appStore';
-import { CHECKOUT_WAIT, checkoutBlock, openBillingPortal, openCheckout, rememberCheckout, webCheckoutReady, webPlans, type WebPlan } from '../lib/checkout';
+import { GOLD, isAndroid, isAppleMobile } from '../lib/appStore';
+import { CHECKOUT_WAIT, checkoutBlock, openBillingPortal, openCheckout, rememberCheckout, webCheckoutReady, webPlans, type CheckoutCampaign, type WebPlan } from '../lib/checkout';
 import { cx } from '../lib/cx';
 import { GOLD_FEATURES } from '../lib/gold';
 import { stillSignedInAs } from '../lib/account';
@@ -16,7 +16,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   reason?: string;
-  campaign: Campaign;
+  campaign: CheckoutCampaign;
   /** The plan to have picked when the sheet opens, if it can be bought here */
   plan?: WebPlan;
   /** Start checkout on that plan as soon as the sheet can, with no second tap */
@@ -51,7 +51,7 @@ function WebCheckout({
   onPlanChange,
   autoStart = false,
 }: {
-  campaign: Campaign;
+  campaign: CheckoutCampaign;
   initialPlan?: WebPlan;
   /** Go on to sign-up or Stripe on mount, when initialPlan can be bought here */
   autoStart?: boolean;

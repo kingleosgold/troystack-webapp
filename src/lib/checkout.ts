@@ -1,5 +1,5 @@
 import { ApiError, postJson } from './apiClient';
-import type { Campaign } from './appStore';
+import type { Campaign, SiteCampaign } from './appStore';
 
 /**
  * Gold bought on the web goes through Stripe on the TroyStack API. Monthly and
@@ -57,7 +57,7 @@ const INTENT_TTL_MS = 30 * 60 * 1000;
  * Where a checkout started, stored on the Stripe session. A surface of this
  * site, or a site-* token from troystack.com's own links.
  */
-export type CheckoutCampaign = Campaign | `site-${string}`;
+export type CheckoutCampaign = Campaign | SiteCampaign;
 
 /** A site-* token from a link, shaped the way the API accepts it, or undefined. */
 export function siteCampaign(value: string | null | undefined): CheckoutCampaign | undefined {
