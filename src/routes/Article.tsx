@@ -4,6 +4,7 @@ import { ArrowLeft, Check, ExternalLink, Share2 } from 'lucide-react';
 import { useArticle, usePodcast, useSignalFeed } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { categoryLabel } from '../lib/signalApi';
+import { articleLd, jsonLdScript } from '../lib/structuredData';
 import { excerpt, formatDate, formatTimeET } from '../lib/text';
 import { money } from '../lib/format';
 import { Markdown } from '../lib/markdown';
@@ -14,9 +15,7 @@ import { Card, EmptyState, ErrorNote, Img, LinkButton, Skeleton } from '../ui/pr
 
 function ShareButton({ title, slug }: { title: string; slug: string }) {
   const [copied, setCopied] = useState(false);
-  // troystack.com renders each article with its own preview card, so links
-  // shared in messages and social posts unfurl properly.
-  const url = `https://troystack.com/signal/${slug}`;
+  const url = `https://troystack.ai/signal/${slug}`;
   return (
     <button
       type="button"
@@ -51,7 +50,7 @@ export default function Article() {
   usePageMeta({
     title: a ? a.title : 'The Signal',
     description: a ? excerpt(a.oneLiner || a.commentary, 160) : undefined,
-    canonical: slug ? `https://troystack.com/signal/${slug}` : '/signal',
+    canonical: slug ? `/signal/${slug}` : '/signal',
     image: a?.imageUrl || undefined,
   });
 
@@ -81,11 +80,12 @@ export default function Article() {
         </div>
       ) : (
         <article className="mt-5">
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(articleLd(a)) }} />
           <div className="text-[13px] font-semibold text-gold">{a.isDigest ? 'The Stack Signal' : categoryLabel(a.category)}</div>
           <h1 className="mt-1.5 text-[28px] sm:text-[34px] font-semibold leading-tight tracking-tight text-fg">{a.title}</h1>
           {a.oneLiner && a.isDigest && <p className="mt-2 text-[17px] text-fg-2">{a.oneLiner}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px] text-fg-3">
-            <img src="/troy-96.png" alt="" className="h-7 w-7 rounded-full" width={28} height={28} />
+            <img src="/troy-96.png" alt="Troy" className="h-7 w-7 rounded-full" width={28} height={28} />
             <span>By Troy</span>
             <span aria-hidden="true">·</span>
             <time dateTime={a.publishedAt}>
@@ -105,7 +105,7 @@ export default function Article() {
               <EpisodePlayer episode={episode} />
             </Card>
           )}
-          {a.imageUrl && !a.isDigest && <Img src={a.imageUrl} className="mt-6 w-full rounded-2xl border border-line aspect-[16/9] object-cover" loading="lazy" />}
+          {a.imageUrl && !a.isDigest && <Img src={a.imageUrl} alt={a.title} className="mt-6 w-full rounded-2xl border border-line aspect-[16/9] object-cover" loading="lazy" />}
           <div className="mt-6 text-[16px] sm:text-[17px] leading-[1.7] text-fg-2">
             <Markdown text={a.commentary} />
           </div>

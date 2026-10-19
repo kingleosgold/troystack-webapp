@@ -9,9 +9,9 @@ import { useSubscription } from '../hooks/useSubscription';
 import { METALS } from '../lib/metals';
 import { stackTotals } from '../lib/stackMath';
 import { money, signedMoney, signedPercent } from '../lib/format';
-import { formatDate, formatShortDate, formatTimeET, greeting, leadParagraphs, minutesLabel, whenET } from '../lib/text';
+import { formatDate, formatLocalDate, formatShortDate, formatTimeET, greeting, leadParagraphs, minutesLabel, whenET } from '../lib/text';
 import { Markdown } from '../lib/markdown';
-import { GOLD, PODCAST_APPLE_URL } from '../lib/appStore';
+import { APP_STORE_RATING_LINE, GOLD, PODCAST_APPLE_URL } from '../lib/appStore';
 import { cx } from '../lib/cx';
 import { MetalTile } from '../ui/Market';
 import { ArticleCard, ArticleRowSkeleton } from '../ui/Signal';
@@ -60,7 +60,7 @@ function TroysTake() {
   return (
     <Card className="p-5 sm:p-6">
       <div className="flex items-center gap-3">
-        <img src="/troy-96.png" alt="" className="h-10 w-10 rounded-full" width={40} height={40} />
+        <img src="/troy-96.png" alt="Troy" className="h-10 w-10 rounded-full" width={40} height={40} />
         <div>
           <div className="text-[13px] font-semibold text-gold">Troy's take</div>
           <div className="text-[12px] text-fg-3">
@@ -111,7 +111,7 @@ function AskTroyCard({ hasStack }: { hasStack: boolean }) {
   return (
     <Card className="p-5">
       <div className="flex items-center gap-2.5">
-        <img src="/troy-96.png" alt="" className="h-8 w-8 rounded-full" width={32} height={32} />
+        <img src="/troy-96.png" alt="Troy" className="h-8 w-8 rounded-full" width={32} height={32} />
         <h2 className="text-[15px] font-semibold text-fg">Ask Troy</h2>
       </div>
       <p className="mt-2 text-[14px] text-fg-2">He follows the metals all day. Ask what moved, what a coin is worth, or how your stack is doing.</p>
@@ -298,10 +298,10 @@ const TOOLS = [
 function GetAppSection() {
   const { isGold, loading: planLoading } = useSubscription();
   const features = [
-    { icon: <Bell size={17} />, text: 'Price alerts the minute metal crosses your number' },
-    { icon: <Camera size={17} />, text: 'Snap a dealer receipt and it lands in your stack' },
-    { icon: <Headphones size={17} />, text: "Talk to Troy out loud and hear him answer, even with the screen locked, on Gold" },
-    { icon: <Smartphone size={17} />, text: 'Home screen widgets and a daily brief built on your stack, on Gold' },
+    { icon: <Bell size={17} />, text: 'Price alerts in the iPhone app, on the free plan' },
+    { icon: <Camera size={17} />, text: 'Five receipt scans every 30 days, unlimited on Gold' },
+    { icon: <Headphones size={17} />, text: 'Troy reads his answers aloud, on Gold' },
+    { icon: <Smartphone size={17} />, text: 'Home screen widgets and a morning brief around your stack, on Gold' },
   ];
   return (
     <Card className="overflow-hidden">
@@ -309,6 +309,7 @@ function GetAppSection() {
         <div className="p-6 sm:p-8">
           <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-gold">TroyStack for iPhone</div>
           <h2 className="mt-2 text-[24px] sm:text-[28px] font-semibold tracking-tight text-fg leading-tight">Your stack and Troy, in your pocket</h2>
+          <p className="mt-2 text-[14px] font-semibold text-fg">{APP_STORE_RATING_LINE}</p>
           <p className="mt-2 text-[15px] text-fg-2 max-w-lg">Same account as the site, so your stack and your chats with Troy are there when you sign in.</p>
           <ul className="mt-5 space-y-3">
             {features.map((f) => (
@@ -343,10 +344,15 @@ export default function Home() {
     <div className="mx-auto max-w-6xl px-4 sm:px-6 pt-6 sm:pt-8">
       <header className="mb-6">
         <div className="text-[13px] text-fg-3">
-          {greeting()} · {formatDate(new Date(), { weekday: 'long', month: 'long', day: 'numeric', year: undefined })}
+          {greeting()} · {formatLocalDate()}
         </div>
-        <h1 className="mt-1 text-[28px] sm:text-[34px] font-semibold tracking-tight text-fg leading-tight">Gold and silver today</h1>
-        <p className="mt-1.5 text-[15px] text-fg-2 max-w-2xl">Live spot for all four metals, Troy's read on what moved them, and your stack at today's prices.</p>
+        <h1 className="mt-1 text-[28px] sm:text-[34px] font-semibold tracking-tight text-fg leading-tight">Your gold and silver, valued live, with an AI analyst on call</h1>
+        <p className="mt-1.5 text-[15px] text-fg-2 max-w-2xl">Track every coin and bar at today's spot, and ask Troy what moved the market. Free, no account needed to start.</p>
+        <p className="mt-1.5 text-[14px] text-fg-3">Troy is an AI analyst who reads the market every day.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <LinkButton to="/stack?add=1">Add your first coin</LinkButton>
+          <LinkButton to="/troy" variant="secondary">Ask Troy</LinkButton>
+        </div>
       </header>
 
       {!spot.live && !spot.isLoading && !spot.refreshing ? (

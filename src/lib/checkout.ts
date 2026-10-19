@@ -18,6 +18,9 @@ const PRICE_IDS: Record<WebPlan, string> = {
 export const WEB_PLANS: Array<{ id: WebPlan; label: string; price: string; per: string; note?: string }> = [
   { id: 'yearly', label: 'Yearly', price: '$39.99', per: 'a year', note: 'Save 33%' },
   { id: 'monthly', label: 'Monthly', price: '$4.99', per: 'a month' },
+  // $99.99 is the price this site shows and the price in the marketing site's
+  // terms. The Stripe price id is an environment variable; its unit amount is
+  // not in this repo or the API repo.
   { id: 'lifetime', label: 'Lifetime', price: '$99.99', per: 'once' },
 ];
 

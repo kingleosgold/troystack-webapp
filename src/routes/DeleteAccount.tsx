@@ -99,7 +99,7 @@ export default function DeleteAccount() {
 
         <h2 className="pt-3 text-[17px] font-semibold text-fg">Subscriptions</h2>
         <p>
-          Deleting your account doesn't cancel a subscription you bought through the App Store or Google Play. Cancel it in your phone's
+          Deleting your account doesn't cancel a subscription you bought through the App Store. Cancel it in your iPhone's
           subscription settings. A Gold plan bought on troystack.ai is cancelled in Settings here before the account can be deleted, so your card
           isn't charged again.
         </p>

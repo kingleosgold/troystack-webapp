@@ -52,7 +52,7 @@ export default function ResetPassword() {
   return (
     <div className="mx-auto w-full max-w-[26rem] px-4 py-10 sm:py-16">
       <div className="text-center">
-        <img src="/troy-96.png" alt="" width={56} height={56} className="mx-auto h-14 w-14 rounded-full" />
+        <img src="/troy-96.png" alt="Troy" width={56} height={56} className="mx-auto h-14 w-14 rounded-full" />
         <h1 className="mt-4 text-[24px] font-semibold tracking-tight text-fg">Set a new password</h1>
       </div>
       <div className="mt-6 rounded-2xl border border-line bg-surface p-5 sm:p-6">

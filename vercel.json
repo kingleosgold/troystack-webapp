@@ -1,11 +1,35 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
-  "rewrites": [
+  "redirects": [
+    { "source": "/dashboard", "destination": "/", "permanent": true },
+    { "source": "/today", "destination": "/", "permanent": true },
+    { "source": "/portfolio", "destination": "/stack", "permanent": true },
+    { "source": "/analytics", "destination": "/stack", "permanent": true },
+    { "source": "/speculate", "destination": "/tools/what-if", "permanent": true },
+    { "source": "/junk-silver", "destination": "/tools/junk-silver", "permanent": true },
+    { "source": "/chat", "destination": "/troy", "permanent": true },
+    { "source": "/c/:conversationId", "destination": "/troy/c/:conversationId", "permanent": false },
     {
-      "source": "/(.*)",
-      "destination": "/"
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.troystack.ai" }],
+      "destination": "https://troystack.ai/",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.troystack.ai" }],
+      "destination": "https://troystack.ai/:path*",
+      "permanent": true
     }
+  ],
+  "rewrites": [
+    { "source": "/troy/c/:conversationId", "destination": "/" },
+    { "source": "/settings", "destination": "/" },
+    { "source": "/auth", "destination": "/" },
+    { "source": "/reset-password", "destination": "/" },
+    { "source": "/developers/keys", "destination": "/" },
+    { "source": "/signal/:slug", "destination": "/api/signal-html?slug=:slug" }
   ],
   "headers": [
     {

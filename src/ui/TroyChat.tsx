@@ -89,7 +89,7 @@ export function MessageBubble({ message, userId, canListen }: { message: TroyMes
   }
   return (
     <div className="flex gap-3 animate-fade-up">
-      <img src="/troy-96.png" alt="" className="h-8 w-8 rounded-full shrink-0 mt-0.5" width={32} height={32} />
+      <img src="/troy-96.png" alt="Troy" className="h-8 w-8 rounded-full shrink-0 mt-0.5" width={32} height={32} />
       <div className="min-w-0 flex-1 max-w-[46rem]">
         <div className="text-[13px] font-semibold text-gold mb-1">Troy</div>
         <div className="text-[15px] leading-relaxed text-fg-2">
@@ -108,7 +108,7 @@ export function MessageBubble({ message, userId, canListen }: { message: TroyMes
 export function TypingIndicator() {
   return (
     <div className="flex gap-3" role="status" aria-live="polite">
-      <img src="/troy-96.png" alt="" className="h-8 w-8 rounded-full shrink-0" width={32} height={32} />
+      <img src="/troy-96.png" alt="Troy" className="h-8 w-8 rounded-full shrink-0" width={32} height={32} />
       <div className="flex items-center gap-1.5 rounded-2xl bg-surface-2 border border-line px-4 py-3">
         <span className="h-1.5 w-1.5 rounded-full bg-gold animate-bounce [animation-delay:-0.3s]" />
         <span className="h-1.5 w-1.5 rounded-full bg-gold animate-bounce [animation-delay:-0.15s]" />

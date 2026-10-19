@@ -27,7 +27,8 @@ import { useTheme } from '../hooks/useTheme';
 import { METALS, METAL_LABEL, METAL_VAR } from '../lib/metals';
 import { money, signedPercent, changeTone } from '../lib/format';
 import { cx } from '../lib/cx';
-import { appStoreUrl, PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL } from '../lib/appStore';
+import { APP_STORE_RATING_LINE, appStoreUrl, PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL } from '../lib/appStore';
+import { buttonClass } from '../lib/cx';
 import { AppStoreButton, QrCode } from './AppStore';
 import { MarketStatus } from './Market';
 import { Sheet } from './primitives';
@@ -50,7 +51,7 @@ const NAV: NavItem[] = [
   { to: '/vault', label: 'Vault Watch', icon: <Warehouse size={18} /> },
   { to: '/tools', label: 'Tools', icon: <Calculator size={18} /> },
   { to: '/dealers', label: 'Where to Buy', icon: <Store size={18} /> },
-  { to: '/gold', label: 'Gold', icon: <Crown size={18} /> },
+  { to: '/gold', label: 'Gold plan', icon: <Crown size={18} /> },
 ];
 
 const COLLAPSE_KEY = 'troystack_sidebar_collapsed';
@@ -66,7 +67,7 @@ function readCollapsed(): boolean {
 function Brand({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <Link to="/" className="flex items-center gap-2.5 min-w-0" aria-label="TroyStack home">
-      <img src="/troy-96.png" alt="" className="h-8 w-8 rounded-full shrink-0" width={32} height={32} />
+      <img src="/troy-96.png" alt="Troy" className="h-8 w-8 rounded-full shrink-0" width={32} height={32} />
       {!collapsed && <span className="text-[16px] font-semibold tracking-tight text-fg">TroyStack</span>}
     </Link>
   );
@@ -149,6 +150,7 @@ function SidebarAppCard() {
         <QrCode value={appStoreUrl('webapp-sidebar', true)} size={64} label="QR code that opens TroyStack on the App Store" className="shrink-0" />
         <div className="min-w-0">
           <p className="text-[13px] font-semibold text-fg leading-snug">TroyStack for iPhone</p>
+          <p className="text-[12px] font-semibold text-fg mt-0.5 leading-snug">{APP_STORE_RATING_LINE}</p>
           <p className="text-[12px] text-fg-3 mt-0.5 leading-snug">
             {offerWeek ? 'Alerts, widgets, and a free week of Gold.' : 'Alerts, widgets and Troy on your lock screen.'}
           </p>
@@ -199,7 +201,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
 }
 
 /** Live spot for all four metals and the ratio, always in view. */
-function Ticker({ className, withStatus = false }: { className?: string; withStatus?: boolean }) {
+function Ticker({ className, withStatus = false, pinRatio = false }: { className?: string; withStatus?: boolean; pinRatio?: boolean }) {
   const spot = useSpotMap();
   const { marketsClosed } = spot;
   const ratio = spot.priced('gold') && spot.priced('silver') ? spot.prices.gold / spot.prices.silver : null;
@@ -207,16 +209,14 @@ function Ticker({ className, withStatus = false }: { className?: string; withSta
   // connection is down or the last good read is too old: one short line that
   // asks again when tapped.
   const unavailable = !spot.live && !spot.isLoading && !spot.refreshing;
-  return (
-    <div
-      className={cx(
-        'flex items-center gap-5 overflow-x-auto scrollbar-none whitespace-nowrap',
-        // Where the row is wider than the space, it fades out instead of cutting off mid-word.
-        !withStatus && '[mask-image:linear-gradient(to_right,#000_calc(100%-40px),transparent)] 2xl:[mask-image:none]',
-        className,
-      )}
-      aria-label="Live spot prices"
-    >
+  const ratioLink = ratio ? (
+    <Link to="/tools/ratio" className={cx('flex shrink-0 items-center gap-1.5 text-[13px] hover:opacity-80', !pinRatio && 'pr-6 2xl:pr-0')}>
+      <span className="text-fg-2">Gold/silver</span>
+      <span className="font-semibold text-fg tnum">{ratio.toFixed(1)}</span>
+    </Link>
+  ) : null;
+  const row = (
+    <>
       {unavailable ? (
         <button type="button" onClick={() => void spot.refetch()} className="text-[13px] text-fg-3 hover:text-fg">
           {spot.stale ? 'Prices out of date, tap to retry' : 'Prices unavailable, tap to retry'}
@@ -243,13 +243,31 @@ function Ticker({ className, withStatus = false }: { className?: string; withSta
           );
         })
       )}
-      {ratio && (
-        <Link to="/tools/ratio" className="flex items-center gap-1.5 text-[13px] hover:opacity-80 pr-6 2xl:pr-0">
-          <span className="text-fg-2">Gold/silver</span>
-          <span className="font-semibold text-fg tnum">{ratio.toFixed(1)}</span>
-        </Link>
-      )}
+      {!pinRatio && ratioLink}
       {withStatus && <MarketStatus closed={marketsClosed} className="ml-auto pl-2" />}
+    </>
+  );
+  if (pinRatio) {
+    return (
+      <div className={cx('flex min-w-0 items-center gap-4', className)} aria-label="Live spot prices">
+        <div className="flex min-w-0 flex-1 items-center gap-5 overflow-x-auto scrollbar-none whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%-24px),transparent)]">
+          {row}
+        </div>
+        {ratioLink}
+      </div>
+    );
+  }
+  return (
+    <div
+      className={cx(
+        'flex items-center gap-5 overflow-x-auto scrollbar-none whitespace-nowrap',
+        // Where the row is wider than the space, it fades out instead of cutting off mid-word.
+        !withStatus && '[mask-image:linear-gradient(to_right,#000_calc(100%-40px),transparent)] 2xl:[mask-image:none]',
+        className,
+      )}
+      aria-label="Live spot prices"
+    >
+      {row}
     </div>
   );
 }
@@ -266,9 +284,9 @@ function DesktopMarketStatus() {
 function DesktopTopBar() {
   return (
     <div className="hidden lg:flex sticky top-0 z-30 h-14 items-center gap-6 border-b border-line bg-bg/85 backdrop-blur px-6">
-      <Ticker className="flex-1 min-w-0" />
+      <Ticker className="flex-1 min-w-0" pinRatio />
       <DesktopMarketStatus />
-      <AppStoreButton campaign="webapp-nav" size="sm" label="Get the app" />
+      <Link to="/stack?add=1" className={buttonClass('primary', 'sm')}>Start free</Link>
     </div>
   );
 }
@@ -409,8 +427,8 @@ export function Footer() {
             <Link to="/gold" className="text-fg-2 hover:text-fg">Gold plans</Link>
             <Link to="/developers" className="text-fg-2 hover:text-fg">API</Link>
             <a href={`mailto:${SUPPORT_EMAIL}`} className="text-fg-2 hover:text-fg">Support</a>
-            <a href={PRIVACY_URL} className="text-fg-2 hover:text-fg">Privacy</a>
-            <a href={TERMS_URL} className="text-fg-2 hover:text-fg">Terms</a>
+            <Link to={PRIVACY_URL} className="text-fg-2 hover:text-fg">Privacy</Link>
+            <Link to={TERMS_URL} className="text-fg-2 hover:text-fg">Terms</Link>
           </div>
         </div>
         <div className="mt-8 border-t border-line pt-5 text-[12px] text-fg-3 space-y-1">

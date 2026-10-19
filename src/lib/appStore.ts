@@ -43,8 +43,11 @@ export const PODCAST_APPLE_URL = 'https://podcasts.apple.com/us/podcast/id681598
 export const PODCAST_RSS_URL = 'https://api.troystack.ai/v1/podcast/feed.xml';
 
 export const SUPPORT_EMAIL = 'support@troystack.com';
-export const PRIVACY_URL = 'https://troystack.com/privacy';
-export const TERMS_URL = 'https://troystack.com/terms';
+export const PRIVACY_URL = '/privacy';
+export const TERMS_URL = '/terms';
+
+/** App Store rating given in the 2026-10-19 fix list: 4.9 from 11 ratings. */
+export const APP_STORE_RATING_LINE = '★ 4.9 on the App Store (11 ratings)';
 
 /**
  * Gold's price and trial, as set in App Store Connect. Both plans carry a
