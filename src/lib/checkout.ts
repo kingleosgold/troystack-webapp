@@ -61,7 +61,7 @@ export type CheckoutCampaign = Campaign | SiteCampaign;
 
 /** A site-* token from a link, shaped the way the API accepts it, or undefined. */
 export function siteCampaign(value: string | null | undefined): CheckoutCampaign | undefined {
-  return typeof value === 'string' && /^site-[a-z0-9-]{1,35}$/.test(value) ? (value as CheckoutCampaign) : undefined;
+  return typeof value === 'string' && /^site-[a-z0-9-]{1,32}$/.test(value) ? (value as CheckoutCampaign) : undefined;
 }
 
 interface StoredIntent {

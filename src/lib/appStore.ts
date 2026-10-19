@@ -30,7 +30,7 @@ export type Campaign =
   | 'webapp-auth'
   | 'webapp-gold';
 
-/** A token from one of troystack.com's links, at most 35 characters so "-qr" still fits. */
+/** A token from one of troystack.com's links, at most 37 characters so "-qr" still fits in 40. */
 export type SiteCampaign = `site-${string}`;
 
 export function appStoreUrl(campaign: Campaign | SiteCampaign, qr = false): string {

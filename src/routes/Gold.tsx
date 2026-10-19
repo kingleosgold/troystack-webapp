@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -36,8 +36,9 @@ export default function Gold() {
   const { openTrial } = useTrial();
   // A visitor from one of troystack.com's links keeps that page's site-* token
   // through the counts and checkout, so the funnel shows which page sent them.
+  // It's read once, so the view and the taps on one visit count together.
   const [params] = useSearchParams();
-  const campaign = siteCampaign(params.get('campaign')) ?? 'webapp-gold';
+  const [campaign] = useState(() => siteCampaign(params.get('campaign')) ?? 'webapp-gold');
   // The card already showed the plan and its price, so where it can be bought
   // here the button goes on to sign-up or Stripe without a second pick.
   const start = (plan: WebPlan) => {
