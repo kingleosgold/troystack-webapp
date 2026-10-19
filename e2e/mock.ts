@@ -177,6 +177,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     const p = url.pathname;
     calls.push(`${req.method()} ${p}`);
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+    if (p === '/v1/funnel') return route.fulfill({ status: 204, headers: CORS });
 
     if (p === '/v1/prices') {
       if (opts.failPrices || !pricesUp) return fulfillJson(route, { error: 'Prices unavailable' }, 503);
