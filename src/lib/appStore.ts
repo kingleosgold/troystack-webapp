@@ -2,7 +2,8 @@
  * Links out to the App Store and the podcast. Every App Store link carries
  * a campaign token (ct) under TroyStack's provider token (pt), so App Store
  * Connect's campaign report shows which part of the site sent each install.
- * Tokens stay under Apple's 40-character limit and all start with "webapp".
+ * Tokens stay under Apple's 40-character limit. The site's own start with
+ * "webapp", and a visitor sent from troystack.com keeps its "site-" token.
  */
 
 export const APP_STORE_ID = '6757343766';
@@ -29,7 +30,10 @@ export type Campaign =
   | 'webapp-auth'
   | 'webapp-gold';
 
-export function appStoreUrl(campaign: Campaign, qr = false): string {
+/** A token from one of troystack.com's links, at most 37 characters so "-qr" still fits in 40. */
+export type SiteCampaign = `site-${string}`;
+
+export function appStoreUrl(campaign: Campaign | SiteCampaign, qr = false): string {
   const ct = qr ? `${campaign}-qr` : campaign;
   return `https://apps.apple.com/app/apple-store/id${APP_STORE_ID}?pt=${PROVIDER_TOKEN}&ct=${encodeURIComponent(ct)}&mt=8`;
 }

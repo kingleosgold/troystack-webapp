@@ -136,3 +136,39 @@ test('the Gold page counts the view, the plan tap and the sign-up, and nothing a
     { step: 'signup', plan: 'lifetime', campaign: 'webapp-gold' },
   ]);
 });
+
+test('a visitor from a troystack.com link keeps its page token from the Gold page to Stripe', async ({ page }) => {
+  await mockBackends(page);
+  const steps: Array<Record<string, unknown>> = [];
+  const checkouts: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+    if (r.url().endsWith('/v1/stripe/create-checkout-session') && r.method() === 'POST') checkouts.push(r.postDataJSON());
+  });
+  await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
+  await page.goto('/gold?campaign=site-pricing');
+  await expect.poll(() => steps.length).toBe(1);
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  await page.getByLabel('Email').fill('new@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('a-long-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  expect(steps).toEqual([
+    { step: 'gold_view', campaign: 'site-pricing' },
+    { step: 'plan_tap', plan: 'lifetime', campaign: 'site-pricing' },
+    { step: 'signup', plan: 'lifetime', campaign: 'site-pricing' },
+  ]);
+  expect(checkouts).toHaveLength(1);
+  expect(checkouts[0].campaign).toBe('site-pricing');
+});
+
+test('a token that is not a troystack.com page counts as the Gold page', async ({ page }) => {
+  await mockBackends(page);
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
+  await page.goto('/gold?campaign=webapp-troy-limit');
+  await expect.poll(() => steps.length).toBe(1);
+  expect(steps[0]).toEqual({ step: 'gold_view', campaign: 'webapp-gold' });
+});

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Smartphone } from 'lucide-react';
-import { appStoreUrl, isAppleMobile, type Campaign } from '../lib/appStore';
+import { appStoreUrl, isAppleMobile } from '../lib/appStore';
+import type { CheckoutCampaign } from '../lib/checkout';
 import { cx } from '../lib/cx';
 
 type QrLib = typeof import('qrcode');
@@ -67,7 +68,7 @@ export function QrCode({ value, size = 132, className, label }: { value: string;
 }
 
 interface AppStoreButtonProps {
-  campaign: Campaign;
+  campaign: CheckoutCampaign;
   label?: string;
   size?: 'sm' | 'md' | 'lg';
   variant?: 'primary' | 'dark';
@@ -105,7 +106,7 @@ export function AppStoreButton({ campaign, label = 'Get the app', size = 'md', v
  * The app's install path for this device: a button on iPhone and iPad, and a
  * QR code plus the button on a computer, since installs happen on the phone.
  */
-export function InstallPath({ campaign, label = 'Get TroyStack on the App Store', compact = false }: { campaign: Campaign; label?: string; compact?: boolean }) {
+export function InstallPath({ campaign, label = 'Get TroyStack on the App Store', compact = false }: { campaign: CheckoutCampaign; label?: string; compact?: boolean }) {
   const apple = isAppleMobile();
   if (apple) return <AppStoreButton campaign={campaign} label={label} size={compact ? 'md' : 'lg'} fullWidth />;
   return (

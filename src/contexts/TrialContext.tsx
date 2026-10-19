@@ -1,12 +1,11 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import type { Campaign } from '../lib/appStore';
-import type { WebPlan } from '../lib/checkout';
+import type { CheckoutCampaign, WebPlan } from '../lib/checkout';
 import { TrialSheet } from '../ui/TrialSheet';
 
 interface TrialRequest {
   /** One line on why Gold came up, shown above the features */
   reason?: string;
-  campaign?: Campaign;
+  campaign?: CheckoutCampaign;
   /** The plan to have picked when the sheet opens */
   plan?: WebPlan;
   /** The plan was already picked, so checkout starts without asking again */
