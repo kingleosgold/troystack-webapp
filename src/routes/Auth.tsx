@@ -2,7 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageMeta } from '../hooks/usePageMeta';
-import { isWebPlan } from '../lib/checkout';
+import { checkoutIntentCampaign, isWebPlan } from '../lib/checkout';
+import { countStep } from '../lib/funnel';
 import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { Button, Field, Input } from '../ui/primitives';
 
@@ -103,7 +104,10 @@ export default function Auth() {
         if (err) setError(err.message);
         else setNotice('Check your email for a link to reset your password.');
       } else if (mode === 'signup') {
+        // Read before signing up, since signing in uses the waiting plan up.
+        const campaign = forCheckout ? checkoutIntentCampaign() : undefined;
         const { error: err, needsConfirmation } = await signUp(email.trim(), password);
+        if (!err) countStep('signup', forCheckout ? plan : null, campaign);
         if (err) setError(err.message);
         else if (needsConfirmation) {
           setNotice(

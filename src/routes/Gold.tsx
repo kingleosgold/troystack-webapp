@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -6,6 +7,7 @@ import { useTrial } from '../contexts/TrialContext';
 import SEO from '../lib/seo.json';
 import { GOLD } from '../lib/appStore';
 import { goldPagePlans, webCheckoutReady, type WebPlan } from '../lib/checkout';
+import { countStep } from '../lib/funnel';
 import { GOLD_FEATURES } from '../lib/gold';
 import { cx } from '../lib/cx';
 import { Button, Card } from '../ui/primitives';
@@ -34,7 +36,11 @@ export default function Gold() {
   const { openTrial } = useTrial();
   // The card already showed the plan and its price, so where it can be bought
   // here the button goes on to sign-up or Stripe without a second pick.
-  const start = (plan: WebPlan) => openTrial({ campaign: 'webapp-gold', plan, start: webCheckoutReady(plan) });
+  const start = (plan: WebPlan) => {
+    countStep('plan_tap', plan, 'webapp-gold');
+    openTrial({ campaign: 'webapp-gold', plan, start: webCheckoutReady(plan) });
+  };
+  useEffect(() => countStep('gold_view', null, 'webapp-gold'), []);
   const plans = goldPagePlans();
 
   return (

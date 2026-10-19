@@ -115,3 +115,24 @@ test('someone with an account can still sign in from the checkout form', async (
   await page.getByRole('button', { name: 'Have an account? Sign in' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to TroyStack');
 });
+
+test('the Gold page counts the view, the plan tap and the sign-up, and nothing about who', async ({ page }) => {
+  await mockBackends(page);
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
+  await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
+  await page.goto('/gold');
+  await expect.poll(() => steps.length).toBe(1);
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  await page.getByLabel('Email').fill('new@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('a-long-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  expect(steps).toEqual([
+    { step: 'gold_view', campaign: 'webapp-gold' },
+    { step: 'plan_tap', plan: 'lifetime', campaign: 'webapp-gold' },
+    { step: 'signup', plan: 'lifetime', campaign: 'webapp-gold' },
+  ]);
+});

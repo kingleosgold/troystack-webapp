@@ -119,6 +119,15 @@ export function hasCheckoutIntent(now = Date.now()): boolean {
   }
 }
 
+/** The surface a plan waiting for sign-in was picked on, without using the plan up. */
+export function checkoutIntentCampaign(now = Date.now()): CheckoutCampaign | undefined {
+  try {
+    return readIntent(now)?.campaign;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The plan picked before signing in, if it was picked in the last half hour. Reading it clears it. */
 export function takeCheckoutIntent(now = Date.now()): { plan: WebPlan; campaign?: CheckoutCampaign } | null {
   try {
