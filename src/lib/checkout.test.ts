@@ -150,3 +150,33 @@ describe('what checkout says is in the way', () => {
     expect(assign).not.toHaveBeenCalled();
   });
 });
+
+describe('where a checkout backs out to', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function cancelUrlFor(pathname: string, campaign?: string) {
+    const c = await withPrices({ monthly: 'price_m' });
+    vi.stubGlobal('window', { location: { origin: 'https://troystack.ai', pathname, assign: vi.fn() } });
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/e2e' }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetch);
+    await c.startCheckout('7b1c6c1e-1111-4a2b-9c3d-000000000001', 'token', 'monthly', campaign as never);
+    const init = (fetch.mock.calls[0] as unknown as [string, RequestInit])[1];
+    return (JSON.parse(String(init.body)) as { cancel_url: string }).cancel_url;
+  }
+
+  it('is the plans with the token for a troystack.com link, wherever checkout opened', async () => {
+    expect(await cancelUrlFor('/auth', 'site-pricing')).toBe('https://troystack.ai/gold?campaign=site-pricing');
+  });
+
+  it('is the plans for a Gold-page pick, even when checkout opened on /auth after sign-up', async () => {
+    expect(await cancelUrlFor('/auth', 'webapp-gold')).toBe('https://troystack.ai/gold');
+    expect(await cancelUrlFor('/', 'webapp-gold')).toBe('https://troystack.ai/gold');
+  });
+
+  it('is the page checkout opened on for anything else', async () => {
+    expect(await cancelUrlFor('/settings', 'webapp-settings')).toBe('https://troystack.ai/settings');
+    expect(await cancelUrlFor('/troy')).toBe('https://troystack.ai/troy');
+  });
+});
