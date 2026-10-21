@@ -20,17 +20,23 @@ async function stubStripe(page: Page) {
 
 for (const provider of ['Google', 'Apple'] as const) {
   test(`a troystack.com visitor who signs in with ${provider} reaches Stripe with the link's token`, async ({ page, baseURL }) => {
-    // Coming back from the provider signs the browser in, as supabase-js does
-    // when it reads the return address.
-    await page.addInitScript((value) => {
-      if (new URLSearchParams(location.search).has('e2e_oauth')) localStorage.setItem('sb-e2e-auth-token', value);
-    }, JSON.stringify(sessionFor()));
     await mockBackends(page);
     await stubStripe(page);
+    // The provider sends the browser back to the return address with the
+    // session in the hash, and supabase-js signs in from it, as it does live.
+    const session = sessionFor();
+    const returned = new URLSearchParams({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_in: String(session.expires_in),
+      expires_at: String(session.expires_at),
+      token_type: session.token_type,
+    });
     const authorize: string[] = [];
     await page.route('https://e2e.supabase.co/auth/v1/authorize**', (route) => {
       authorize.push(route.request().url());
-      return route.fulfill({ status: 302, headers: { Location: `${baseURL}/?e2e_oauth=1` } });
+      const back = new URL(route.request().url()).searchParams.get('redirect_to');
+      return route.fulfill({ status: 302, headers: { Location: `${back}#${returned}` } });
     });
     const checkouts = watch(page);
 
@@ -41,6 +47,7 @@ for (const provider of ['Google', 'Apple'] as const) {
 
     expect(authorize).toHaveLength(1);
     expect(new URL(authorize[0]).searchParams.get('provider')).toBe(provider.toLowerCase());
+    expect(new URL(authorize[0]).searchParams.get('redirect_to')).toBe(`${baseURL}/`);
     expect(checkouts).toHaveLength(1);
     expect(checkouts[0].campaign).toBe('site-pricing');
     expect(checkouts[0].cancel_url).toBe(`${baseURL}/gold?campaign=site-pricing`);
