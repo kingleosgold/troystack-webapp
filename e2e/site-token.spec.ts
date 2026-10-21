@@ -69,7 +69,7 @@ test("backing out of Stripe lands on the plans with the link's token, and a seco
   expect(checkouts[1].cancel_url).toBe(`${baseURL}/gold?campaign=site-signal`);
 });
 
-test('a checkout with no troystack.com token keeps its old way back, the page checkout opened on', async ({ page, baseURL }) => {
+test('a Gold-page checkout with no troystack.com token backs out to the plans, not to /auth', async ({ page, baseURL }) => {
   await mockBackends(page);
   await stubStripe(page);
   const checkouts = watch(page);
@@ -80,5 +80,10 @@ test('a checkout with no troystack.com token keeps its old way back, the page ch
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page).toHaveURL(/checkout\.stripe\.com/);
   expect(checkouts[0].campaign).toBe('webapp-gold');
-  expect(checkouts[0].cancel_url).toBe(`${baseURL}/auth`);
+  expect(checkouts[0].cancel_url).toBe(`${baseURL}/gold`);
+
+  // Backing out of Stripe, signed in now, shows the plans again.
+  await page.goto(checkouts[0].cancel_url as string);
+  await expect(page).toHaveURL(/\/gold$/);
+  await expect(page.getByRole('button', { name: 'Get Lifetime' })).toBeVisible();
 });
