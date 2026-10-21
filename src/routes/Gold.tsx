@@ -39,14 +39,19 @@ export default function Gold() {
   // It's read once, so the view and the taps on one visit count together.
   const [params] = useSearchParams();
   const [campaign] = useState(() => siteCampaign(params.get('campaign')) ?? 'webapp-gold');
+  // Someone back from Stripe already counted a view and a tap on the way in,
+  // so this visit counts neither and the funnel reads one pass per visitor.
+  const [returning] = useState(() => params.get('back') === '1');
   // The card already showed the plan and its price, so where it can be bought
   // here the button goes on to sign-up or Stripe without a second pick.
   const start = (plan: WebPlan) => {
-    countStep('plan_tap', plan, campaign);
+    if (!returning) countStep('plan_tap', plan, campaign);
     openTrial({ campaign, plan, start: webCheckoutReady(plan) });
   };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- one view per visit, under the token it landed with
-  useEffect(() => countStep('gold_view', null, campaign), []);
+  useEffect(() => {
+    if (!returning) countStep('gold_view', null, campaign);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one view per visit, under the token it landed with
+  }, []);
   const plans = goldPagePlans();
 
   return (

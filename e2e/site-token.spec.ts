@@ -56,7 +56,7 @@ for (const provider of ['Google', 'Apple'] as const) {
     expect(new URL(authorize[0]).searchParams.get('redirect_to')).toBe(`${baseURL}/`);
     expect(checkouts).toHaveLength(1);
     expect(checkouts[0].campaign).toBe('site-pricing');
-    expect(checkouts[0].cancel_url).toBe(`${baseURL}/gold?campaign=site-pricing`);
+    expect(checkouts[0].cancel_url).toBe(`${baseURL}/gold?campaign=site-pricing&back=1`);
   });
 }
 
@@ -64,13 +64,17 @@ test("backing out of Stripe lands on the plans with the link's token, and a seco
   await mockBackends(page);
   await stubStripe(page);
   const checkouts = watch(page);
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
   await page.goto('/gold?campaign=site-signal');
   await page.getByRole('button', { name: 'Get Lifetime' }).click();
   await page.getByLabel('Email').fill('new@example.com');
   await page.getByLabel('Password', { exact: true }).fill('a-long-password');
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page).toHaveURL(/checkout\.stripe\.com/);
-  expect(checkouts[0].cancel_url).toBe(`${baseURL}/gold?campaign=site-signal`);
+  expect(checkouts[0].cancel_url).toBe(`${baseURL}/gold?campaign=site-signal&back=1`);
 
   // Stripe's back link.
   await page.goto(checkouts[0].cancel_url as string);
@@ -79,7 +83,13 @@ test("backing out of Stripe lands on the plans with the link's token, and a seco
   await expect(page).toHaveURL(/checkout\.stripe\.com/);
   expect(checkouts).toHaveLength(2);
   expect(checkouts[1].campaign).toBe('site-signal');
-  expect(checkouts[1].cancel_url).toBe(`${baseURL}/gold?campaign=site-signal`);
+  expect(checkouts[1].cancel_url).toBe(`${baseURL}/gold?campaign=site-signal&back=1`);
+  // The view and tap counted on the way in, so the second pass adds neither.
+  expect(steps).toEqual([
+    { step: 'gold_view', campaign: 'site-signal' },
+    { step: 'plan_tap', plan: 'lifetime', campaign: 'site-signal' },
+    { step: 'signup', plan: 'lifetime', campaign: 'site-signal' },
+  ]);
 });
 
 test('a Gold-page checkout with no troystack.com token backs out to the plans, not to /auth', async ({ page, baseURL }) => {
@@ -93,10 +103,10 @@ test('a Gold-page checkout with no troystack.com token backs out to the plans, n
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page).toHaveURL(/checkout\.stripe\.com/);
   expect(checkouts[0].campaign).toBe('webapp-gold');
-  expect(checkouts[0].cancel_url).toBe(`${baseURL}/gold`);
+  expect(checkouts[0].cancel_url).toBe(`${baseURL}/gold?back=1`);
 
   // Backing out of Stripe, signed in now, shows the plans again.
   await page.goto(checkouts[0].cancel_url as string);
-  await expect(page).toHaveURL(/\/gold$/);
+  await expect(page).toHaveURL(/\/gold\?back=1$/);
   await expect(page.getByRole('button', { name: 'Get Lifetime' })).toBeVisible();
 });

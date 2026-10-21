@@ -167,12 +167,12 @@ describe('where a checkout backs out to', () => {
   }
 
   it('is the plans with the token for a troystack.com link, wherever checkout opened', async () => {
-    expect(await cancelUrlFor('/auth', 'site-pricing')).toBe('https://troystack.ai/gold?campaign=site-pricing');
+    expect(await cancelUrlFor('/auth', 'site-pricing')).toBe('https://troystack.ai/gold?campaign=site-pricing&back=1');
   });
 
   it('is the plans for a Gold-page pick, even when checkout opened on /auth after sign-up', async () => {
-    expect(await cancelUrlFor('/auth', 'webapp-gold')).toBe('https://troystack.ai/gold');
-    expect(await cancelUrlFor('/', 'webapp-gold')).toBe('https://troystack.ai/gold');
+    expect(await cancelUrlFor('/auth', 'webapp-gold')).toBe('https://troystack.ai/gold?back=1');
+    expect(await cancelUrlFor('/', 'webapp-gold')).toBe('https://troystack.ai/gold?back=1');
   });
 
   it('is the page checkout opened on for anything else', async () => {
