@@ -85,7 +85,7 @@ function WebCheckout({
     if (!user) {
       rememberCheckout(plan, campaign);
       onClose();
-      navigate(`/auth?redirect=checkout&plan=${plan}&next=${encodeURIComponent(location.pathname)}`);
+      navigate(`/auth?redirect=checkout&plan=${plan}&from=sheet&next=${encodeURIComponent(location.pathname)}`);
       return;
     }
     setBusy(true);

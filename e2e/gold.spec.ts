@@ -99,6 +99,28 @@ test('a new visitor goes from a plan on the Gold page through one sign-up form t
   expect(checkouts[0].campaign).toBe('webapp-gold');
 });
 
+test("a later sign-in link with no campaign doesn't inherit the Gold page's", async ({ page }) => {
+  await mockBackends(page);
+  const checkouts: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/stripe/create-checkout-session') && r.method() === 'POST') checkouts.push(r.postDataJSON());
+  });
+  await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
+  // Lifetime picked on the Gold page waits for sign-in, tagged webapp-gold.
+  await page.goto('/gold');
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=lifetime&from=sheet/);
+  // Then a link from somewhere else asks for the same plan with no campaign.
+  await page.goto('/auth?mode=signup&redirect=checkout&plan=lifetime');
+  await page.getByLabel('Email').fill('new@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('a-long-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  expect(checkouts).toHaveLength(1);
+  expect(checkouts[0].price_id).toBe('price_e2e_lifetime');
+  expect(checkouts[0].campaign).toBeUndefined();
+});
+
 test('a new visitor who picks monthly lands on sign-up with monthly kept', async ({ page }) => {
   await mockBackends(page);
   await page.goto('/gold');

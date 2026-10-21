@@ -59,7 +59,11 @@ export function useAfterSignIn(): { checkoutOverlay: CheckoutOverlay } {
     if (!onAuthPage) return;
     const params = new URLSearchParams(search);
     const plan = params.get('plan');
-    if (params.get('redirect') === 'checkout' && isWebPlan(plan)) rememberCheckout(plan, siteCampaign(params.get('campaign')));
+    // Only the plan sheet's own link carries on the campaign the sheet kept.
+    // Any other link without one, like the app's, starts the plan untagged.
+    if (params.get('redirect') === 'checkout' && isWebPlan(plan)) {
+      rememberCheckout(plan, siteCampaign(params.get('campaign')), Date.now(), params.get('from') === 'sheet');
+    }
     rememberNextPath(params.get('next'));
   }, [onAuthPage, search]);
 
