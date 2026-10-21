@@ -83,13 +83,15 @@ function readIntent(now: number): StoredIntent | null {
 }
 
 /**
- * Keeps the plan picked before signing in. The sign-in link may not repeat
- * the campaign, so a campaign already kept for the same plan stays with it.
+ * Keeps the plan picked before signing in. The plan sheet keeps its campaign
+ * here and sends a sign-in link that doesn't repeat it, so that link asks with
+ * `keepCampaign` for a campaign already kept for the same plan to stay. Any
+ * other link without a campaign starts the plan with none.
  */
-export function rememberCheckout(plan: WebPlan, campaign?: CheckoutCampaign, now = Date.now()): void {
+export function rememberCheckout(plan: WebPlan, campaign?: CheckoutCampaign, now = Date.now(), keepCampaign = false): void {
   try {
     let kept = campaign;
-    if (!kept) {
+    if (!kept && keepCampaign) {
       const existing = readIntent(now);
       if (existing?.plan === plan) kept = existing.campaign;
     }
