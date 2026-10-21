@@ -474,7 +474,7 @@ function sessionUser(id = USER_ID, email = 'stacker@example.com') {
   };
 }
 
-function sessionFor(user = sessionUser()) {
+export function sessionFor(user = sessionUser()) {
   return {
     access_token: 'e2e-access-token',
     token_type: 'bearer',
