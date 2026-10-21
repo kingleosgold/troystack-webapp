@@ -98,13 +98,18 @@ export function whenET(at: string | number | Date, now = new Date()): string {
   return todayET(d) === todayET(now) ? formatTimeET(d) : `${formatDate(d, { month: 'short', year: undefined })}, ${formatTimeET(d)}`;
 }
 
-/** "Good morning" by New York hour */
+/** "Good morning" by the viewer's local hour. */
 export function greeting(now = new Date()): string {
-  const hour = Number(now.toLocaleString('en-US', { timeZone: NY, hour: 'numeric', hour12: false }));
+  const hour = now.getHours();
   if (hour < 5) return 'Good evening';
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
+}
+
+/** The date beside the greeting, in the viewer's local calendar. */
+export function formatLocalDate(now = new Date()): string {
+  return now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 }
 
 export function minutesLabel(seconds: number): string {

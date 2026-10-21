@@ -8,17 +8,9 @@ import SEO from '../lib/seo.json';
 import { GOLD } from '../lib/appStore';
 import { goldPagePlans, siteCampaign, webCheckoutReady, type WebPlan } from '../lib/checkout';
 import { countStep } from '../lib/funnel';
-import { GOLD_FEATURES } from '../lib/gold';
+import { FREE_FEATURES, GOLD_FEATURES } from '../lib/gold';
 import { cx } from '../lib/cx';
 import { Button, Card } from '../ui/primitives';
-
-const FREE = [
-  'Live spot for all four metals, with charts',
-  'Your stack at live spot, with cost basis and gain',
-  'Three questions a day with Troy',
-  'Five receipt scans every 30 days',
-  'Every calculator, the Signal and the podcast',
-];
 
 const QUESTIONS = [
   {
@@ -94,7 +86,7 @@ export default function Gold() {
         <Card className="p-5">
           <h2 className="text-[17px] font-semibold text-fg">Free</h2>
           <ul className="mt-3 space-y-2.5">
-            {FREE.map((f) => (
+            {FREE_FEATURES.map((f) => (
               <li key={f} className="flex gap-2.5 text-[14px] text-fg-2">
                 <Check size={16} className="mt-0.5 shrink-0 text-fg-3" aria-hidden="true" />
                 <span>{f}</span>
@@ -126,6 +118,9 @@ export default function Gold() {
           ))}
         </dl>
       </section>
+
+      <h2 className="mt-10 text-[15px] font-semibold text-fg">Who's behind this</h2>
+      <p className="mt-1 text-[13px] text-fg-3">Built by Jon Mancini, Mancini Tech Solutions, Connecticut.</p>
     </div>
   );
 }
