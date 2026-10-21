@@ -29,14 +29,19 @@ for (const provider of ['Google', 'Apple'] as const) {
       access_token: session.access_token,
       refresh_token: session.refresh_token,
       expires_in: String(session.expires_in),
-      expires_at: String(session.expires_at),
+      expires_at: String(Math.floor(Date.now() / 1000) + session.expires_in),
       token_type: session.token_type,
     });
     const authorize: string[] = [];
     await page.route('https://e2e.supabase.co/auth/v1/authorize**', (route) => {
       authorize.push(route.request().url());
-      const back = new URL(route.request().url()).searchParams.get('redirect_to');
+      const back = new URL(route.request().url()).searchParams.get('redirect_to') ?? `${baseURL}/`;
       return route.fulfill({ status: 302, headers: { Location: `${back}#${returned}` } });
+    });
+    // supabase-js reads the user with the token from the hash.
+    const userBearers: string[] = [];
+    page.on('request', (r) => {
+      if (new URL(r.url()).pathname === '/auth/v1/user') userBearers.push(r.headers()['authorization'] ?? '');
     });
     const checkouts = watch(page);
 
@@ -45,6 +50,7 @@ for (const provider of ['Google', 'Apple'] as const) {
     await page.getByRole('button', { name: `Continue with ${provider}` }).click();
     await expect(page).toHaveURL(/checkout\.stripe\.com/);
 
+    expect(userBearers).toContain(`Bearer ${session.access_token}`);
     expect(authorize).toHaveLength(1);
     expect(new URL(authorize[0]).searchParams.get('provider')).toBe(provider.toLowerCase());
     expect(new URL(authorize[0]).searchParams.get('redirect_to')).toBe(`${baseURL}/`);
