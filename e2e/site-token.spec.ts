@@ -105,8 +105,36 @@ test('a Gold-page checkout with no troystack.com token backs out to the plans, n
   expect(checkouts[0].campaign).toBe('webapp-gold');
   expect(checkouts[0].cancel_url).toBe(`${baseURL}/gold?back=1`);
 
-  // Backing out of Stripe, signed in now, shows the plans again.
+  // Backing out of Stripe, signed in now, shows the plans again, without
+  // counting the view a second time, and drops back=1 from the address.
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
   await page.goto(checkouts[0].cancel_url as string);
-  await expect(page).toHaveURL(/\/gold\?back=1$/);
+  await expect(page).toHaveURL(/\/gold$/);
   await expect(page.getByRole('button', { name: 'Get Lifetime' })).toBeVisible();
+  // A different plan is a new pick and counts.
+  await page.getByRole('button', { name: 'Start free week' }).first().click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  expect(steps).toEqual([{ step: 'plan_tap', plan: 'yearly', campaign: 'webapp-gold' }]);
+});
+
+test("a troystack.com link straight to checkout backs out to the plans and counts the view there", async ({ page, baseURL }) => {
+  await mockBackends(page);
+  await stubStripe(page);
+  const checkouts = watch(page);
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
+  await page.goto('/auth?redirect=checkout&plan=lifetime&campaign=site-pricing');
+  await page.getByLabel('Email').fill('new@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('a-long-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  expect(checkouts[0].cancel_url).toBe(`${baseURL}/gold?campaign=site-pricing`);
+
+  await page.goto(checkouts[0].cancel_url as string);
+  await expect.poll(() => steps.filter((x) => x.step === 'gold_view')).toEqual([{ step: 'gold_view', campaign: 'site-pricing' }]);
 });

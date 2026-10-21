@@ -6,7 +6,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { useTrial } from '../contexts/TrialContext';
 import SEO from '../lib/seo.json';
 import { GOLD } from '../lib/appStore';
-import { goldPagePlans, siteCampaign, webCheckoutReady, type WebPlan } from '../lib/checkout';
+import { goldPagePlans, goldTap, rememberGoldTap, siteCampaign, webCheckoutReady, type WebPlan } from '../lib/checkout';
 import { countStep } from '../lib/funnel';
 import { GOLD_FEATURES } from '../lib/gold';
 import { cx } from '../lib/cx';
@@ -37,19 +37,30 @@ export default function Gold() {
   // A visitor from one of troystack.com's links keeps that page's site-* token
   // through the counts and checkout, so the funnel shows which page sent them.
   // It's read once, so the view and the taps on one visit count together.
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [campaign] = useState(() => siteCampaign(params.get('campaign')) ?? 'webapp-gold');
   // Someone back from Stripe already counted a view and a tap on the way in,
-  // so this visit counts neither and the funnel reads one pass per visitor.
-  const [returning] = useState(() => params.get('back') === '1');
+  // so this visit doesn't count the view again, or a tap on the same plan.
+  // A different plan is a new pick and counts.
+  const [tappedBefore] = useState(() => {
+    const before = goldTap();
+    return params.get('back') === '1' && before?.campaign === campaign ? before.plan : undefined;
+  });
   // The card already showed the plan and its price, so where it can be bought
   // here the button goes on to sign-up or Stripe without a second pick.
   const start = (plan: WebPlan) => {
-    if (!returning) countStep('plan_tap', plan, campaign);
+    if (plan !== tappedBefore) countStep('plan_tap', plan, campaign);
+    rememberGoldTap(plan, campaign);
     openTrial({ campaign, plan, start: webCheckoutReady(plan) });
   };
   useEffect(() => {
-    if (!returning) countStep('gold_view', null, campaign);
+    if (tappedBefore === undefined) countStep('gold_view', null, campaign);
+    // back=1 is for this landing only, so a reload or a shared link counts.
+    if (params.has('back')) {
+      const next = new URLSearchParams(params);
+      next.delete('back');
+      setParams(next, { replace: true });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one view per visit, under the token it landed with
   }, []);
   const plans = goldPagePlans();

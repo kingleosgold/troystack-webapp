@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The price ids are read when the module loads, so each case loads it fresh.
 async function withPrices(ids: { monthly?: string; yearly?: string; lifetime?: string }) {
@@ -152,12 +152,18 @@ describe('what checkout says is in the way', () => {
 });
 
 describe('where a checkout backs out to', () => {
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) });
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  async function cancelUrlFor(pathname: string, campaign?: string) {
+  async function cancelUrlFor(pathname: string, campaign?: string, tappedOnGold = true) {
     const c = await withPrices({ monthly: 'price_m' });
+    if (tappedOnGold && campaign) c.rememberGoldTap('monthly', campaign as never);
     vi.stubGlobal('window', { location: { origin: 'https://troystack.ai', pathname, assign: vi.fn() } });
     const fetch = vi.fn(async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/e2e' }), { status: 200, headers: { 'content-type': 'application/json' } }));
     vi.stubGlobal('fetch', fetch);
@@ -173,6 +179,14 @@ describe('where a checkout backs out to', () => {
   it('is the plans for a Gold-page pick, even when checkout opened on /auth after sign-up', async () => {
     expect(await cancelUrlFor('/auth', 'webapp-gold')).toBe('https://troystack.ai/gold?back=1');
     expect(await cancelUrlFor('/', 'webapp-gold')).toBe('https://troystack.ai/gold?back=1');
+  });
+
+  it("doesn't say the counts happened when this tab never tapped a plan on the Gold page under that campaign", async () => {
+    expect(await cancelUrlFor('/auth', 'site-pricing', false)).toBe('https://troystack.ai/gold?campaign=site-pricing');
+    expect(await cancelUrlFor('/auth', 'webapp-gold', false)).toBe('https://troystack.ai/gold');
+    const c = await withPrices({ monthly: 'price_m' });
+    c.rememberGoldTap('monthly', 'site-signal' as never);
+    expect(await cancelUrlFor('/auth', 'site-pricing', false)).toBe('https://troystack.ai/gold?campaign=site-pricing');
   });
 
   it('is the page checkout opened on for anything else', async () => {
