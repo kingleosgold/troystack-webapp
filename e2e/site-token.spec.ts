@@ -61,16 +61,15 @@ test("backing out of Stripe lands on the plans with the link's token, and a seco
 
   // Stripe's back link.
   await page.goto(checkouts[0].cancel_url as string);
+  // Signed in now, so one tap goes straight to Stripe.
   await page.getByRole('button', { name: 'Get Lifetime' }).click();
-  const sheet = page.getByRole('dialog');
-  const go = sheet.getByRole('button', { name: /Get Lifetime for/ });
-  if (await go.isVisible().catch(() => false)) await go.click();
   await expect(page).toHaveURL(/checkout\.stripe\.com/);
   expect(checkouts).toHaveLength(2);
   expect(checkouts[1].campaign).toBe('site-signal');
+  expect(checkouts[1].cancel_url).toBe(`${baseURL}/gold?campaign=site-signal`);
 });
 
-test('a checkout with no troystack.com token goes back to the page it opened from', async ({ page, baseURL }) => {
+test('a checkout with no troystack.com token keeps its old way back, the page checkout opened on', async ({ page, baseURL }) => {
   await mockBackends(page);
   await stubStripe(page);
   const checkouts = watch(page);
