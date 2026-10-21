@@ -46,17 +46,18 @@ export default function Article() {
   const feed = useSignalFeed('');
   const podcast = usePodcast();
   const a = article.data;
+  const key = a?.slug || slug;
 
   usePageMeta({
     title: a ? a.title : 'The Signal',
     description: a ? excerpt(a.oneLiner || a.commentary, 160) : undefined,
     // Once loaded, the API's slug, so a differently cased link isn't made canonical.
-    canonical: a ? `/signal/${a.slug}` : slug ? `/signal/${slug}` : '/signal',
+    canonical: key ? `/signal/${key}` : '/signal',
     image: a?.imageUrl || undefined,
   });
 
-  const episode = useMemo(() => podcast.data?.episodes.find((e) => e.slug === slug), [podcast.data, slug]);
-  const more = useMemo(() => (feed.data?.pages[0] ?? []).filter((x) => x.slug !== slug && !x.isDigest).slice(0, 4), [feed.data, slug]);
+  const episode = useMemo(() => podcast.data?.episodes.find((e) => e.slug === key), [podcast.data, key]);
+  const more = useMemo(() => (feed.data?.pages[0] ?? []).filter((x) => x.slug !== key && !x.isDigest).slice(0, 4), [feed.data, key]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 pt-6 sm:pt-8">
