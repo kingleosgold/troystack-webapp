@@ -196,12 +196,17 @@ export async function startCheckout(
   const priceId = PRICE_IDS[plan];
   if (!priceId) throw new Error('Web checkout is not set up here yet.');
   const origin = window.location.origin;
+  // Someone from a troystack.com link who backs out of Stripe lands on the
+  // plans again with the link's token, so a second try still counts for the
+  // page that sent them. Anyone else goes back to the page they were on.
+  const site = siteCampaign(campaign);
+  const back = site ? `/gold?campaign=${site}` : window.location.pathname;
   const { url } = await postJson<{ url: string }>('/v1/stripe/create-checkout-session', {
     user_id: userId,
     price_id: priceId,
     campaign,
     success_url: `${origin}/settings?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}${window.location.pathname}`,
+    cancel_url: `${origin}${back}`,
   }, { token });
   if (!url) throw new Error('Checkout did not start.');
   if (!stillWanted()) return false;
