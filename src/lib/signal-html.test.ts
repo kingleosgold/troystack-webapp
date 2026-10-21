@@ -65,3 +65,12 @@ describe('signal-html', () => {
     }
   });
 });
+
+describe('signal-html with odd article text', () => {
+  it("keeps a $ in the title as text and takes the API's slug for the canonical", async () => {
+    const res = await run('Gold-2026-10-20', () => json({ article: { slug: 'gold-2026-10-20', title: "Gold at $' and $& and $`", troy_commentary: 'Body.' } }));
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain("<title>Gold at $' and $&amp; and $` | TroyStack</title>");
+    expect(res.body).toContain('<link rel="canonical" href="https://troystack.ai/signal/gold-2026-10-20" />');
+  });
+});

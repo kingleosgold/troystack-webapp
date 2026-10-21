@@ -28,17 +28,17 @@ function apply(html, { title, description, url, image }) {
   const safeUrl = escapeHtml(url);
   const safeImage = escapeHtml(image);
   return html
-    .replace(/<title>[^<]*<\/title>/, `<title>${safeTitle}</title>`)
-    .replace(/<meta name="description" content="[^"]*" \/>/, `<meta name="description" content="${safeDesc}" />`)
-    .replace(/<link rel="canonical" href="[^"]*" \/>/, `<link rel="canonical" href="${safeUrl}" />`)
-    .replace(/<meta property="og:url" content="[^"]*" \/>/, `<meta property="og:url" content="${safeUrl}" />`)
-    .replace(/<meta property="og:title" content="[^"]*" \/>/, `<meta property="og:title" content="${safeTitle}" />`)
-    .replace(/<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="${safeDesc}" />`)
-    .replace(/<meta property="og:image" content="[^"]*" \/>/, `<meta property="og:image" content="${safeImage}" />`)
-    .replace(/<meta property="og:type" content="[^"]*" \/>/, `<meta property="og:type" content="article" />`)
-    .replace(/<meta name="twitter:title" content="[^"]*" \/>/, `<meta name="twitter:title" content="${safeTitle}" />`)
-    .replace(/<meta name="twitter:description" content="[^"]*" \/>/, `<meta name="twitter:description" content="${safeDesc}" />`)
-    .replace(/<meta name="twitter:image" content="[^"]*" \/>/, `<meta name="twitter:image" content="${safeImage}" />`);
+    .replace(/<title>[^<]*<\/title>/, () => `<title>${safeTitle}</title>`)
+    .replace(/<meta name="description" content="[^"]*" \/>/, () => `<meta name="description" content="${safeDesc}" />`)
+    .replace(/<link rel="canonical" href="[^"]*" \/>/, () => `<link rel="canonical" href="${safeUrl}" />`)
+    .replace(/<meta property="og:url" content="[^"]*" \/>/, () => `<meta property="og:url" content="${safeUrl}" />`)
+    .replace(/<meta property="og:title" content="[^"]*" \/>/, () => `<meta property="og:title" content="${safeTitle}" />`)
+    .replace(/<meta property="og:description" content="[^"]*" \/>/, () => `<meta property="og:description" content="${safeDesc}" />`)
+    .replace(/<meta property="og:image" content="[^"]*" \/>/, () => `<meta property="og:image" content="${safeImage}" />`)
+    .replace(/<meta property="og:type" content="[^"]*" \/>/, () => `<meta property="og:type" content="article" />`)
+    .replace(/<meta name="twitter:title" content="[^"]*" \/>/, () => `<meta name="twitter:title" content="${safeTitle}" />`)
+    .replace(/<meta name="twitter:description" content="[^"]*" \/>/, () => `<meta name="twitter:description" content="${safeDesc}" />`)
+    .replace(/<meta name="twitter:image" content="[^"]*" \/>/, () => `<meta name="twitter:image" content="${safeImage}" />`);
 }
 
 export default async function handler(req, res) {
@@ -102,7 +102,9 @@ export default async function handler(req, res) {
   const rawTitle = plainDashes(String(article.title || '')) || 'The Signal';
   const title = rawTitle.includes('TroyStack') ? rawTitle : `${rawTitle} | TroyStack`;
   const description = plainDashes(usableOneLiner(article.troy_one_liner) || String(article.troy_commentary || '') || rawTitle).replace(/\s+/g, ' ').trim().slice(0, 160);
-  const url = `${SITE}/signal/${slug}`;
+  // The canonical takes the API's slug, so /signal/Gold-x and /signal/gold-x agree.
+  const canonicalSlug = /^[a-z0-9-]{1,120}$/.test(String(article.slug || '')) ? article.slug : slug.toLowerCase();
+  const url = `${SITE}/signal/${canonicalSlug}`;
   const image = article.image_url || `${SITE}/og-image.png`;
   html = apply(html, { title, description, url, image });
   const ld = {
@@ -116,7 +118,7 @@ export default async function handler(req, res) {
     author: { '@type': 'Organization', name: 'TroyStack', url: SITE },
     publisher: { '@type': 'Organization', name: 'Mancini Tech Solutions, LLC', url: SITE },
   };
-  html = html.replace('</head>', `<script type="application/ld+json">${scriptJson(ld)}</script></head>`);
+  html = html.replace('</head>', () => `<script type="application/ld+json">${scriptJson(ld)}</script></head>`);
 
   await send(200, html);
 }

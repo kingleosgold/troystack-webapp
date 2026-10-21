@@ -23,7 +23,8 @@ const fullTitle = (t) => (t.includes('TroyStack') ? t : `${t} | TroyStack`);
 
 function setTag(html, pattern, replacement) {
   if (!pattern.test(html)) throw new Error(`prerender: index.html is missing ${pattern}`);
-  return html.replace(pattern, replacement);
+  // A function, so a $ in an article's text isn't read as a pattern.
+  return html.replace(pattern, () => replacement);
 }
 
 function render(route, meta, body, ld, extra = {}) {
