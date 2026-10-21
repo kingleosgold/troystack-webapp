@@ -187,6 +187,13 @@ for (const [route, meta] of Object.entries(pages)) {
 let notFound = template;
 notFound = setTag(notFound, /<title>[^<]*<\/title>/, '<title>Page not found | TroyStack</title>');
 notFound = setTag(notFound, /<meta name="description" content="[^"]*" \/>/, '<meta name="description" content="That page is not on TroyStack." />');
+// A shared broken link shouldn't unfurl as the home page, and a missing page has no canonical address.
+notFound = setTag(notFound, /<meta property="og:title" content="[^"]*" \/>/, '<meta property="og:title" content="Page not found | TroyStack" />');
+notFound = setTag(notFound, /<meta property="og:description" content="[^"]*" \/>/, '<meta property="og:description" content="That page is not on TroyStack." />');
+notFound = setTag(notFound, /<meta name="twitter:title" content="[^"]*" \/>/, '<meta name="twitter:title" content="Page not found | TroyStack" />');
+notFound = setTag(notFound, /<meta name="twitter:description" content="[^"]*" \/>/, '<meta name="twitter:description" content="That page is not on TroyStack." />');
+notFound = setTag(notFound, /\s*<link rel="canonical" href="[^"]*" \/>/, '');
+notFound = setTag(notFound, /\s*<meta property="og:url" content="[^"]*" \/>/, '');
 notFound = notFound.includes('name="robots"') ? notFound : notFound.replace('</head>', '<meta name="robots" content="noindex" /></head>');
 writeFileSync(path.join(dist, '404.html'), notFound);
 

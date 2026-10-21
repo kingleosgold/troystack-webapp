@@ -50,7 +50,8 @@ export default function Article() {
   usePageMeta({
     title: a ? a.title : 'The Signal',
     description: a ? excerpt(a.oneLiner || a.commentary, 160) : undefined,
-    canonical: slug ? `/signal/${slug}` : '/signal',
+    // Once loaded, the API's slug, so a differently cased link isn't made canonical.
+    canonical: a ? `/signal/${a.slug}` : slug ? `/signal/${slug}` : '/signal',
     image: a?.imageUrl || undefined,
   });
 
