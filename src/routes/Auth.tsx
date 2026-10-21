@@ -242,8 +242,8 @@ export default function Auth() {
       {mode === 'signup' && (
         <p className="mt-4 text-center text-[12px] text-fg-3">
           By making an account you agree to the{' '}
-          <a href={TERMS_URL} className="underline hover:text-fg-2">Terms</a> and{' '}
-          <a href={PRIVACY_URL} className="underline hover:text-fg-2">Privacy Policy</a>.
+          <a href={TERMS_URL} target="_blank" rel="noopener" className="underline hover:text-fg-2">Terms</a> and{' '}
+          <a href={PRIVACY_URL} target="_blank" rel="noopener" className="underline hover:text-fg-2">Privacy Policy</a>.
         </p>
       )}
     </div>
