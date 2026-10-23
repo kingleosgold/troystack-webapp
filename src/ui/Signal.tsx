@@ -6,16 +6,16 @@ import { excerpt, timeAgo } from '../lib/text';
 import { cx } from '../lib/cx';
 import { Skeleton } from './primitives';
 
-function Thumb({ src, className }: { src: string | null; className?: string }) {
+function Thumb({ src, alt, className }: { src: string | null; alt: string; className?: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div className={cx('bg-surface-2 flex items-center justify-center', className)} aria-hidden="true">
-        <img src="/troy-96.png" alt="" className="h-10 w-10 rounded-full opacity-70" />
+      <div className={cx('bg-surface-2 flex items-center justify-center', className)}>
+        <img src="/troy-96.png" alt="Troy" className="h-10 w-10 rounded-full opacity-70" />
       </div>
     );
   }
-  return <img src={src} alt="" loading="lazy" onError={() => setFailed(true)} className={cx('object-cover bg-surface-2', className)} />;
+  return <img src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} className={cx('object-cover bg-surface-2', className)} />;
 }
 
 /** A Signal article in a list. */
@@ -30,7 +30,7 @@ export function ArticleCard({ article, variant = 'row' }: { article: SignalArtic
   if (variant === 'tile') {
     return (
       <Link to={`/signal/${article.slug}`} className="group flex flex-col rounded-2xl border border-line bg-surface overflow-hidden hover:border-line-strong transition-colors">
-        <Thumb src={article.imageUrl} className="aspect-[16/9] w-full" />
+        <Thumb src={article.imageUrl} alt={article.title} className="aspect-[16/9] w-full" />
         <div className="p-4 flex flex-col gap-1.5 flex-1">
           {meta}
           <h3 className="text-[15px] font-semibold leading-snug text-fg group-hover:text-gold transition-colors line-clamp-3">{article.title}</h3>
@@ -46,7 +46,7 @@ export function ArticleCard({ article, variant = 'row' }: { article: SignalArtic
         <h3 className="text-[15px] font-semibold leading-snug text-fg group-hover:text-gold transition-colors line-clamp-2">{article.title}</h3>
         <p className="text-[13px] text-fg-2 line-clamp-2">{excerpt(article.commentary, 160)}</p>
       </div>
-      <Thumb src={article.imageUrl} className="h-20 w-24 sm:h-24 sm:w-32 shrink-0 rounded-xl" />
+      <Thumb src={article.imageUrl} alt={article.title} className="h-20 w-24 sm:h-24 sm:w-32 shrink-0 rounded-xl" />
     </Link>
   );
 }

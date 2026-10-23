@@ -1,22 +1,9 @@
-import { Bell, Camera, Headphones, Layers, MessageCircle, Smartphone } from 'lucide-react';
 import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { GOLD } from '../lib/appStore';
+import { FREE_FEATURES, GOLD_FEATURES } from '../lib/gold';
 import { InstallPath } from '../ui/AppStore';
 import { Card } from '../ui/primitives';
-
-const FREE = [
-  { icon: <Layers size={18} />, title: 'Your stack at live spot', body: 'Add what you own, and the app values it all day with your cost basis and gain.' },
-  { icon: <Bell size={18} />, title: 'Price alerts', body: 'Pick a price above or below spot for any metal and get a push when it crosses.' },
-  { icon: <Camera size={18} />, title: 'Receipt scanning', body: 'Snap a dealer receipt and Troy pulls out every item. Five a month on the free plan.' },
-  { icon: <MessageCircle size={18} />, title: 'Troy', body: 'Ask him anything about the metals. Three questions a day on the free plan.' },
-];
-
-const GOLD_FEATURES = [
-  { icon: <MessageCircle size={18} />, title: '30 questions a day', body: 'Troy remembers every conversation and knows your stack.' },
-  { icon: <Headphones size={18} />, title: 'Troy out loud', body: 'Hear his answers and keep listening from the lock screen.' },
-  { icon: <Smartphone size={18} />, title: 'Widgets and the daily brief', body: 'Live spot on your home screen and a morning brief written around your stack.' },
-];
 
 export default function GetApp() {
   usePageMeta({ ...SEO['/app'], canonical: '/app' });
@@ -45,33 +32,27 @@ export default function GetApp() {
         </div>
       </div>
 
-      <section className="mt-12" aria-labelledby="free-heading">
-        <h2 id="free-heading" className="text-[17px] font-semibold text-fg">Free in the app</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {FREE.map((f) => (
-            <Card key={f.title} className="p-5 flex gap-3">
-              <span className="text-gold mt-0.5" aria-hidden="true">{f.icon}</span>
-              <span>
-                <span className="block text-[15px] font-semibold text-fg">{f.title}</span>
-                <span className="block text-[14px] text-fg-2 mt-0.5">{f.body}</span>
-              </span>
-            </Card>
-          ))}
-        </div>
-      </section>
+      <div className="mt-12 grid gap-3 sm:grid-cols-2">
+        <Card className="p-5">
+          <h2 className="text-[17px] font-semibold text-fg">Free in the app and on the web</h2>
+          <ul className="mt-3 space-y-2.5">
+            {FREE_FEATURES.map((f) => (
+              <li key={f} className="text-[14px] text-fg-2">{f}</li>
+            ))}
+          </ul>
+        </Card>
+        <Card className="p-5 border-gold">
+          <h2 className="text-[17px] font-semibold text-fg">With Gold</h2>
+          <ul className="mt-3 space-y-2.5">
+            {GOLD_FEATURES.map((f) => (
+              <li key={f} className="text-[14px] text-fg-2">{f}</li>
+            ))}
+          </ul>
+        </Card>
+      </div>
 
-      <section className="mt-8" aria-labelledby="gold-heading">
-        <h2 id="gold-heading" className="text-[17px] font-semibold text-fg">With Gold</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          {GOLD_FEATURES.map((f) => (
-            <Card key={f.title} className="p-5">
-              <span className="text-gold" aria-hidden="true">{f.icon}</span>
-              <span className="mt-2 block text-[15px] font-semibold text-fg">{f.title}</span>
-              <span className="block text-[14px] text-fg-2 mt-0.5">{f.body}</span>
-            </Card>
-          ))}
-        </div>
-      </section>
+      <h2 className="mt-10 text-[15px] font-semibold text-fg">Who's behind this</h2>
+      <p className="mt-1 text-[13px] text-fg-3">Built by Jon Mancini, Mancini Tech Solutions, Connecticut.</p>
     </div>
   );
 }

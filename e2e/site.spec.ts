@@ -21,7 +21,7 @@ async function expectNoLongDashes(page: Page) {
 }
 
 const PAGES: Array<[string, string | RegExp]> = [
-  ['/', /Gold and silver today/i],
+  ['/', /Your gold and silver, valued live/i],
   ['/prices/silver', /Silver spot price/],
   ['/signal', /Metals news, with Troy's read/],
   ['/signal/evening-signal-2026-10-08', /The Stack Signal, October 8, 2026/],
@@ -43,6 +43,8 @@ const PAGES: Array<[string, string | RegExp]> = [
   ['/delete-account', /Delete your TroyStack account/],
   ['/auth', /Sign in to TroyStack/],
   ['/developers', /TroyStack API/],
+  ['/privacy', /Privacy Policy/],
+  ['/terms', /Terms of Service/],
   ['/nope', /That page isn't here/],
 ];
 
@@ -89,7 +91,7 @@ test('home shows live prices and Troy\'s read', async ({ page }) => {
 test('pages fit a small phone without scrolling sideways', async ({ page }) => {
   await mockBackends(page);
   await page.setViewportSize({ width: 320, height: 700 });
-  for (const path of ['/', '/prices/gold', '/signal', '/tools/melt', '/tools/what-if', '/troy', '/stack', '/app', '/developers']) {
+  for (const path of ['/', '/prices/gold', '/signal', '/tools/melt', '/tools/what-if', '/troy', '/stack', '/app', '/developers', '/privacy', '/terms', '/gold']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible({ timeout: 15_000 });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

@@ -1,7 +1,7 @@
 {
   "/": {
     "title": "TroyStack: live gold and silver prices, with Troy",
-    "description": "Live spot for gold, silver, platinum and palladium, Troy's daily read on the market, the Stack Signal podcast, and your stack at today's prices."
+    "description": "Track every coin and bar at today's spot, and ask Troy what moved the market. Free, no account needed to start."
   },
   "/troy": {
     "title": "Ask Troy, the AI analyst for gold and silver stackers",
@@ -66,6 +66,14 @@
   "/delete-account": {
     "title": "Delete your TroyStack account",
     "description": "How to delete your TroyStack account and what it holds, what's kept, and what happens to an App Store, Google Play or troystack.ai subscription."
+  },
+  "/privacy": {
+    "title": "Privacy Policy",
+    "description": "What TroyStack collects, who it is shared with, and how to delete your account. Mancini Tech Solutions, LLC."
+  },
+  "/terms": {
+    "title": "Terms of Service",
+    "description": "Terms for TroyStack, including TroyStack Gold at $4.99 a month, $39.99 a year, or $99.99 once. Mancini Tech Solutions, LLC."
   },
   "/developers": {
     "title": "TroyStack API and MCP server for precious metals data",

@@ -6,6 +6,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { plainDashes, usableOneLiner } from '../api/_lib/signal-text.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
@@ -22,13 +23,15 @@ const fullTitle = (t) => (t.includes('TroyStack') ? t : `${t} | TroyStack`);
 
 function setTag(html, pattern, replacement) {
   if (!pattern.test(html)) throw new Error(`prerender: index.html is missing ${pattern}`);
-  return html.replace(pattern, replacement);
+  // A function, so a $ in an article's text isn't read as a pattern.
+  return html.replace(pattern, () => replacement);
 }
 
-function render(route, meta, body, ld) {
-  const url = `${SITE}${route === '/' ? '/' : route}`;
+function render(route, meta, body, ld, extra = {}) {
+  const url = extra.url || `${SITE}${route === '/' ? '/' : route}`;
   const title = escape(fullTitle(meta.title));
   const desc = escape(meta.description);
+  const image = extra.image ? escape(extra.image) : null;
   let html = template;
   html = setTag(html, /<title>[^<]*<\/title>/, `<title>${title}</title>`);
   html = setTag(html, /<meta name="description" content="[^"]*" \/>/, `<meta name="description" content="${desc}" />`);
@@ -38,12 +41,72 @@ function render(route, meta, body, ld) {
   html = setTag(html, /<meta property="og:description" content="[^"]*" \/>/, `<meta property="og:description" content="${desc}" />`);
   html = setTag(html, /<meta name="twitter:title" content="[^"]*" \/>/, `<meta name="twitter:title" content="${title}" />`);
   html = setTag(html, /<meta name="twitter:description" content="[^"]*" \/>/, `<meta name="twitter:description" content="${desc}" />`);
+  if (image) {
+    html = setTag(html, /<meta property="og:image" content="[^"]*" \/>/, `<meta property="og:image" content="${image}" />`);
+    html = setTag(html, /<meta name="twitter:image" content="[^"]*" \/>/, `<meta name="twitter:image" content="${image}" />`);
+  }
+  if (extra.ogType) html = setTag(html, /<meta property="og:type" content="[^"]*" \/>/, `<meta property="og:type" content="${escape(extra.ogType)}" />`);
   // Crawlers that don't run JavaScript, which includes most AI ones, read the
   // page's facts from here. With JavaScript on, browsers ignore it.
   if (body) html = setTag(html, /<noscript>[^<]*<\/noscript>/, `<noscript>${body}</noscript>`);
   // Structured data search engines read, like the breadcrumb a result shows.
-  if (ld) html = setTag(html, /<\/head>/, `<script type="application/ld+json">${scriptJson(ld)}</script></head>`);
+  const blocks = (Array.isArray(ld) ? ld : ld ? [ld] : []).map((item) => `<script type="application/ld+json">${scriptJson(item)}</script>`).join('');
+  if (blocks) html = setTag(html, /<\/head>/, `${blocks}</head>`);
   return html;
+}
+
+/** The iPhone app, free to download. */
+const SOFTWARE = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'TroyStack',
+  operatingSystem: 'iOS',
+  applicationCategory: 'FinanceApplication',
+  url: 'https://apps.apple.com/app/id6757343766',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+};
+
+function articleLd(article, title, description) {
+  const url = `${SITE}/signal/${article.slug}`;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: title,
+    description,
+    datePublished: article.published_at || article.created_at || undefined,
+    mainEntityOfPage: url,
+    image: article.image_url || `${SITE}/og-image.png`,
+    author: { '@type': 'Organization', name: 'TroyStack', url: SITE },
+    publisher: { '@type': 'Organization', name: 'Mancini Tech Solutions, LLC', url: SITE },
+  };
+}
+
+function plainExcerpt(text, max = 160) {
+  const plain = String(text || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\s+/g, ' ').trim();
+  if (plain.length <= max) return plain;
+  const cut = plain.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${cut.slice(0, lastSpace > max * 0.6 ? lastSpace : max).replace(/[,;:.\s]+$/, '')}…`;
+}
+
+async function loadSignalArticles() {
+  // The browser tests build offline, so they skip the live article list.
+  if (process.env.PRERENDER_SIGNAL === 'off') return [];
+  try {
+    const articles = [];
+    for (let offset = 0; offset < 1000; offset += 50) {
+      const res = await fetch(`https://api.troystack.ai/v1/stack-signal?limit=50&offset=${offset}`, { signal: AbortSignal.timeout(12000) });
+      if (!res.ok) throw new Error(`list ${res.status}`);
+      const body = await res.json();
+      const batch = Array.isArray(body.articles) ? body.articles : [];
+      articles.push(...batch);
+      if (batch.length < 50) break;
+    }
+    return articles;
+  } catch (err) {
+    console.warn(`prerender: signal articles skipped (${err.message})`);
+    return [];
+  }
 }
 
 const NEEDS_JS = '<p>TroyStack needs JavaScript to show live prices and talk to Troy.</p>';
@@ -87,20 +150,52 @@ function coinBreadcrumb(c) {
 
 const pages = { ...seo, '/prices': seo['/prices/gold'] };
 const bodies = { '/coins': coinsIndexBody() };
-const structured = {};
+const structured = { '/': SOFTWARE, '/app': SOFTWARE };
+const extras = {};
 for (const c of coins) {
   pages[`/coins/${c.slug}`] = { title: c.title, description: c.description };
   bodies[`/coins/${c.slug}`] = coinBody(c);
   structured[`/coins/${c.slug}`] = coinBreadcrumb(c);
 }
+
+const signalArticles = await loadSignalArticles();
+for (const article of signalArticles) {
+  const slug = String(article.slug || '');
+  if (!/^[a-z0-9-]{1,120}$/i.test(slug)) continue;
+  // A one-liner cut to a word or two falls back to the commentary, as in the app.
+  const title = plainDashes(article.title) || 'The Signal';
+  const description = plainExcerpt(plainDashes(usableOneLiner(article.troy_one_liner) || article.troy_commentary || article.title || ''));
+  const route = `/signal/${slug}`;
+  pages[route] = { title, description };
+  const commentary = escape(plainExcerpt(plainDashes(article.troy_commentary || ''), 4000));
+  bodies[route] = `<h1>${escape(title)}</h1><p>${escape(description)}</p><p>${commentary}</p><p>Troy is an AI. This is his analysis and opinion, not financial advice.</p>${NEEDS_JS}`;
+  structured[route] = articleLd(article, title, description);
+  extras[route] = { ogType: 'article', image: article.image_url || undefined };
+}
+
 let count = 0;
 for (const [route, meta] of Object.entries(pages)) {
-  const html = render(route, meta, bodies[route], structured[route]);
+  const html = render(route, meta, bodies[route], structured[route], extras[route]);
   const file = route === '/' ? path.join(dist, 'index.html') : path.join(dist, `${route.slice(1)}.html`);
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, html);
   count += 1;
 }
+
+// Unknown paths. Vercel serves this file with HTTP 404 when nothing else matches.
+// The app script is still here, so the same not-found screen renders.
+let notFound = template;
+notFound = setTag(notFound, /<title>[^<]*<\/title>/, '<title>Page not found | TroyStack</title>');
+notFound = setTag(notFound, /<meta name="description" content="[^"]*" \/>/, '<meta name="description" content="That page is not on TroyStack." />');
+// A shared broken link shouldn't unfurl as the home page, and a missing page has no canonical address.
+notFound = setTag(notFound, /<meta property="og:title" content="[^"]*" \/>/, '<meta property="og:title" content="Page not found | TroyStack" />');
+notFound = setTag(notFound, /<meta property="og:description" content="[^"]*" \/>/, '<meta property="og:description" content="That page is not on TroyStack." />');
+notFound = setTag(notFound, /<meta name="twitter:title" content="[^"]*" \/>/, '<meta name="twitter:title" content="Page not found | TroyStack" />');
+notFound = setTag(notFound, /<meta name="twitter:description" content="[^"]*" \/>/, '<meta name="twitter:description" content="That page is not on TroyStack." />');
+notFound = setTag(notFound, /\s*<link rel="canonical" href="[^"]*" \/>/, '');
+notFound = setTag(notFound, /\s*<meta property="og:url" content="[^"]*" \/>/, '');
+notFound = notFound.includes('name="robots"') ? notFound : notFound.replace('</head>', '<meta name="robots" content="noindex" /></head>');
+writeFileSync(path.join(dist, '404.html'), notFound);
 
 // /prices shows the gold page, so it is the gold page under a shorter
 // address: its file is the gold page's, canonical address and all, the same

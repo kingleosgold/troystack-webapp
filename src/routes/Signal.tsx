@@ -19,7 +19,7 @@ function DigestFeature() {
   return (
     <Link to={`/signal/${d.slug}`} className="group block rounded-2xl border border-line bg-surface p-5 sm:p-6 hover:border-line-strong transition-colors">
       <div className="flex items-center gap-3">
-        <img src="/troy-96.png" alt="" className="h-9 w-9 rounded-full" width={36} height={36} />
+        <img src="/troy-96.png" alt="Troy" className="h-9 w-9 rounded-full" width={36} height={36} />
         <div>
           <div className="text-[13px] font-semibold text-gold">The Stack Signal</div>
           <div className="text-[12px] text-fg-3">

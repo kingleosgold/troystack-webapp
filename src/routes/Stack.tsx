@@ -430,7 +430,7 @@ export default function Stack() {
       ) : holdings.length === 0 ? (
         <Card>
           <EmptyState
-            icon={<img src="/troy-96.png" alt="" className="h-14 w-14 rounded-full" />}
+            icon={<img src="/troy-96.png" alt="Troy" className="h-14 w-14 rounded-full" />}
             title="Nothing in your stack yet"
             body="Add a coin or bar and TroyStack values it at live spot, with what you paid and what you've gained. Or import a spreadsheet you already keep."
             action={
