@@ -4,10 +4,13 @@ import { mockBackends, sessionFor } from './mock';
 // A troystack.com link's site-* token rides from /gold through sign-up to
 // Stripe, and back to /gold if they back out, whichever way they sign in.
 
-function watch(page: Page) {
+function watch(page: Page, bearers: string[] = []) {
   const checkouts: Array<Record<string, unknown>> = [];
   page.on('request', (r) => {
-    if (r.url().endsWith('/v1/stripe/create-checkout-session') && r.method() === 'POST') checkouts.push(r.postDataJSON());
+    if (r.url().endsWith('/v1/stripe/create-checkout-session') && r.method() === 'POST') {
+      checkouts.push(r.postDataJSON());
+      bearers.push(r.headers()['authorization'] ?? '');
+    }
   });
   return checkouts;
 }
@@ -24,7 +27,9 @@ for (const provider of ['Google', 'Apple'] as const) {
     await stubStripe(page);
     // The provider sends the browser back to the return address with the
     // session in the hash, and supabase-js signs in from it, as it does live.
-    const session = sessionFor();
+    // The hash carries its own token, unlike the mock's /auth/v1/token answer,
+    // so the checks below prove the hash's session is the one in use.
+    const session = { ...sessionFor(), access_token: 'e2e-oauth-access-token' };
     const returned = new URLSearchParams({
       access_token: session.access_token,
       refresh_token: session.refresh_token,
@@ -43,7 +48,8 @@ for (const provider of ['Google', 'Apple'] as const) {
     page.on('request', (r) => {
       if (new URL(r.url()).pathname === '/auth/v1/user') userBearers.push(r.headers()['authorization'] ?? '');
     });
-    const checkouts = watch(page);
+    const checkoutBearers: string[] = [];
+    const checkouts = watch(page, checkoutBearers);
 
     await page.goto('/gold?campaign=site-pricing');
     await page.getByRole('button', { name: 'Get Lifetime' }).click();
@@ -55,6 +61,7 @@ for (const provider of ['Google', 'Apple'] as const) {
     expect(new URL(authorize[0]).searchParams.get('provider')).toBe(provider.toLowerCase());
     expect(new URL(authorize[0]).searchParams.get('redirect_to')).toBe(`${baseURL}/`);
     expect(checkouts).toHaveLength(1);
+    expect(checkoutBearers).toEqual([`Bearer ${session.access_token}`]);
     expect(checkouts[0].campaign).toBe('site-pricing');
     expect(checkouts[0].cancel_url).toBe(`${baseURL}/gold?campaign=site-pricing&back=1`);
   });
