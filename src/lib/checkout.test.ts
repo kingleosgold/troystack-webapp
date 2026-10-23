@@ -194,3 +194,64 @@ describe('where a checkout backs out to', () => {
     expect(await cancelUrlFor('/troy')).toBe('https://troystack.ai/troy');
   });
 });
+
+describe('a plan tapped on the Gold page', () => {
+  let store: Map<string, string>;
+  beforeEach(() => {
+    store = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const now = 1_800_000_000_000;
+
+  it('is the plan back from Stripe under the same campaign', async () => {
+    const c = await withPrices({ monthly: 'price_m' });
+    c.rememberGoldTap('yearly', 'webapp-gold', now);
+    expect(c.backedOutPlan('1', 'webapp-gold', now + 60_000)).toBe('yearly');
+  });
+
+  it("isn't, without back=1 or under another campaign", async () => {
+    const c = await withPrices({ monthly: 'price_m' });
+    c.rememberGoldTap('yearly', 'webapp-gold', now);
+    expect(c.backedOutPlan(null, 'webapp-gold', now)).toBeUndefined();
+    expect(c.backedOutPlan('0', 'webapp-gold', now)).toBeUndefined();
+    expect(c.backedOutPlan('1', 'site-pricing', now)).toBeUndefined();
+  });
+
+  it('lasts half an hour, so the same tab back much later counts again', async () => {
+    const c = await withPrices({ monthly: 'price_m' });
+    c.rememberGoldTap('monthly', 'site-pricing' as never, now);
+    expect(c.goldTap(now + 30 * 60 * 1000)).toEqual({ plan: 'monthly', campaign: 'site-pricing' });
+    expect(c.goldTap(now + 30 * 60 * 1000 + 1)).toBeNull();
+    expect(c.backedOutPlan('1', 'site-pricing', now + 31 * 60 * 1000)).toBeUndefined();
+  });
+
+  it("isn't one with no time, a time ahead of the clock, an unknown plan or a broken value", async () => {
+    const c = await withPrices({ monthly: 'price_m' });
+    store.set('stg_gold_tap', JSON.stringify({ plan: 'monthly', campaign: 'webapp-gold' }));
+    expect(c.goldTap(now)).toBeNull();
+    store.set('stg_gold_tap', JSON.stringify({ plan: 'monthly', campaign: 'webapp-gold', at: now + 5 * 60 * 1000 }));
+    expect(c.goldTap(now)).toBeNull();
+    store.set('stg_gold_tap', JSON.stringify({ plan: 'weekly', campaign: 'webapp-gold', at: now }));
+    expect(c.goldTap(now)).toBeNull();
+    store.set('stg_gold_tap', JSON.stringify({ plan: 'monthly', campaign: 7, at: now }));
+    expect(c.goldTap(now)).toBeNull();
+    store.set('stg_gold_tap', '{not json');
+    expect(c.goldTap(now)).toBeNull();
+  });
+
+  it("keeps a back-out to the Gold page from saying the counts happened once the tap is stale", async () => {
+    const c = await withPrices({ monthly: 'price_m' });
+    c.rememberGoldTap('monthly', 'webapp-gold', Date.now() - 31 * 60 * 1000);
+    vi.stubGlobal('window', { location: { origin: 'https://troystack.ai', pathname: '/auth', assign: vi.fn() } });
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/e2e' }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetch);
+    await c.startCheckout('7b1c6c1e-1111-4a2b-9c3d-000000000001', 'token', 'monthly', 'webapp-gold');
+    const init = (fetch.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect((JSON.parse(String(init.body)) as { cancel_url: string }).cancel_url).toBe('https://troystack.ai/gold');
+  });
+});

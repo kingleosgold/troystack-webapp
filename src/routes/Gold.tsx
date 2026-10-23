@@ -6,7 +6,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { useTrial } from '../contexts/TrialContext';
 import SEO from '../lib/seo.json';
 import { GOLD } from '../lib/appStore';
-import { goldPagePlans, goldTap, rememberGoldTap, siteCampaign, webCheckoutReady, type WebPlan } from '../lib/checkout';
+import { backedOutPlan, goldPagePlans, rememberGoldTap, siteCampaign, webCheckoutReady, type WebPlan } from '../lib/checkout';
 import { countStep } from '../lib/funnel';
 import { GOLD_FEATURES } from '../lib/gold';
 import { cx } from '../lib/cx';
@@ -42,10 +42,7 @@ export default function Gold() {
   // Someone back from Stripe already counted a view and a tap on the way in,
   // so this visit doesn't count the view again, or a tap on the same plan.
   // A different plan is a new pick and counts.
-  const [tappedBefore] = useState(() => {
-    const before = goldTap();
-    return params.get('back') === '1' && before?.campaign === campaign ? before.plan : undefined;
-  });
+  const [tappedBefore] = useState(() => backedOutPlan(params.get('back'), campaign));
   // The card already showed the plan and its price, so where it can be bought
   // here the button goes on to sign-up or Stripe without a second pick.
   const start = (plan: WebPlan) => {

@@ -185,24 +185,42 @@ export function takeNextPath(now = Date.now()): string | null {
 
 // The plan this tab last tapped on the Gold page, and under which campaign.
 // It's how checkout knows the view and tap already counted, so a back-out
-// can say so, and only for someone who came through the Gold page.
+// can say so, and only for someone who came through the Gold page. A tap
+// older than the half hour a sign-up or checkout intent lasts no longer
+// counts, so the same tab back much later counts its view again.
 const GOLD_TAP_KEY = 'stg_gold_tap';
 
-export function rememberGoldTap(plan: WebPlan, campaign: CheckoutCampaign): void {
+export function rememberGoldTap(plan: WebPlan, campaign: CheckoutCampaign, now = Date.now()): void {
   try {
-    sessionStorage.setItem(GOLD_TAP_KEY, JSON.stringify({ plan, campaign }));
+    sessionStorage.setItem(GOLD_TAP_KEY, JSON.stringify({ plan, campaign, at: now }));
   } catch {
     // the back-out counts again, as before
   }
 }
 
-export function goldTap(): { plan?: unknown; campaign?: unknown } | null {
+export function goldTap(now = Date.now()): { plan: WebPlan; campaign: string } | null {
   try {
     const raw = sessionStorage.getItem(GOLD_TAP_KEY);
-    return raw && raw.startsWith('{') ? (JSON.parse(raw) as { plan?: unknown; campaign?: unknown }) : null;
+    if (!raw || !raw.startsWith('{')) return null;
+    const parsed = JSON.parse(raw) as { plan?: unknown; campaign?: unknown; at?: unknown };
+    const at = typeof parsed.at === 'number' ? parsed.at : 0;
+    if (now - at > INTENT_TTL_MS || at > now + 60_000) return null;
+    if (!isWebPlan(parsed.plan) || typeof parsed.campaign !== 'string') return null;
+    return { plan: parsed.plan, campaign: parsed.campaign };
   } catch {
     return null;
   }
+}
+
+/**
+ * The plan someone back from Stripe already tapped on the Gold page, when the
+ * address says back=1 and this tab's tap was under the same campaign. Their
+ * view and that tap already counted, so the page counts neither again.
+ */
+export function backedOutPlan(back: string | null, campaign: string, now = Date.now()): WebPlan | undefined {
+  if (back !== '1') return undefined;
+  const before = goldTap(now);
+  return before?.campaign === campaign ? before.plan : undefined;
 }
 
 /**
