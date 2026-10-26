@@ -159,21 +159,25 @@ test('the Gold page counts the view, the plan tap and the sign-up, and nothing a
   ]);
 });
 
-test('an automated browser opens the Gold page and picks a plan without a single count', async ({ page }) => {
+test('an automated browser opens the Gold page, picks a plan and signs up without a single count', async ({ page }) => {
   await mockBackends(page, { automated: true });
   const steps: Array<Record<string, unknown>> = [];
   page.on('request', (r) => {
     if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
   });
+  await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
   await page.goto('/gold');
   // Only webdriver gives it away, since the device profile's user agent reads as a person.
   expect(await page.evaluate(() => navigator.webdriver)).toBe(true);
   expect(await page.evaluate(() => /headless/i.test(navigator.userAgent))).toBe(false);
   await page.getByRole('button', { name: 'Get Lifetime' }).click();
   await expect(page.getByLabel('Email')).toBeVisible();
-  // A person's view goes on mount and the tap in its click handler, both before
-  // the sign-up form shows, so the wait only covers a slow request leaving.
-  await page.waitForTimeout(300);
+  await page.getByLabel('Email').fill('new@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('a-long-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  // A person's sign-up count goes before the page leaves for Stripe, as the
+  // test above shows, so by now any count would have been seen.
   expect(steps).toEqual([]);
 });
 
