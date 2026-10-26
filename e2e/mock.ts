@@ -130,6 +130,9 @@ export const BRIEF_TEXT = 'Gold held near $4,180 overnight and silver firmed. Yo
 
 /** Answers every TroyStack API and Supabase request the site makes. */
 export async function mockBackends(page: Page, opts: MockOptions = {}) {
+  // The funnel skips automated browsers, and Playwright is one. These tests
+  // stand in for a person, so the page sees an ordinary browser.
+  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false }));
   const quota = opts.visitorQuota === undefined ? { questionsUsed: 0, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' } : opts.visitorQuota;
   let asked = quota?.questionsUsed ?? 0;
   const calls: string[] = [];
