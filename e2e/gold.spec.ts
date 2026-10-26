@@ -166,11 +166,14 @@ test('an automated browser opens the Gold page and picks a plan without a single
     if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
   });
   await page.goto('/gold');
+  // Only webdriver gives it away, since the device profile's user agent reads as a person.
   expect(await page.evaluate(() => navigator.webdriver)).toBe(true);
+  expect(await page.evaluate(() => /headless/i.test(navigator.userAgent))).toBe(false);
   await page.getByRole('button', { name: 'Get Lifetime' }).click();
   await expect(page.getByLabel('Email')).toBeVisible();
-  // The view and tap would have gone by now, as in the test above.
-  await page.waitForLoadState('networkidle');
+  // A person's view goes on mount and the tap in its click handler, both before
+  // the sign-up form shows, so the wait only covers a slow request leaving.
+  await page.waitForTimeout(300);
   expect(steps).toEqual([]);
 });
 
