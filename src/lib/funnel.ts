@@ -10,8 +10,10 @@ import type { WebPlan } from './checkout';
 export type FunnelStep = 'gold_view' | 'plan_tap' | 'signup';
 
 // Crawlers, link previews and headless browsers render the Gold page too, and
-// in its first week they were most of its views. Only a person's visit counts.
-const AUTOMATED_UA = /bot\/|\+https?:|crawl|spider|slurp|headless|lighthouse|facebookexternalhit|embedly|^curl\/|^wget\/|python-|node-fetch|axios\//i;
+// in its first week they were most of its views. Google's own fetchers,
+// speed tests and Vercel's preview shots don't say bot, so they're named.
+// Only a person's visit counts.
+const AUTOMATED_UA = /bot\/|\+https?:|crawl|spider|slurp|headless|lighthouse|facebookexternalhit|embedly|google-inspectiontool|googleother|google-read-aloud|ptst\/|gtmetrix|vercel-screenshot|^curl\/|^wget\/|python-|node-fetch|axios\//i;
 
 export function isAutomated(nav: Pick<Navigator, 'userAgent' | 'webdriver'> | undefined): boolean {
   if (!nav) return true;

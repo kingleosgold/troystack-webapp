@@ -159,6 +159,21 @@ test('the Gold page counts the view, the plan tap and the sign-up, and nothing a
   ]);
 });
 
+test('an automated browser opens the Gold page and picks a plan without a single count', async ({ page }) => {
+  await mockBackends(page, { automated: true });
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
+  await page.goto('/gold');
+  expect(await page.evaluate(() => navigator.webdriver)).toBe(true);
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  await expect(page.getByLabel('Email')).toBeVisible();
+  // The view and tap would have gone by now, as in the test above.
+  await page.waitForLoadState('networkidle');
+  expect(steps).toEqual([]);
+});
+
 test('a visitor from a troystack.com link keeps its page token from the Gold page to Stripe', async ({ page }) => {
   await mockBackends(page);
   const steps: Array<Record<string, unknown>> = [];
