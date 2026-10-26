@@ -17,6 +17,8 @@ const CORS = {
 };
 
 export interface MockOptions {
+  /** Leaves navigator.webdriver as Playwright sets it, so the page sees automation. */
+  automated?: boolean;
   /** What GET /v1/troy/ask/status answers. null means the route isn't live yet (404). */
   visitorQuota?: { questionsUsed: number; questionsLimit: number; resetsAt: string } | null;
   conversations?: number;
@@ -132,7 +134,7 @@ export const BRIEF_TEXT = 'Gold held near $4,180 overnight and silver firmed. Yo
 export async function mockBackends(page: Page, opts: MockOptions = {}) {
   // The funnel skips automated browsers, and Playwright is one. These tests
   // stand in for a person, so the page sees an ordinary browser.
-  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false }));
+  if (!opts.automated) await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false }));
   const quota = opts.visitorQuota === undefined ? { questionsUsed: 0, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' } : opts.visitorQuota;
   let asked = quota?.questionsUsed ?? 0;
   const calls: string[] = [];

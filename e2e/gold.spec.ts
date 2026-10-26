@@ -159,6 +159,24 @@ test('the Gold page counts the view, the plan tap and the sign-up, and nothing a
   ]);
 });
 
+test('an automated browser opens the Gold page and picks a plan without a single count', async ({ page }) => {
+  await mockBackends(page, { automated: true });
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
+  await page.goto('/gold');
+  // Only webdriver gives it away, since the device profile's user agent reads as a person.
+  expect(await page.evaluate(() => navigator.webdriver)).toBe(true);
+  expect(await page.evaluate(() => /headless/i.test(navigator.userAgent))).toBe(false);
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  await expect(page.getByLabel('Email')).toBeVisible();
+  // A person's view goes on mount and the tap in its click handler, both before
+  // the sign-up form shows, so the wait only covers a slow request leaving.
+  await page.waitForTimeout(300);
+  expect(steps).toEqual([]);
+});
+
 test('a visitor from a troystack.com link keeps its page token from the Gold page to Stripe', async ({ page }) => {
   await mockBackends(page);
   const steps: Array<Record<string, unknown>> = [];
