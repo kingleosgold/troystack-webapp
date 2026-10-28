@@ -1,0 +1,6 @@
+{
+  "collectible": "Melt is the floor for coins like this. Worn common dates trade near it, but key dates, scarce mint marks and coins in high grades are worth more than their metal, so look yours up in a price guide or show it to a coin dealer before you sell.",
+  "bullion": "Dealers sell above melt and buy back near it. The gap is the premium, and it's smaller on bars and common coins than on small sizes and special issues. Compare a few dealers, and check what they pay as well as what they charge.",
+  "method": "Melt value is the pure metal in troy ounces times live spot from the TroyStack price feed, refreshed every 60 seconds.",
+  "noAdvice": "TroyStack doesn't buy or sell metal. Nothing here is financial advice."
+}

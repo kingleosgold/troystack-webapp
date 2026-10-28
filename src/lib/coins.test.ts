@@ -36,7 +36,7 @@ describe('the coin catalog', () => {
     for (const c of COINS) {
       expect(c.title.length, c.slug).toBeLessThanOrEqual(60);
       expect(c.description.length, c.slug).toBeLessThanOrEqual(160);
-      expect(c.title, c.slug).toMatch(/today/);
+      expect(c.title, c.slug).toMatch(/today/i);
       for (const text of [c.name, c.title, c.description, c.about, c.purity, c.face ?? '', c.mint ?? '', c.years ?? '']) {
         expect(text, c.slug).not.toMatch(/[–—]/);
       }

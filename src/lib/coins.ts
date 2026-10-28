@@ -34,6 +34,14 @@ export interface Coin {
   title: string;
   description: string;
   about: string;
+  /** The page's heading when it should differ from the name, like "Krugerrand value today" */
+  h1?: string;
+  /** Questions and answers shown on the page and in its FAQPage data, identical in both */
+  faq?: Array<{ q: string; a: string }>;
+  /** Where the specs come from, linked on the page */
+  sources?: Array<{ label: string; url: string }>;
+  /** The day this record's page content last changed, YYYY-MM-DD, for the sitemap */
+  modified: string;
 }
 
 export const COIN_GROUPS: Array<{ id: CoinGroup; label: string; metal: Metal }> = [
