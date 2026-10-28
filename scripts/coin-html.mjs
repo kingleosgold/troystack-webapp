@@ -52,14 +52,16 @@ export function usableSnapshot(body, metal, now = Date.now()) {
   return { price, at: new Date(at).toISOString(), closed: Boolean(body.marketsClosed) };
 }
 
+/** When the build read the price. With markets closed it's the last close, read at that time. */
+const asOf = (snap) => (snap.closed ? `markets closed, checked ${etTime(snap.at)}` : `as of ${etTime(snap.at)}`);
+
 /** The opening answer: what's in the coin, and what that was worth at the snapshot. */
 export function answerSentence(c, snap) {
   const name = inSentence(c);
   const unit = isBar(c) ? 'piece' : 'coin';
   const holds = `${capitalize(aOrAn(name))} ${name} holds ${ounces(c.fineOzt)} troy oz of ${c.metal}.`;
   if (!snap) return `${holds} Its melt value is that weight times live ${c.metal} spot.`;
-  const label = snap.closed ? 'markets closed, last price' : 'as of';
-  return `${holds} At ${c.metal} spot of ${usd(snap.price)}, one ${unit} melts to ${usd(c.fineOzt * snap.price)} (${label} ${etTime(snap.at)}).`;
+  return `${holds} At ${c.metal} spot of ${usd(snap.price)}, one ${unit} melts to ${usd(c.fineOzt * snap.price)} (${asOf(snap)}).`;
 }
 
 function specRows(c) {
@@ -75,7 +77,7 @@ function specRows(c) {
 
 function faqHtml(faq) {
   if (!faq?.length) return '';
-  return `<h2>Questions people ask</h2>${faq.map((f) => `<h3>${escape(f.q)}</h3><p>${escape(f.a)}</p>`).join('')}`;
+  return `<h2 class="mt-6 text-[15px] font-semibold text-fg">Questions people ask</h2>${faq.map((f) => `<h3 class="mt-4 text-[14px] font-semibold text-fg">${escape(f.q)}</h3><p class="mt-1 text-[14px] leading-relaxed text-fg-2">${escape(f.a)}</p>`).join('')}`;
 }
 
 function sourcesHtml(sources) {
@@ -99,16 +101,16 @@ export function coinBody(coins, c, snap, copy) {
   const rows = specRows(c);
   const links = coinLinks(coins, c);
   return [
-    '<main class="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8">',
+    '<main class="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8 text-[15px] leading-relaxed text-fg-2">',
     '<p><a href="/coins">Coin and bar values</a></p>',
-    `<h1>${escape(c.h1 || c.name)}</h1>`,
-    `<p>${escape(answerSentence(c, snap))}</p>`,
-    `<h2>Specifications</h2><table><tbody>${rows.map(([k, v]) => `<tr><th scope="row">${escape(k)}</th><td>${escape(v)}</td></tr>`).join('')}</tbody></table>`,
-    `<h2>What to know</h2><p>${escape(c.about)}</p><p>${escape(isCollectible(c) ? copy.collectible : copy.bullion)}</p>`,
+    `<h1 class="text-[26px] sm:text-[30px] font-semibold tracking-tight text-fg leading-tight">${escape(c.h1 || c.name)}</h1>`,
+    `<p class="mt-2 text-[15px] leading-relaxed text-fg-2">${escape(answerSentence(c, snap))}</p>`,
+    `<h2 class="mt-6 text-[15px] font-semibold text-fg">Specifications</h2><table><tbody>${rows.map(([k, v]) => `<tr><th scope="row">${escape(k)}</th><td>${escape(v)}</td></tr>`).join('')}</tbody></table>`,
+    `<h2 class="mt-6 text-[15px] font-semibold text-fg">What to know</h2><p>${escape(c.about)}</p><p>${escape(isCollectible(c) ? copy.collectible : copy.bullion)}</p>`,
     faqHtml(c.faq),
-    `<h2>Track what you own</h2><p><a href="/stack?add=1&amp;coin=${escape(c.slug)}">Add ${escape(aOrAn(inSentence(c)))} ${escape(inSentence(c))} to your stack</a> or <a href="/app">get the TroyStack app</a>.</p>`,
-    `<h2>More ${escape(c.metal)}</h2><ul>${links.map(([href, label]) => `<li><a href="${escape(href)}">${escape(label)}</a></li>`).join('')}</ul>`,
-    `<h2>How this page works</h2><p>${escape(copy.method)}${sourcesHtml(c.sources)}</p><p>${escape(copy.noAdvice)}</p>`,
+    `<h2 class="mt-6 text-[15px] font-semibold text-fg">Track what you own</h2><p><a href="/stack?add=1&amp;coin=${escape(c.slug)}">Add ${escape(aOrAn(inSentence(c)))} ${escape(inSentence(c))} to your stack</a> or <a href="/app">get the TroyStack app</a>.</p>`,
+    `<h2 class="mt-6 text-[15px] font-semibold text-fg">More ${escape(c.metal)}</h2><ul>${links.map(([href, label]) => `<li><a href="${escape(href)}">${escape(label)}</a></li>`).join('')}</ul>`,
+    `<h2 class="mt-6 text-[15px] font-semibold text-fg">How this page works</h2><p>${escape(copy.method)}${sourcesHtml(c.sources)}</p><p>${escape(copy.noAdvice)}</p>`,
     '</main>',
   ].join('');
 }
@@ -148,18 +150,18 @@ export function coinLd(c) {
 
 /** The junk silver calculator's facts and FAQ, for the same reason as a coin's. */
 export function junkBody(page, coins, snap, copy) {
-  const perFace = (oz) => (snap ? ` At silver spot of ${usd(snap.price)}, that's ${usd(oz * snap.price)} (${snap.closed ? 'markets closed, last price' : 'as of'} ${etTime(snap.at)}).` : '');
+  const perFace = (oz) => (snap ? ` At silver spot of ${usd(snap.price)}, that's ${usd(oz * snap.price)} (${asOf(snap)}).` : '');
   const usSilver = coins.filter((c) => c.group === 'us-silver');
   return [
-    '<main class="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8">',
+    '<main class="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8 text-[15px] leading-relaxed text-fg-2">',
     '<p><a href="/tools">Tools</a></p>',
-    `<h1>${escape(page.h1)}</h1>`,
-    `<p>${escape(`One dollar in face value of US dimes, quarters or halves from 1964 and earlier held 0.7234 troy oz of silver as struck.${perFace(0.7234)}`)}</p>`,
-    `<p>${escape(`Dealers usually figure 0.715 troy oz for circulated coins, a trade convention that allows for wear.${perFace(0.715)}`)}</p>`,
+    `<h1 class="text-[26px] sm:text-[30px] font-semibold tracking-tight text-fg leading-tight">${escape(page.h1)}</h1>`,
+    `<p class="mt-2 text-[15px] leading-relaxed text-fg-2">${escape(`One dollar in face value of US dimes, quarters or halves from 1964 and earlier held 0.7234 troy oz of silver as struck.${perFace(0.7234)}`)}</p>`,
+    `<p class="mt-2 text-[15px] leading-relaxed text-fg-2">${escape(`Dealers usually figure 0.715 troy oz for circulated coins, a trade convention that allows for wear.${perFace(0.715)}`)}</p>`,
     faqHtml(page.faq),
-    `<h2>Coin by coin</h2><ul>${usSilver.map((c) => `<li><a href="/coins/${escape(c.slug)}">${escape(c.name)}</a>, ${ounces(c.fineOzt)} troy oz of silver</li>`).join('')}</ul>`,
+    `<h2 class="mt-6 text-[15px] font-semibold text-fg">Coin by coin</h2><ul>${usSilver.map((c) => `<li><a href="/coins/${escape(c.slug)}">${escape(c.name)}</a>, ${ounces(c.fineOzt)} troy oz of silver</li>`).join('')}</ul>`,
     '<p><a href="/tools/melt">Melt value calculator</a>, <a href="/prices/silver">Silver spot price</a>, <a href="/coins">All coin and bar values</a></p>',
-    `<h2>How this page works</h2><p>${escape(copy.method)}${sourcesHtml(page.sources)}</p><p>${escape(copy.noAdvice)}</p>`,
+    `<h2 class="mt-6 text-[15px] font-semibold text-fg">How this page works</h2><p>${escape(copy.method)}${sourcesHtml(page.sources)}</p><p>${escape(copy.noAdvice)}</p>`,
     '</main>',
   ].join('');
 }

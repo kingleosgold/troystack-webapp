@@ -133,9 +133,9 @@ test.describe('coin values', () => {
     expect(html).toContain('<link rel="canonical" href="https://troystack.ai/coins/mercury-dime" />');
     // The facts sit in the page itself, not only in a no-script fallback.
     const root = html.slice(html.indexOf('<div id="root">'));
-    expect(root).toContain('<h1>Mercury dime melt value today</h1>');
+    expect(root).toContain('tight text-fg leading-tight">Mercury dime melt value today</h1>');
     expect(root).toContain('A Mercury dime holds 0.0723 troy oz of silver.');
-    expect(root).toContain('<h3>Are some Mercury dimes worth far more than melt?</h3>');
+    expect(root).toContain('text-fg">Are some Mercury dimes worth far more than melt?</h3>');
     expect(root).toContain('href="https://www.usmint.gov/learn/coin-and-medal-programs/coin-specifications"');
     expect([...root.matchAll(/<a href="\/[^"]*"/g)].length).toBeGreaterThanOrEqual(8);
     // One block: the breadcrumb search results show, the page and its FAQ.
@@ -243,7 +243,7 @@ test.describe('coins struck to different specs over the years', () => {
   test('each era page arrives with its own title, and the old addresses still answer', async ({ request }) => {
     const older = await (await request.get('/coins/chinese-silver-panda-1-oz.html')).text();
     expect(older).toContain('<title>1 oz Chinese Silver Panda melt value today | TroyStack</title>');
-    expect(older).toContain('<h1>Chinese Silver Panda (1 oz)</h1>');
+    expect(older).toContain('tight text-fg leading-tight">Chinese Silver Panda (1 oz)</h1>');
     const current = await (await request.get('/coins/chinese-silver-panda.html')).text();
     expect(current).toContain('<title>30 g Chinese Silver Panda melt value today | TroyStack</title>');
     const sitemap = await (await request.get('/sitemap.xml')).text();

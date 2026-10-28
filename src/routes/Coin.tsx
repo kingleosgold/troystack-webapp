@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, MessageCircle, Plus, Store } from 'lucide-react';
+import { ArrowLeft, ChevronDown, MessageCircle, Plus, Store } from 'lucide-react';
 import { useSpotMap } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { COIN_GROUPS, aOrAn, coinBySlug, inSentence, isBar, isCollectible, otherEras, ounces, relatedCoins, type Coin } from '../lib/coins';
@@ -179,9 +179,10 @@ export default function CoinPage() {
           </h2>
           <div className="divide-y divide-line rounded-xl border border-line bg-surface">
             {coin.faq.map((f) => (
-              <details key={f.q} className="px-4 py-3">
-                <summary className="cursor-pointer list-none text-[14px] font-semibold text-fg marker:hidden">
-                  <h3 className="inline">{f.q}</h3>
+              <details key={f.q} className="group px-4 py-3">
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-3 text-[14px] font-semibold text-fg [&::-webkit-details-marker]:hidden">
+                  <h3>{f.q}</h3>
+                  <ChevronDown size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-fg-3 transition-transform group-open:rotate-180" />
                 </summary>
                 <p className="mt-2 text-[14px] leading-relaxed text-fg-2">{f.a}</p>
               </details>

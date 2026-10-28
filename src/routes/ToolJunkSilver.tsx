@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSpotMap } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -97,11 +98,11 @@ export default function ToolJunkSilver() {
               <dd className="text-fg tnum">{money(faceTotal)}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-fg-3">Per $1 face, circulated (0.715 oz)</dt>
+              <dt className="text-fg-3">Per $1 face, circulated</dt>
               <dd className="text-fg tnum">{shown(OZ_PER_DOLLAR_FACE * spot)}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-fg-3">Per $1 face, as struck (0.7234 oz)</dt>
+              <dt className="text-fg-3">Per $1 face, as struck</dt>
               <dd className="text-fg tnum">{shown(OZ_PER_DOLLAR_FACE_STRUCK * spot)}</dd>
             </div>
             <div className="flex justify-between gap-3">
@@ -141,9 +142,10 @@ export default function ToolJunkSilver() {
         </h2>
         <div className="divide-y divide-line rounded-xl border border-line bg-surface">
           {PAGE.faq.map((f) => (
-            <details key={f.q} className="px-4 py-3">
-              <summary className="cursor-pointer list-none text-[14px] font-semibold text-fg marker:hidden">
-                <h3 className="inline">{f.q}</h3>
+            <details key={f.q} className="group px-4 py-3">
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-3 text-[14px] font-semibold text-fg [&::-webkit-details-marker]:hidden">
+                <h3>{f.q}</h3>
+                <ChevronDown size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-fg-3 transition-transform group-open:rotate-180" />
               </summary>
               <p className="mt-2 text-[14px] leading-relaxed text-fg-2">{f.a}</p>
             </details>
@@ -161,7 +163,7 @@ export default function ToolJunkSilver() {
               </a>
             </span>
           ))}
-          . The 0.715 figure is a dealer convention for worn coins, not a mint figure.
+          . Circulated uses 0.715 troy oz per dollar of face, a dealer convention for worn coins, not a mint figure. As struck uses 0.7234.
         </p>
         <p className="mt-1">{COPY.noAdvice}</p>
       </footer>

@@ -84,10 +84,10 @@ describe('the prerendered coin page', () => {
   it('opens with the heading, the answer, the specs, the FAQ and the sources', () => {
     const c = coinBySlug('american-silver-eagle')!;
     const body: string = html.coinBody(COINS, c, html.usableSnapshot(FRESH, 'silver', NOW), COPY);
-    expect(body).toContain('<h1>American Silver Eagle value today</h1>');
+    expect(body).toContain('tight text-fg leading-tight">American Silver Eagle value today</h1>');
     expect(body).toContain('An American Silver Eagle holds 1 troy oz of silver. At silver spot of $48.50, one coin melts to $48.50 (as of Oct 28, 2026, 3:00 AM ET).');
     expect(body).toContain('<th scope="row">Purity</th><td>.999 fine</td>');
-    expect(body).toContain('<h3>Why do Silver Eagles cost more than spot?</h3>');
+    expect(body).toContain('text-fg">Why do Silver Eagles cost more than spot?</h3>');
     expect(body).toContain(COPY.bullion);
     expect(body).toContain('href="https://www.usmint.gov/coins/coin-medal-programs/american-eagle/silver-bullion"');
     expect(body).toContain('href="/stack?add=1&amp;coin=american-silver-eagle"');
@@ -98,7 +98,7 @@ describe('the prerendered coin page', () => {
     const c = coinBySlug('silver-roosevelt-dime')!;
     const snap = html.usableSnapshot({ ...FRESH, marketsClosed: true }, 'silver', NOW);
     // 0.07234 oz at $48.50
-    expect(html.answerSentence(c, snap)).toBe('A silver Roosevelt dime holds 0.0723 troy oz of silver. At silver spot of $48.50, one coin melts to $3.51 (markets closed, last price Oct 28, 2026, 3:00 AM ET).');
+    expect(html.answerSentence(c, snap)).toBe('A silver Roosevelt dime holds 0.0723 troy oz of silver. At silver spot of $48.50, one coin melts to $3.51 (markets closed, checked Oct 28, 2026, 3:00 AM ET).');
   });
 
   it('leaves the number out when the build has no fresh price', () => {
@@ -130,7 +130,7 @@ describe('the prerendered coin page', () => {
 
   it('does the same for the junk silver calculator, with both silver figures', () => {
     const body: string = html.junkBody(JUNK, COINS, html.usableSnapshot(FRESH, 'silver', NOW), COPY);
-    expect(body).toContain('<h1>Junk silver melt value calculator</h1>');
+    expect(body).toContain('tight text-fg leading-tight">Junk silver melt value calculator</h1>');
     // 0.7234 and 0.715 oz at $48.50
     expect(body).toContain("that's $35.08");
     expect(body).toContain("that's $34.68");
