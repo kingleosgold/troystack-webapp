@@ -47,8 +47,8 @@
     ],
     "sources": [
       {
-        "label": "United States Mint, American Eagle Silver Bullion",
-        "url": "https://www.usmint.gov/coins/coin-medal-programs/american-eagle/silver-bullion"
+        "label": "United States Mint, Bullion Coins",
+        "url": "https://www.usmint.gov/coin-programs/bullion-coins/"
       }
     ],
     "modified": "2026-10-28"
@@ -401,12 +401,8 @@
     ],
     "sources": [
       {
-        "label": "United States Mint, Coin Specifications",
-        "url": "https://www.usmint.gov/learn/coin-and-medal-programs/coin-specifications"
-      },
-      {
-        "label": "United States Mint, Half Dollar",
-        "url": "https://www.usmint.gov/learn/coins-and-medals/circulating-coins/half-dollar"
+        "label": "NGC, U.S. Silver Coin Melt Values",
+        "url": "https://www.ngccoin.com/price-guide/coin-melt-values.aspx"
       }
     ],
     "modified": "2026-10-28"
@@ -464,8 +460,8 @@
     ],
     "sources": [
       {
-        "label": "United States Mint, Coin Specifications",
-        "url": "https://www.usmint.gov/learn/coin-and-medal-programs/coin-specifications"
+        "label": "NGC, U.S. Silver Coin Melt Values",
+        "url": "https://www.ngccoin.com/price-guide/coin-melt-values.aspx"
       }
     ],
     "modified": "2026-10-28"
@@ -523,8 +519,8 @@
     ],
     "sources": [
       {
-        "label": "United States Mint, Coin Specifications",
-        "url": "https://www.usmint.gov/learn/coin-and-medal-programs/coin-specifications"
+        "label": "NGC, U.S. Silver Coin Melt Values",
+        "url": "https://www.ngccoin.com/price-guide/coin-melt-values.aspx"
       }
     ],
     "modified": "2026-10-28"
@@ -569,8 +565,8 @@
     ],
     "sources": [
       {
-        "label": "United States Mint, Coin Specifications",
-        "url": "https://www.usmint.gov/learn/coin-and-medal-programs/coin-specifications"
+        "label": "NGC, U.S. Silver Coin Melt Values",
+        "url": "https://www.ngccoin.com/price-guide/coin-melt-values.aspx"
       }
     ],
     "modified": "2026-10-28"
@@ -702,8 +698,8 @@
     ],
     "sources": [
       {
-        "label": "United States Mint, American Eagle Gold Bullion",
-        "url": "https://www.usmint.gov/coins/coin-medal-programs/american-eagle/gold-bullion"
+        "label": "United States Mint, Bullion Coins",
+        "url": "https://www.usmint.gov/coin-programs/bullion-coins/"
       }
     ],
     "modified": "2026-10-28"
@@ -778,8 +774,8 @@
     ],
     "sources": [
       {
-        "label": "United States Mint, American Eagle Gold Bullion",
-        "url": "https://www.usmint.gov/coins/coin-medal-programs/american-eagle/gold-bullion"
+        "label": "United States Mint, Bullion Coins",
+        "url": "https://www.usmint.gov/coin-programs/bullion-coins/"
       }
     ],
     "modified": "2026-10-28"
@@ -820,8 +816,8 @@
     ],
     "sources": [
       {
-        "label": "United States Mint, American Buffalo Gold Bullion",
-        "url": "https://www.usmint.gov/coins/coin-medal-programs/american-buffalo-coin-program/bullion"
+        "label": "United States Mint, Bullion Coins",
+        "url": "https://www.usmint.gov/coin-programs/bullion-coins/"
       }
     ],
     "modified": "2026-10-28"

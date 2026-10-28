@@ -136,7 +136,7 @@ test.describe('coin values', () => {
     expect(root).toContain('tight text-fg leading-tight">Mercury dime melt value today</h1>');
     expect(root).toContain('A Mercury dime holds 0.0723 troy oz of silver.');
     expect(root).toContain('text-fg">Are some Mercury dimes worth far more than melt?</h3>');
-    expect(root).toContain('href="https://www.usmint.gov/learn/coin-and-medal-programs/coin-specifications"');
+    expect(root).toContain('href="https://www.ngccoin.com/price-guide/coin-melt-values.aspx"');
     expect([...root.matchAll(/<a href="\/[^"]*"/g)].length).toBeGreaterThanOrEqual(8);
     // One block: the breadcrumb search results show, the page and its FAQ.
     const blocks = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)];
@@ -163,7 +163,7 @@ test.describe('coin values', () => {
     const question = page.getByText('How much is a tube of 20 Silver Eagles worth?');
     await question.click();
     await expect(page.getByText(/A mint tube holds 20 coins/)).toBeVisible();
-    await expect(page.getByRole('link', { name: 'United States Mint, American Eagle Silver Bullion' })).toHaveAttribute('href', /usmint\.gov/);
+    await expect(page.getByRole('link', { name: 'United States Mint, Bullion Coins' })).toHaveAttribute('href', /usmint\.gov/);
     await expect(page.getByText("TroyStack doesn't buy or sell metal.")).toBeVisible();
     expect(errors).toEqual([]);
     await shot(page, 'coin-faq');

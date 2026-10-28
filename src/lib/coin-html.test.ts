@@ -53,7 +53,7 @@ describe('coin page FAQs', () => {
     for (const c of COINS) {
       expect(c.modified, c.slug).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       if (c.faq) expect(c.sources?.length, c.slug).toBeGreaterThan(0);
-      for (const s of c.sources ?? []) expect(s.url, c.slug).toMatch(/^https:\/\/www\.(usmint\.gov|mint\.ca|randrefinery\.com)\//);
+      for (const s of c.sources ?? []) expect(s.url, c.slug).toMatch(/^https:\/\/www\.(usmint\.gov|mint\.ca|randrefinery\.com|ngccoin\.com)\//);
     }
   });
 
@@ -89,7 +89,7 @@ describe('the prerendered coin page', () => {
     expect(body).toContain('<th scope="row">Purity</th><td>.999 fine</td>');
     expect(body).toContain('text-fg">Why do Silver Eagles cost more than spot?</h3>');
     expect(body).toContain(COPY.bullion);
-    expect(body).toContain('href="https://www.usmint.gov/coins/coin-medal-programs/american-eagle/silver-bullion"');
+    expect(body).toContain('href="https://www.usmint.gov/coin-programs/bullion-coins/"');
     expect(body).toContain('href="/stack?add=1&amp;coin=american-silver-eagle"');
     expect(body).toContain('href="/prices/silver"');
   });
