@@ -32,8 +32,8 @@
     "description": "Work out the melt value of any gold, silver, platinum or palladium coin, round or bar at live spot, including pre-1933 US gold and pre-1965 silver."
   },
   "/tools/junk-silver": {
-    "title": "Junk silver calculator, pre-1965 coin melt value",
-    "description": "Melt value of pre-1965 US silver dimes, quarters and halves, 40% Kennedys, war nickels and Morgan dollars at live silver spot, by the coin or by face value."
+    "title": "Junk Silver Melt Value Calculator: Pre-1965 Coins",
+    "description": "Melt value of 90% silver dimes, quarters and halves by face value at live spot, using 0.7234 oz per $1 face (as struck) or 0.715 (circulated)."
   },
   "/tools/what-if": {
     "title": "What if gold or silver hit your number",

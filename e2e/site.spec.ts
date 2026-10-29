@@ -1184,8 +1184,8 @@ test.describe('prices that are missing', () => {
 
     await page.goto('/tools/junk-silver');
     await expect(page.getByText("Live prices didn't load, so values that need them are on hold.")).toBeVisible();
-    // The face value can be $0.00, since it isn't a price. The melt value and spot say there's none.
-    await expect(page.getByText('No price', { exact: true }).filter({ visible: true })).toHaveCount(3);
+    // The face value can be $0.00, since it isn't a price. The melt value, both per-face figures and spot say there's none.
+    await expect(page.getByText('No price', { exact: true }).filter({ visible: true })).toHaveCount(4);
   });
 
   test("the stacking tool has no value for today without a live price, and offers to try again", async ({ page }) => {

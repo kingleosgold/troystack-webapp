@@ -43,8 +43,8 @@ test.describe('coin values', () => {
     await page.getByLabel('How many').fill('2.5');
     await expect(page.getByTestId('coin-total')).toHaveText('$93.18');
     await expect(page.getByText('Whole coins only, so this counts 2.')).toBeVisible();
-    await expect(page.getByText(/Melt is the floor/)).toBeVisible();
-    await expect(page).toHaveTitle('Morgan silver dollar melt value today | TroyStack');
+    await expect(page.getByText(/Melt is the floor for coins like this/)).toBeVisible();
+    await expect(page).toHaveTitle('Morgan Silver Dollar Melt Value Today | TroyStack');
     expect(errors).toEqual([]);
     await shot(page, 'coin-morgan');
   });
@@ -97,10 +97,10 @@ test.describe('coin values', () => {
     await page.goto('/tools/melt');
     await page.getByLabel('Coin or bar').selectOption('south-african-krugerrand');
     await page.getByRole('link', { name: /Weight, purity and what to know/ }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('South African Krugerrand');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Krugerrand value today');
     await goInApp(page, '/tools/junk-silver');
     await page.getByRole('link', { name: 'Mercury dime', exact: true }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mercury dime');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mercury dime melt value today');
   });
 
   test('price pages show a gram, a kilo and karat gold at spot', async ({ page }) => {
@@ -129,18 +129,53 @@ test.describe('coin values', () => {
 
   test('a coin page arrives with its own title and facts before any script runs', async ({ request }) => {
     const html = await (await request.get('/coins/mercury-dime.html')).text();
-    expect(html).toContain('<title>Mercury dime melt value today | TroyStack</title>');
+    expect(html).toContain('<title>Mercury Dime Melt Value Today | TroyStack</title>');
     expect(html).toContain('<link rel="canonical" href="https://troystack.ai/coins/mercury-dime" />');
-    expect(html).toContain('<noscript><h1>Mercury dime</h1>');
-    // The breadcrumb search results show, Coin and bar values then the coin.
-    const ld = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)![1]);
-    expect(ld['@type']).toBe('BreadcrumbList');
-    expect(ld.itemListElement.map((i: { name: string; item: string }) => [i.name, i.item])).toEqual([
+    // The facts sit in the page itself, not only in a no-script fallback.
+    const root = html.slice(html.indexOf('<div id="root">'));
+    expect(root).toContain('tight text-fg leading-tight">Mercury dime melt value today</h1>');
+    expect(root).toContain('A Mercury dime holds 0.0723 troy oz of silver.');
+    expect(root).toContain('text-fg">Are some Mercury dimes worth far more than melt?</h3>');
+    expect(root).toContain('href="https://www.ngccoin.com/price-guide/coin-melt-values.aspx"');
+    expect([...root.matchAll(/<a href="\/[^"]*"/g)].length).toBeGreaterThanOrEqual(8);
+    // One block: the breadcrumb search results show, the page and its FAQ.
+    const blocks = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)];
+    expect(blocks).toHaveLength(1);
+    const graph = JSON.parse(blocks[0][1])['@graph'];
+    expect(graph.map((n: { '@type': string }) => n['@type'])).toEqual(['BreadcrumbList', 'WebPage', 'FAQPage']);
+    expect(graph[0].itemListElement.map((i: { name: string; item: string }) => [i.name, i.item])).toEqual([
       ['Coin and bar values', 'https://troystack.ai/coins'],
       ['Mercury dime', 'https://troystack.ai/coins/mercury-dime'],
     ]);
     const sitemap = await (await request.get('/sitemap.xml')).text();
-    expect(sitemap).toContain('<loc>https://troystack.ai/coins/mercury-dime</loc>');
+    expect(sitemap).toContain('<url><loc>https://troystack.ai/coins/mercury-dime</loc><lastmod>2026-10-28</lastmod></url>');
+    // A record this change didn't touch keeps the date it last changed, not the build's.
+    expect(sitemap).toContain('<url><loc>https://troystack.ai/coins/war-nickel</loc><lastmod>2026-10-09</lastmod></url>');
+  });
+
+  test('a coin page shows its questions and where its specs come from', async ({ page }) => {
+    const errors = watchErrors(page);
+    await mockBackends(page);
+    await page.goto('/coins/american-silver-eagle');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('American Silver Eagle value today');
+    await expect(page).toHaveTitle('Silver Eagle Value Today: 1 oz Melt Value, Live | TroyStack');
+    await expect(page.getByTestId('coin-melt')).toHaveText('$60.24');
+    const question = page.getByText('How much is a tube of 20 Silver Eagles worth?');
+    await question.click();
+    await expect(page.getByText(/A mint tube holds 20 coins/)).toBeVisible();
+    await expect(page.getByRole('link', { name: 'United States Mint, Bullion Coins' })).toHaveAttribute('href', /usmint\.gov/);
+    await expect(page.getByText("TroyStack doesn't buy or sell metal.")).toBeVisible();
+    expect(errors).toEqual([]);
+    await shot(page, 'coin-faq');
+  });
+
+  test('the page an unknown coin falls to stays out of search', async ({ request }) => {
+    // Vercel serves 404.html with HTTP 404 for a slug with no file, since no
+    // rewrite catches /coins paths (hosting.test.ts). The preview server here
+    // doesn't, so this checks the file itself.
+    expect(await (await request.get('/404.html')).text()).toContain('<meta name="robots" content="noindex" />');
+    const sitemap = await (await request.get('/sitemap.xml')).text();
+    expect(sitemap).not.toContain('not-a-coin');
   });
 });
 
@@ -208,7 +243,7 @@ test.describe('coins struck to different specs over the years', () => {
   test('each era page arrives with its own title, and the old addresses still answer', async ({ request }) => {
     const older = await (await request.get('/coins/chinese-silver-panda-1-oz.html')).text();
     expect(older).toContain('<title>1 oz Chinese Silver Panda melt value today | TroyStack</title>');
-    expect(older).toContain('<noscript><h1>Chinese Silver Panda (1 oz)</h1>');
+    expect(older).toContain('tight text-fg leading-tight">Chinese Silver Panda (1 oz)</h1>');
     const current = await (await request.get('/coins/chinese-silver-panda.html')).text();
     expect(current).toContain('<title>30 g Chinese Silver Panda melt value today | TroyStack</title>');
     const sitemap = await (await request.get('/sitemap.xml')).text();
@@ -274,7 +309,7 @@ test('the count on a coin page starts at one on the next coin', async ({ page })
   await page.goto('/coins/morgan-silver-dollar');
   await page.getByLabel('How many').fill('20');
   await page.getByRole('link', { name: /Peace silver dollar/ }).first().click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Peace silver dollar');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Peace silver dollar melt value today');
   await expect(page.getByLabel('How many')).toHaveValue('1');
 });
 

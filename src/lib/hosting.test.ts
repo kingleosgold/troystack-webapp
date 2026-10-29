@@ -10,6 +10,11 @@ describe('Vercel routing', () => {
     expect(sources).not.toContain('/:path*');
   });
 
+  it('lets a coin page with no file fall to the 404 page', () => {
+    const sources: string[] = (vercel.rewrites ?? []).map((rule: { source: string }) => rule.source);
+    expect(sources.filter((source) => source.startsWith('/coins'))).toEqual([]);
+  });
+
   it('sends an unknown Signal slug to the page that can answer 404', () => {
     const rule = (vercel.rewrites ?? []).find((item: { source: string }) => item.source === '/signal/:slug');
     expect(rule?.destination).toBe('/api/signal-html?slug=:slug');

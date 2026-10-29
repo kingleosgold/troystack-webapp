@@ -11,9 +11,47 @@
     "face": "$1",
     "mint": "United States Mint",
     "years": "1986 to today",
-    "title": "American Silver Eagle melt value today",
+    "title": "Silver Eagle Value Today: 1 oz Melt Value, Live",
     "about": "The US Mint's silver bullion coin and the most traded one in the country. Each holds one troy ounce of .999 silver, with the weight and purity backed by the US government. The design changed partway through 2021 from the heraldic eagle to an eagle landing, so you'll find both versions dated that year.",
-    "description": "How much silver is in an American Silver Eagle, what it's worth at live spot, and its weight, purity and years."
+    "description": "What a 1 oz American Silver Eagle is worth at live silver spot, why dealers charge more than melt, and its weight, purity and years. Track yours free.",
+    "h1": "American Silver Eagle value today",
+    "faq": [
+      {
+        "q": "What is a 1 oz Silver Eagle worth today?",
+        "a": "Its melt value is one troy ounce of silver at spot, because every Silver Eagle holds exactly one troy ounce of .999 fine silver. The live figure on this page updates through the trading day. What a dealer charges or pays will sit above or below that, since melt is only the metal."
+      },
+      {
+        "q": "Why do Silver Eagles cost more than spot?",
+        "a": "The price over spot is the premium. It covers the US Mint's own charge to its dealers, shipping, insurance and each dealer's margin. Silver Eagles usually carry a bigger premium than bars or other one ounce coins because demand for them is steady and the Mint sells them only through authorized buyers."
+      },
+      {
+        "q": "Is a Silver Eagle worth more than its one dollar face value?",
+        "a": "Yes, by a wide margin. The one dollar face makes it legal tender, but nobody spends one at face, because the silver inside is worth many times that. Treat the face value as a formality and value the coin by its silver content at spot."
+      },
+      {
+        "q": "Do the 2021 Type 2 Silver Eagles hold the same silver?",
+        "a": "Yes. The design changed partway through 2021 from the heraldic eagle to an eagle landing, and the Mint added security features, but both types hold one troy ounce of .999 fine silver. Their melt value is identical. Some 2021 Type 1 and Type 2 versions draw collector interest, which is separate from melt."
+      },
+      {
+        "q": "What will a dealer pay me for a Silver Eagle?",
+        "a": "Most dealers buy common date Silver Eagles back at or a little above melt, depending on demand that week. The quickest way to know is to ask two or three dealers for their buy price on the same day and compare it with the live melt value on this page."
+      },
+      {
+        "q": "Are proof or graded Silver Eagles worth more than melt?",
+        "a": "Often, yes. Proof coins, low mintage years and coins graded by PCGS or NGC sell on collector demand as well as silver, so melt is the floor rather than the price. Check a price guide or ask a dealer for anything that isn't a plain bullion coin."
+      },
+      {
+        "q": "How much is a tube of 20 Silver Eagles worth?",
+        "a": "A mint tube holds 20 coins, so its melt value is 20 troy ounces of silver at spot. Pick 20 in the quick amounts on this page to see the live total. A sealed monster box from the Mint holds 500 coins, or 25 tubes."
+      }
+    ],
+    "sources": [
+      {
+        "label": "United States Mint, Bullion Coins",
+        "url": "https://www.usmint.gov/coin-programs/bullion-coins/"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "canadian-silver-maple-leaf",
@@ -27,9 +65,35 @@
     "face": "$5 Canadian",
     "mint": "Royal Canadian Mint",
     "years": "1988 to today",
-    "title": "Canadian Silver Maple Leaf melt value today",
+    "title": "Silver Maple Leaf Value Today: 1 oz Melt Value",
     "about": "Canada's silver bullion coin, struck by the Royal Canadian Mint in .9999 silver, a step purer than most. Coins since 2014 carry radial lines and a tiny engraved maple leaf as security features, which makes fakes harder to pass.",
-    "description": "How much silver is in a Canadian Silver Maple Leaf, what it's worth at live spot, and its weight, purity and years."
+    "description": "What a 1 oz Canadian Silver Maple Leaf (.9999 silver, $5 face) is worth at live spot, and why it often costs less over spot than an Eagle.",
+    "h1": "Canadian Silver Maple Leaf value today",
+    "faq": [
+      {
+        "q": "What is a Silver Maple Leaf worth?",
+        "a": "Each Silver Maple Leaf holds one troy ounce of .9999 fine silver, so its melt value is the silver spot price. The live figure is shown on this page. Dealers sell it above melt and usually buy it back near melt."
+      },
+      {
+        "q": "Does a Maple Leaf hold more silver than a Silver Eagle?",
+        "a": "Both are one troy ounce bullion coins, and dealers and this page value each at one ounce of silver. The Maple Leaf is .9999 fine and the Silver Eagle is .999 fine, a difference of a tenth of a percent that no dealer prices in. What separates them in practice is the premium."
+      },
+      {
+        "q": "Why are Maple Leaf premiums often lower?",
+        "a": "The Royal Canadian Mint strikes Maple Leafs in large numbers and sells them widely, so dealers often price them closer to spot than Silver Eagles. That isn't fixed. Premiums move with demand, so compare the price over spot from a few dealers on the same day."
+      },
+      {
+        "q": "What are the radial lines and the small privy mark?",
+        "a": "Since 2014 the Royal Canadian Mint has struck fine radial lines into the background and a tiny maple leaf mark with the year's last two digits. Both are anti counterfeiting features. Recent coins also carry the Mint's Bullion DNA, which lets authorized dealers verify a coin."
+      }
+    ],
+    "sources": [
+      {
+        "label": "Royal Canadian Mint, Silver Maple Leaf bullion",
+        "url": "https://www.mint.ca/en/shop/coins/2026/2026-sml-1-oz-9999-pure-silver-coin-bullion"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "british-silver-britannia",
@@ -46,7 +110,8 @@
     "years": "2013 to today",
     "title": "British Silver Britannia melt value today",
     "about": "The Royal Mint's silver bullion coin, struck in .999 silver since 2013. Britannias from 1997 to 2012 were .958 Britannia silver on a heavier blank, and they hold an ounce too.",
-    "description": "How much silver is in a British Silver Britannia, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in a British Silver Britannia, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "british-silver-britannia-1997-2012",
@@ -63,7 +128,8 @@
     "years": "1997 to 2012",
     "title": "British Silver Britannia .958 melt value today",
     "about": "The silver Britannia as the Royal Mint struck it from 1997 to 2012, in .958 Britannia silver on a 32.45 gram blank. That's heavier than today's coin, so it still holds a troy ounce of silver. From 2013 the Britannia has been .999 silver.",
-    "description": "How much silver is in a 1997 to 2012 British Silver Britannia, what it's worth at live spot, and its weight and purity."
+    "description": "How much silver is in a 1997 to 2012 British Silver Britannia, what it's worth at live spot, and its weight and purity.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "austrian-silver-philharmonic",
@@ -79,7 +145,8 @@
     "years": "2008 to today",
     "title": "Austrian Silver Philharmonic melt value today",
     "about": "Struck by the Austrian Mint in Vienna, with the Vienna Philharmonic's instruments on one side and the great organ of the Golden Hall on the other. It's one of the most traded silver coins in Europe.",
-    "description": "How much silver is in an Austrian Silver Philharmonic, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in an Austrian Silver Philharmonic, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "mexican-silver-libertad",
@@ -93,7 +160,8 @@
     "years": "1982 to today",
     "title": "Mexican Silver Libertad melt value today",
     "about": "Mexico's silver bullion coin, with the Winged Victory statue from Mexico City's Independence Monument on it. Far fewer are made each year than Eagles or Maples, and they usually cost more over spot.",
-    "description": "How much silver is in a Mexican Silver Libertad, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in a Mexican Silver Libertad, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "australian-silver-kangaroo",
@@ -107,7 +175,8 @@
     "mint": "The Perth Mint",
     "title": "Australian Silver Kangaroo melt value today",
     "about": "The Perth Mint's silver bullion coin, struck in .9999 silver with a leaping kangaroo on the reverse. Unlike Perth's Kookaburra and Koala, the design doesn't change each year, which keeps it a plain bullion coin.",
-    "description": "How much silver is in an Australian Silver Kangaroo, what it's worth at live spot, and its weight and purity."
+    "description": "How much silver is in an Australian Silver Kangaroo, what it's worth at live spot, and its weight and purity.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "south-african-silver-krugerrand",
@@ -122,7 +191,8 @@
     "years": "2017 to today",
     "title": "South African Silver Krugerrand melt value today",
     "about": "The silver version of South Africa's famous gold coin, first struck in 2017 for the Krugerrand's 50th anniversary. It holds one ounce of .999 silver and carries a face value of one rand.",
-    "description": "How much silver is in a South African Silver Krugerrand, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in a South African Silver Krugerrand, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "chinese-silver-panda",
@@ -139,7 +209,8 @@
     "years": "2016 to today",
     "title": "30 g Chinese Silver Panda melt value today",
     "about": "China's silver bullion coin, with a new panda design every year, so it draws collectors as well as stackers. Since 2016 it's been struck in 30 grams of .999 silver, about 0.96 oz. Pandas dated 1989 to 2015 hold a full troy ounce.",
-    "description": "How much silver is in a 30 g Chinese Silver Panda, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in a 30 g Chinese Silver Panda, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "chinese-silver-panda-1-oz",
@@ -156,7 +227,8 @@
     "years": "1989 to 2015",
     "title": "1 oz Chinese Silver Panda melt value today",
     "about": "The Silver Panda as it was struck from 1989 to 2015, a full troy ounce of .999 silver with a new panda design every year. In 2016 China moved to 30 gram coins, so a Panda dated before then holds more silver than one dated after. Pandas from before 1989 were proofs in other weights and purities.",
-    "description": "How much silver is in a 1 oz Chinese Silver Panda from 1989 to 2015, what it's worth at live spot, and its weight and purity."
+    "description": "How much silver is in a 1 oz Chinese Silver Panda from 1989 to 2015, what it's worth at live spot, and its weight and purity.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "america-the-beautiful-5-oz",
@@ -172,7 +244,8 @@
     "years": "2010 to 2021",
     "title": "America the Beautiful 5 oz silver coin value today",
     "about": "Five ounces of .999 silver, struck by the US Mint from 2010 to 2021 with one design for each national park or site in the quarter series. They're three inches across, and a few designs had small mintages that collectors now look for.",
-    "description": "How much silver is in an America the Beautiful 5 oz silver coin, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in an America the Beautiful 5 oz silver coin, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "morgan-silver-dollar",
@@ -186,9 +259,35 @@
     "face": "$1",
     "mint": "United States Mint",
     "years": "1878 to 1904, 1921",
-    "title": "Morgan silver dollar melt value today",
+    "title": "Morgan Silver Dollar Melt Value Today",
     "about": "Struck from 1878 to 1904 and again in 1921, the Morgan dollar is 90% silver. Even worn, common Morgans usually sell above melt, and key dates, Carson City coins and high grades bring far more. The Mint's new Morgans from 2021 on are .999 silver and hold a little more.",
-    "description": "How much silver is in a Morgan silver dollar, what it's worth at live spot, and its weight, purity and years."
+    "description": "A Morgan dollar holds 0.7734 troy oz of silver. Live melt value, when a Morgan is worth more than melt, and its weight and years.",
+    "h1": "Morgan silver dollar melt value today",
+    "faq": [
+      {
+        "q": "How much silver is in a Morgan dollar?",
+        "a": "A Morgan dollar weighs 26.73 grams and is 90% silver and 10% copper, so it holds 0.77344 troy oz of pure silver. That figure comes from the coin's legal weight and fineness, and it's the number every melt calculation for a Morgan starts from."
+      },
+      {
+        "q": "What is a Morgan dollar worth in melt?",
+        "a": "Its melt value is 0.77344 troy oz times silver spot. The live figure on this page moves with the silver price. Melt is the floor for a Morgan, since even worn common dates usually sell for a little more than their metal."
+      },
+      {
+        "q": "When is a Morgan worth more than melt?",
+        "a": "Key dates, scarce mint marks like Carson City, and coins in high grades can be worth far more than their silver. The date and the small letter on the back under the wreath matter most. Check a price guide or show the coin to a dealer before you sell it for melt."
+      },
+      {
+        "q": "Are the new US Mint Morgan dollars the same silver?",
+        "a": "No. The Morgans the US Mint has struck since 2021 are .999 fine silver, not the 90% silver of the originals, and they sell as collector coins. This page covers the original Morgans struck from 1878 to 1904 and in 1921."
+      }
+    ],
+    "sources": [
+      {
+        "label": "United States Mint, One Hundred Years of Silver Dollar Coinage",
+        "url": "https://www.usmint.gov/news/inside-the-mint/one-hundred-years-of-silver-dollar-coinage-1878-1978"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "peace-silver-dollar",
@@ -202,9 +301,35 @@
     "face": "$1",
     "mint": "United States Mint",
     "years": "1921 to 1935",
-    "title": "Peace silver dollar melt value today",
+    "title": "Peace Silver Dollar Melt Value Today",
     "about": "The Peace dollar followed the Morgan in 1921 and was struck until 1935, with the same 0.7734 oz of silver as a Morgan. Like Morgans, they usually sell above melt even when worn, and a few dates are scarce.",
-    "description": "How much silver is in a Peace silver dollar, what it's worth at live spot, and its weight, purity and years."
+    "description": "A Peace dollar holds 0.7734 troy oz of silver. Live melt value, years, and when collectors pay more than melt.",
+    "h1": "Peace silver dollar melt value today",
+    "faq": [
+      {
+        "q": "How much silver is in a Peace dollar?",
+        "a": "A Peace dollar weighs 26.73 grams and is 90% silver, the same standard as the Morgan dollar, so it holds 0.77344 troy oz of pure silver. That's the figure every melt calculation for a Peace dollar starts from, and it's the one this page uses."
+      },
+      {
+        "q": "What is a Peace dollar worth in melt?",
+        "a": "Its melt value is 0.77344 troy oz times silver spot, and the live figure is shown on this page. Melt is the floor for this coin, because even worn common dates usually sell to collectors for a little more than their metal."
+      },
+      {
+        "q": "When is a Peace dollar worth more than melt?",
+        "a": "Scarce dates like 1921, 1928 and 1934 S, and any coin in high grade, can be worth well above its silver. Check the date and the mint mark near the eagle's wing tip, then look it up in a price guide or ask a dealer before you sell for melt."
+      },
+      {
+        "q": "Is the 2021 Peace dollar the same silver?",
+        "a": "No. The Peace dollars the US Mint has struck since 2021 are .999 fine silver and sell as collector coins. This page covers the originals struck from 1921 to 1935, which are 90% silver and hold 0.77344 troy oz each."
+      }
+    ],
+    "sources": [
+      {
+        "label": "United States Mint, One Hundred Years of Silver Dollar Coinage",
+        "url": "https://www.usmint.gov/news/inside-the-mint/one-hundred-years-of-silver-dollar-coinage-1878-1978"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "walking-liberty-half-dollar",
@@ -220,7 +345,8 @@
     "years": "1916 to 1947",
     "title": "Walking Liberty half dollar melt value today",
     "about": "Adolph Weinman's Walking Liberty half was struck from 1916 to 1947. Many collectors call it the most beautiful US coin, but worn common dates trade as junk silver, close to melt.",
-    "description": "How much silver is in a Walking Liberty half dollar, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in a Walking Liberty half dollar, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "franklin-half-dollar",
@@ -236,7 +362,8 @@
     "years": "1948 to 1963",
     "title": "Franklin half dollar melt value today",
     "about": "Struck from 1948 to 1963 with Benjamin Franklin on the front and the Liberty Bell on the back. Circulated Franklins usually trade with other junk silver, near melt.",
-    "description": "How much silver is in a Franklin half dollar, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in a Franklin half dollar, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "1964-kennedy-half-dollar",
@@ -250,9 +377,35 @@
     "face": "50 cents",
     "mint": "United States Mint",
     "years": "1964",
-    "title": "1964 Kennedy half dollar melt value today",
+    "title": "1964 Kennedy Half Dollar Silver Value Today",
     "about": "1964 was the only year the Kennedy half was struck in 90% silver for circulation. Halves from 1965 to 1970 dropped to 40% silver, and the ones made for spending after that have none.",
-    "description": "How much silver is in a 1964 Kennedy half dollar, what it's worth at live spot, and its weight, purity and years."
+    "description": "A 1964 Kennedy half is 90% silver, 0.3617 troy oz. Live melt value, and how 1965 to 1970 (40%) and 1971+ (no silver) halves differ.",
+    "h1": "1964 Kennedy half dollar silver value today",
+    "faq": [
+      {
+        "q": "How much is a 1964 Kennedy half worth?",
+        "a": "A 1964 Kennedy half holds about 0.3617 troy oz of silver, so its melt value is that weight times silver spot. The live figure is shown on this page. Circulated coins trade near melt, while uncirculated and proof coins can bring more."
+      },
+      {
+        "q": "Are 1965 to 1970 Kennedy halves silver?",
+        "a": "Yes, but less of it. From 1965 to 1970 Kennedy halves are 40% silver, about 0.1479 troy oz each, less than half of a 1964 coin. They have their own TroyStack page, the 40% Kennedy half dollar, with a live melt value of their own."
+      },
+      {
+        "q": "Are Kennedy halves from 1971 on silver?",
+        "a": "No. Kennedy halves made for circulation from 1971 on are copper and nickel with no silver. Only special collector issues, like some proof and anniversary coins, were struck in silver. A copper stripe on the edge is the quick sign of a clad coin with no silver inside."
+      },
+      {
+        "q": "Are 1964 proof Kennedy halves worth more than melt?",
+        "a": "Often, yes. A 1964 proof holds the same silver as a circulated coin, but collectors pay for its finish and condition, so melt is the floor rather than the price. Check a price guide or ask a coin dealer for its current value."
+      }
+    ],
+    "sources": [
+      {
+        "label": "NGC, U.S. Silver Coin Melt Values",
+        "url": "https://www.ngccoin.com/price-guide/coin-melt-values.aspx"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "40-percent-kennedy-half-dollar",
@@ -268,7 +421,8 @@
     "years": "1965 to 1970",
     "title": "40% Kennedy half dollar silver value today",
     "about": "From 1965 to 1970 the Kennedy half was struck in 40% silver. They look a lot like later halves that have no silver at all, so check the date.",
-    "description": "How much silver is in a 40% Kennedy half dollar, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in a 40% Kennedy half dollar, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "silver-washington-quarter",
@@ -282,9 +436,35 @@
     "face": "25 cents",
     "mint": "United States Mint",
     "years": "1932 to 1964",
-    "title": "Silver quarter value today, 1964 and earlier",
+    "title": "Silver Quarter Value Today (1964 and Earlier)",
     "about": "Washington quarters dated 1964 and earlier are 90% silver. From 1965 on they're copper and nickel, which shows as a copper stripe on the edge, so a plain silver edge is the quick tell.",
-    "description": "How much silver is in a silver Washington quarter, what it's worth at live spot, and its weight, purity and years."
+    "description": "A pre-1965 Washington quarter holds 0.1808 troy oz of silver. Melt value per coin, roll and $10 face at live spot.",
+    "h1": "Silver quarter melt value today",
+    "faq": [
+      {
+        "q": "How much is a silver quarter worth?",
+        "a": "A Washington quarter from 1964 or earlier holds about 0.1808 troy oz of silver, so its melt value is that weight times silver spot. The live figure is shown on this page. Worn common dates trade near melt, while scarce dates and high grades bring more."
+      },
+      {
+        "q": "Which quarters are silver?",
+        "a": "Every US quarter dated 1964 or earlier is 90% silver. That covers Washington quarters from 1932 to 1964 and older types before them. Quarters from 1965 on are copper and nickel with no silver, apart from proof and collector issues the Mint struck in silver."
+      },
+      {
+        "q": "What is a roll of silver quarters worth?",
+        "a": "A bank roll holds 40 quarters, ten dollars in face value, which comes to about 7.2 troy ounces of silver. Type 40 in the quantity box on this page to see the live melt value of a full roll at today's spot."
+      },
+      {
+        "q": "Are 1976 Bicentennial quarters silver?",
+        "a": "Most aren't. The quarters made for circulation in 1976 are copper and nickel. Only the special collector versions struck at San Francisco with an S mint mark are 40% silver, and they were sold to collectors in sets rather than released for spending."
+      }
+    ],
+    "sources": [
+      {
+        "label": "NGC, U.S. Silver Coin Melt Values",
+        "url": "https://www.ngccoin.com/price-guide/coin-melt-values.aspx"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "standing-liberty-quarter",
@@ -300,7 +480,8 @@
     "years": "1916 to 1930",
     "title": "Standing Liberty quarter melt value today",
     "about": "Struck from 1916 to 1930 and 90% silver. The date wore off many of them in circulation, and those trade as junk silver.",
-    "description": "How much silver is in a Standing Liberty quarter, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in a Standing Liberty quarter, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "mercury-dime",
@@ -314,9 +495,35 @@
     "face": "10 cents",
     "mint": "United States Mint",
     "years": "1916 to 1945",
-    "title": "Mercury dime melt value today",
+    "title": "Mercury Dime Melt Value Today",
     "about": "The Winged Liberty Head dime, struck from 1916 to 1945 and better known as the Mercury dime. Worn common dates trade as junk silver, while a few dates like 1916-D are worth far more.",
-    "description": "How much silver is in a Mercury dime, what it's worth at live spot, and its weight, purity and years."
+    "description": "Mercury dimes (1916 to 1945) hold 0.0723 troy oz of silver. Live melt value, and why key dates are worth far more than melt.",
+    "h1": "Mercury dime melt value today",
+    "faq": [
+      {
+        "q": "What is a Mercury dime's melt value?",
+        "a": "A Mercury dime is 90% silver and holds about 0.0723 troy oz of it, so its melt value is that weight times silver spot. The live figure is shown on this page. Most worn Mercury dimes trade a little above melt because collectors like them."
+      },
+      {
+        "q": "Are some Mercury dimes worth far more than melt?",
+        "a": "Yes. Key dates such as the 1916 D, scarce mint marks and coins in high grades sell to collectors for much more than their silver. Check the date and the mint mark on the back, then look it up in a price guide or ask a dealer before you sell."
+      },
+      {
+        "q": "What are full bands on a Mercury dime?",
+        "a": "Full bands describes a coin whose horizontal bands on the reverse fasces are fully split and rounded. It marks a strong strike and sharp detail, and grading services note it. Full band coins can sell for far more than ordinary ones of the same date, well above melt."
+      },
+      {
+        "q": "Do all Mercury dimes hold the same silver?",
+        "a": "Yes. Every Mercury dime from 1916 to 1945 weighs 2.5 grams and is 90% silver, so each one holds the same 0.0723 troy oz. Wear can shave off a little metal, which is why dealers sometimes quote worn coins slightly under full melt."
+      }
+    ],
+    "sources": [
+      {
+        "label": "NGC, U.S. Silver Coin Melt Values",
+        "url": "https://www.ngccoin.com/price-guide/coin-melt-values.aspx"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "silver-roosevelt-dime",
@@ -330,9 +537,39 @@
     "face": "10 cents",
     "mint": "United States Mint",
     "years": "1946 to 1964",
-    "title": "Silver dime value today, 1964 and earlier",
+    "title": "Silver Dime Melt Value Today (1964 and Earlier)",
     "about": "Roosevelt dimes dated 1964 and earlier are 90% silver. From 1965 on they're copper and nickel, so the date tells you which you have.",
-    "description": "How much silver is in a silver Roosevelt dime, what it's worth at live spot, and its weight, purity and years."
+    "description": "A pre-1965 silver dime holds 0.0723 troy oz of silver. See what one dime, a roll or $10 face is worth at live spot.",
+    "h1": "Silver dime melt value today",
+    "faq": [
+      {
+        "q": "How much is a silver dime worth?",
+        "a": "A Roosevelt dime from 1964 or earlier holds 0.07234 troy oz of silver, so its melt value is that weight times silver spot. The live figure is shown on this page. Worn common dates trade close to melt, while a few scarce dates and mint marks bring more."
+      },
+      {
+        "q": "Which dimes are silver?",
+        "a": "Every US dime dated 1964 or earlier is 90% silver and 10% copper. That covers Roosevelt dimes from 1946 to 1964, Mercury dimes from 1916 to 1945 and Barber dimes before them. Dimes from 1965 on are copper and nickel with no silver, apart from special silver proof sets."
+      },
+      {
+        "q": "How much is a roll of silver dimes worth?",
+        "a": "A bank roll holds 50 dimes, five dollars in face value, which comes to about 3.6 troy ounces of silver. Type 50 in the quantity box on this page to see the live melt value of a full roll at today's spot."
+      },
+      {
+        "q": "Is a 1965 dime silver?",
+        "a": "No. The US switched dimes to a copper and nickel clad coin in 1965, so a circulated 1965 dime holds no silver at all. The easy check is the edge. A silver dime shows a solid silver color, while a clad dime shows a copper stripe."
+      },
+      {
+        "q": "Are any silver dimes worth more than melt?",
+        "a": "Some are. Key dates, rare mint marks and coins in high grades sell to collectors for more than their silver. Most worn Roosevelt dimes trade near melt, so look up the date and mint mark in a price guide or ask a coin dealer before you sell a whole roll."
+      }
+    ],
+    "sources": [
+      {
+        "label": "NGC, U.S. Silver Coin Melt Values",
+        "url": "https://www.ngccoin.com/price-guide/coin-melt-values.aspx"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "war-nickel",
@@ -348,7 +585,8 @@
     "years": "1942 to 1945",
     "title": "War nickel silver value today",
     "about": "From late 1942 through 1945 the Jefferson nickel was made with 35% silver to save nickel for the war. Look for a large mint mark above Monticello on the back.",
-    "description": "How much silver is in a war nickel, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in a war nickel, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "40-percent-eisenhower-dollar",
@@ -364,7 +602,8 @@
     "years": "1971 to 1976",
     "title": "40% Eisenhower dollar silver value today",
     "about": "Most Eisenhower dollars have no silver. The exceptions are the 40% silver coins San Francisco made for collectors from 1971 to 1976. They have an S mint mark, but so do some Ikes with no silver, so check which set yours came from.",
-    "description": "How much silver is in a 40% Eisenhower dollar, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much silver is in a 40% Eisenhower dollar, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "1-oz-silver-round",
@@ -376,7 +615,8 @@
     "purity": ".999 fine",
     "title": "1 oz silver round value today",
     "about": "A round is a coin-shaped piece of silver made by a private mint. It isn't legal tender and has no face value. Rounds usually cost less over spot than government coins with the same silver.",
-    "description": "What a 1 oz silver round is worth at live silver spot, with its weight and purity and what to know before you buy or sell one."
+    "description": "What a 1 oz silver round is worth at live silver spot, with its weight and purity and what to know before you buy or sell one.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "10-oz-silver-bar",
@@ -388,7 +628,8 @@
     "purity": ".999 fine",
     "title": "10 oz silver bar value today",
     "about": "Ten ounces of .999 silver in one bar. Bars cost less over spot per ounce than coins, and ten ounces is the size a lot of stackers move to once single coins start to add up.",
-    "description": "What a 10 oz silver bar is worth at live silver spot, with its weight and purity and what to know before you buy or sell one."
+    "description": "What a 10 oz silver bar is worth at live silver spot, with its weight and purity and what to know before you buy or sell one.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "100-oz-silver-bar",
@@ -400,7 +641,8 @@
     "purity": ".999 fine",
     "title": "100 oz silver bar value today",
     "about": "The biggest bar most people buy, a little under seven pounds of .999 silver. It has the lowest premium per ounce of any silver here, but you sell it whole, so some stackers prefer smaller bars they can sell a few at a time.",
-    "description": "What a 100 oz silver bar is worth at live silver spot, with its weight and purity and what to know before you buy or sell one."
+    "description": "What a 100 oz silver bar is worth at live silver spot, with its weight and purity and what to know before you buy or sell one.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "1-kilo-silver-bar",
@@ -413,7 +655,8 @@
     "purity": ".999 fine",
     "title": "1 kilo silver bar value today",
     "about": "A kilogram bar of .999 silver, which holds about 32.12 troy ounces of pure silver. Kilo bars are the standard size in Europe and Asia and fall between ten ounce and hundred ounce bars on premium.",
-    "description": "What a 1 kilo silver bar is worth at live silver spot, with its weight and purity and what to know before you buy or sell one."
+    "description": "What a 1 kilo silver bar is worth at live silver spot, with its weight and purity and what to know before you buy or sell one.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "american-gold-eagle",
@@ -427,9 +670,39 @@
     "face": "$50",
     "mint": "United States Mint",
     "years": "1986 to today",
-    "title": "American Gold Eagle melt value today",
+    "title": "Gold Eagle Value Today: 1 oz Melt Value, Live",
     "about": "The US Mint's gold bullion coin. It's 22 karat gold, alloyed with silver and copper so it wears well, which is why the coin weighs more than an ounce but holds exactly one ounce of gold. It's the gold coin US dealers know best when you sell.",
-    "description": "How much gold is in a 1 oz American Gold Eagle, what it's worth at live spot, and its weight, purity and years."
+    "description": "What a 1 oz American Gold Eagle is worth at live gold spot, why it's 22 karat but still holds 1 oz of gold, and what dealers add on top.",
+    "h1": "American Gold Eagle value today",
+    "faq": [
+      {
+        "q": "What is a 1 oz Gold Eagle worth?",
+        "a": "Its melt value is one troy ounce of gold at spot, because each one ounce Gold Eagle holds exactly one troy ounce of pure gold. The live figure is shown on this page. Dealers sell above that figure and usually buy back near it."
+      },
+      {
+        "q": "If it's 22 karat, is it really 1 oz of gold?",
+        "a": "Yes. The coin is 91.67% gold with a little silver and copper added to make it harder, so it weighs 33.931 grams in all. The extra weight is the alloy. The pure gold inside is still exactly one troy ounce, as the US Mint states."
+      },
+      {
+        "q": "Should I compare a Gold Eagle with a Gold Buffalo?",
+        "a": "Both hold one troy ounce of gold and have the same melt value. The Buffalo is 24 karat .9999 gold and a little softer, while the Eagle's 22 karat alloy resists scratches. Premiums differ by dealer and by week, so compare the price over spot rather than the coin."
+      },
+      {
+        "q": "What premium over spot is normal for a Gold Eagle?",
+        "a": "Gold Eagles usually cost more over spot than gold bars or some foreign one ounce coins, because of the Mint's own markup and steady demand. The premium changes with the market, so compare a few dealers on the same day and look at the price over the live melt value here."
+      },
+      {
+        "q": "What will a dealer pay for a Gold Eagle?",
+        "a": "Dealers usually buy common Gold Eagles back near melt, sometimes a little above it when demand is strong. Ask two or three dealers for their buy price on the same day and compare each one with the live melt value shown on this page."
+      }
+    ],
+    "sources": [
+      {
+        "label": "United States Mint, Bullion Coins",
+        "url": "https://www.usmint.gov/coin-programs/bullion-coins/"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "american-gold-eagle-half-oz",
@@ -445,7 +718,8 @@
     "years": "1986 to today",
     "title": "1/2 oz American Gold Eagle melt value today",
     "about": "The half ounce Gold Eagle, 22 karat like the one ounce coin. Smaller sizes cost more over spot per ounce, but they're easier to sell a little at a time.",
-    "description": "How much gold is in a 1/2 oz American Gold Eagle, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in a 1/2 oz American Gold Eagle, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "american-gold-eagle-quarter-oz",
@@ -461,7 +735,8 @@
     "years": "1986 to today",
     "title": "1/4 oz American Gold Eagle melt value today",
     "about": "The quarter ounce Gold Eagle. It costs more per ounce than the one ounce coin, and a lot of people buy it as a middle step between a tenth and a full ounce.",
-    "description": "How much gold is in a 1/4 oz American Gold Eagle, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in a 1/4 oz American Gold Eagle, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "american-gold-eagle-tenth-oz",
@@ -475,9 +750,35 @@
     "face": "$5",
     "mint": "United States Mint",
     "years": "1986 to today",
-    "title": "1/10 oz American Gold Eagle melt value today",
+    "title": "1/10 oz Gold Eagle Worth Today: Live Melt Value",
     "about": "The smallest Gold Eagle and a common first gold coin. The premium per ounce is the highest in the series, so it makes more sense as a start or a gift than as the main way to buy gold.",
-    "description": "How much gold is in a 1/10 oz American Gold Eagle, what it's worth at live spot, and its weight, purity and years."
+    "description": "A 1/10 oz Gold Eagle holds 0.1 troy oz of gold. Live melt value, why small gold carries a bigger premium, and its specs.",
+    "h1": "1/10 oz Gold Eagle value today",
+    "faq": [
+      {
+        "q": "What is a 1/10 oz Gold Eagle worth?",
+        "a": "It holds 0.1 troy oz of pure gold, so its melt value is one tenth of the gold spot price. The live figure is shown on this page. Dealers charge more than that for the coin, and the gap is larger than it is on a one ounce coin."
+      },
+      {
+        "q": "Why is the premium per ounce higher on small coins?",
+        "a": "Striking, packaging and handling cost about the same per coin whatever its size, so a tenth ounce coin carries those costs on far less gold. That pushes its price over spot up per ounce. Ten tenth ounce coins usually cost noticeably more than one full ounce coin."
+      },
+      {
+        "q": "Do all 1/10 oz gold coins have the same melt value?",
+        "a": "Yes, if each one holds a tenth of a troy ounce of pure gold. A tenth ounce Gold Eagle, Gold Maple Leaf or Krugerrand all melt to the same figure, whatever their purity or total weight. Only the premium and how easily dealers take them back differ."
+      },
+      {
+        "q": "Does the five dollar face value mean anything?",
+        "a": "Only that the coin is US legal tender. The gold inside is worth many times its face value, so nobody spends one at face. Value it by its gold content at spot, as this page does, and expect dealers to price it the same way."
+      }
+    ],
+    "sources": [
+      {
+        "label": "United States Mint, Bullion Coins",
+        "url": "https://www.usmint.gov/coin-programs/bullion-coins/"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "american-gold-buffalo",
@@ -491,9 +792,35 @@
     "face": "$50",
     "mint": "United States Mint",
     "years": "2006 to today",
-    "title": "American Gold Buffalo melt value today",
+    "title": "Gold Buffalo Value Today: 1 oz Melt Value",
     "about": "The US Mint's pure gold coin, with James Earle Fraser's design from the Buffalo nickel. At 24 karat it's softer than a 22 karat Eagle and scratches more easily, so it's best kept in its capsule.",
-    "description": "How much gold is in an American Gold Buffalo, what it's worth at live spot, and its weight, purity and years."
+    "description": "What a 1 oz .9999 American Gold Buffalo is worth at live gold spot, and how it compares with the 22 karat Gold Eagle.",
+    "h1": "American Gold Buffalo value today",
+    "faq": [
+      {
+        "q": "What is a Gold Buffalo worth?",
+        "a": "Each American Gold Buffalo holds one troy ounce of .9999 fine gold, so its melt value is the gold spot price. The live figure is shown on this page. Dealers sell above melt and usually buy back close to it."
+      },
+      {
+        "q": "How does a Gold Buffalo compare with a Gold Eagle?",
+        "a": "Both hold exactly one troy ounce of gold and have the same melt value. The Buffalo is 24 karat .9999 gold and the Eagle is a harder 22 karat alloy. The Buffalo was the US Mint's first 24 karat gold coin, struck from 2006."
+      },
+      {
+        "q": "Why does the Gold Buffalo weigh 31.108 grams?",
+        "a": "Pure gold at one troy ounce is 31.1035 grams. The Buffalo is .9999 fine rather than perfectly pure, so the Mint makes it a hair heavier to make sure each coin holds a full troy ounce of gold. That's the figure its melt value uses."
+      },
+      {
+        "q": "What will a dealer pay for a Gold Buffalo?",
+        "a": "Dealers usually buy common Gold Buffalos back near melt, sometimes a little above when demand is strong. Ask two or three dealers for their buy price on the same day and compare each with the live melt value on this page."
+      }
+    ],
+    "sources": [
+      {
+        "label": "United States Mint, Bullion Coins",
+        "url": "https://www.usmint.gov/coin-programs/bullion-coins/"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "south-african-krugerrand",
@@ -506,9 +833,39 @@
     "purity": "22 karat (91.67%)",
     "mint": "South African Mint",
     "years": "1967 to today",
-    "title": "Krugerrand gold value today",
+    "title": "Krugerrand Value Today: 1 oz Gold Melt Value",
     "about": "The first modern gold bullion coin and still one of the most traded. It's 22 karat, so the coin weighs 33.93 grams to hold one ounce of gold. There's no face value on it.",
-    "description": "How much gold is in a South African Krugerrand, what it's worth at live spot, and its weight, purity and years."
+    "description": "A 1 oz Krugerrand weighs 33.93 g and holds exactly 1 troy oz of gold. Live melt value, sizes, and how premiums work.",
+    "h1": "Krugerrand value today",
+    "faq": [
+      {
+        "q": "What is a Krugerrand worth today?",
+        "a": "A one ounce Krugerrand holds exactly one troy ounce of pure gold, so its melt value is the gold spot price. The live figure is shown on this page. Krugerrands often carry one of the smaller premiums among gold coins because so many have been struck since 1967."
+      },
+      {
+        "q": "Why is a Krugerrand heavier than one ounce?",
+        "a": "It's 22 karat, 91.67% gold with copper added for hardness, so the whole coin weighs 33.93 grams. The extra weight is the copper. The pure gold inside is 31.10 grams, which is exactly one troy ounce, and that's the part that sets its melt value."
+      },
+      {
+        "q": "Does a Krugerrand have a face value?",
+        "a": "No. It's legal tender in South Africa, but it carries no face value in rand. It was designed to be valued by its gold content alone, and dealers price it that way, at the gold spot price plus a premium."
+      },
+      {
+        "q": "How do I check a Krugerrand isn't fake?",
+        "a": "Start with weight and size. A real one ounce Krugerrand weighs 33.93 grams and measures about 32.77 mm across. A precise scale and calipers catch most fakes. A dealer can run a magnet test, a ping test or an XRF scan if you need more certainty."
+      },
+      {
+        "q": "What sizes of Krugerrand exist?",
+        "a": "Besides the one ounce coin, Krugerrands have been struck since 1980 in half ounce, quarter ounce and tenth ounce sizes. Each holds that fraction of a troy ounce of pure gold, so its melt value is that fraction of the gold spot price."
+      }
+    ],
+    "sources": [
+      {
+        "label": "Rand Refinery, Krugerrand",
+        "url": "https://www.randrefinery.com/products/"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "canadian-gold-maple-leaf",
@@ -523,9 +880,35 @@
     "face": "$50 Canadian",
     "mint": "Royal Canadian Mint",
     "years": "late 1982 to today",
-    "title": "Canadian Gold Maple Leaf melt value today",
+    "title": "Gold Maple Leaf Value Today: 1 oz Melt Value",
     "about": "Canada's gold bullion coin, struck in .9999 gold by the Royal Canadian Mint since late 1982. Maple Leafs from 1979 to 1982 were .999 and hold an ounce too. Newer coins carry radial lines and a tiny engraved maple leaf to make them harder to fake.",
-    "description": "How much gold is in a Canadian Gold Maple Leaf, what it's worth at live spot, and its weight, purity and years."
+    "description": "What a 1 oz .9999 Canadian Gold Maple Leaf is worth at live gold spot, with weight, purity and premium basics.",
+    "h1": "Canadian Gold Maple Leaf value today",
+    "faq": [
+      {
+        "q": "What is a Gold Maple Leaf worth?",
+        "a": "A one ounce Gold Maple Leaf holds one troy ounce of .9999 fine gold, so its melt value is the gold spot price. The live figure is shown on this page. Dealers sell above melt and usually buy back close to it."
+      },
+      {
+        "q": "How is .9999 gold different from 22 karat?",
+        "a": "A .9999 coin is almost pure gold, while a 22 karat coin like the Gold Eagle or Krugerrand mixes in some copper or silver for hardness. Both one ounce coins hold exactly one troy ounce of gold, so their melt values match. Only the total weight differs."
+      },
+      {
+        "q": "Is the Gold Maple Leaf easy to scratch?",
+        "a": "Pure gold is soft, so a Gold Maple Leaf marks more easily than a 22 karat coin. Handle it by the edge and keep it in its capsule. Small marks don't change its melt value, though dealers may pay a little less for a coin that looks rough."
+      },
+      {
+        "q": "Does a Gold Maple Leaf cost less over spot than a Gold Eagle?",
+        "a": "Often, but not always. Gold Maple Leafs are widely traded and frequently priced a little closer to spot than Gold Eagles. Premiums change week to week, so compare the price over spot from a few dealers on the same day."
+      }
+    ],
+    "sources": [
+      {
+        "label": "Royal Canadian Mint, Gold Maple Leaf bullion specifications",
+        "url": "https://www.mint.ca/globalassets/shop/bullion/2025/gml-and-sml/2026-$50-1-oz.-9999au---gml-bullion-e.pdf"
+      }
+    ],
+    "modified": "2026-10-28"
   },
   {
     "slug": "canadian-gold-maple-leaf-1979-1982",
@@ -542,7 +925,8 @@
     "years": "1979 to 1982",
     "title": "1979 to 1982 Gold Maple Leaf melt value today",
     "about": "The first Gold Maple Leafs, struck from 1979 to 1982 in .999 gold, a troy ounce each. The Royal Canadian Mint moved to .9999 gold late in 1982, so a 1982 coin can be either, and most are .999.",
-    "description": "How much gold is in a 1979 to 1982 Canadian Gold Maple Leaf, what it's worth at live spot, and its weight and purity."
+    "description": "How much gold is in a 1979 to 1982 Canadian Gold Maple Leaf, what it's worth at live spot, and its weight and purity.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "austrian-gold-philharmonic",
@@ -558,7 +942,8 @@
     "years": "1989 to today",
     "title": "Austrian Gold Philharmonic melt value today",
     "about": "Austria's gold bullion coin and one of the most traded in Europe, with the same orchestra design as the silver Philharmonic.",
-    "description": "How much gold is in an Austrian Gold Philharmonic, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in an Austrian Gold Philharmonic, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "british-gold-britannia",
@@ -575,7 +960,8 @@
     "years": "2013 to today",
     "title": "British Gold Britannia melt value today",
     "about": "The Royal Mint's gold bullion coin, struck in .9999 gold since 2013. Britannias from 1987 to 2012 were 22 karat on a heavier blank and hold an ounce of gold too. Because it's UK legal tender, it's free of capital gains tax for UK residents.",
-    "description": "How much gold is in a British Gold Britannia, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in a British Gold Britannia, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "british-gold-britannia-1987-2012",
@@ -592,7 +978,8 @@
     "years": "1987 to 2012",
     "title": "22 karat British Gold Britannia melt value today",
     "about": "The gold Britannia as the Royal Mint struck it from 1987 to 2012, in 22 karat gold on a 34.05 gram blank. That's heavier than today's coin, so it still holds a troy ounce of gold. From 2013 the Britannia has been .9999 gold. It's UK legal tender, so it's free of capital gains tax for UK residents.",
-    "description": "How much gold is in a 1987 to 2012 British Gold Britannia, what it's worth at live spot, and its weight and purity."
+    "description": "How much gold is in a 1987 to 2012 British Gold Britannia, what it's worth at live spot, and its weight and purity.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "australian-gold-kangaroo",
@@ -607,7 +994,8 @@
     "years": "1986 to today",
     "title": "Australian Gold Kangaroo melt value today",
     "about": "The Perth Mint's gold bullion coin, first issued in 1986 as the Australian Nugget. The kangaroo on the back changes every year.",
-    "description": "How much gold is in an Australian Gold Kangaroo, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in an Australian Gold Kangaroo, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "chinese-gold-panda",
@@ -624,7 +1012,8 @@
     "years": "2016 to today",
     "title": "30 g Chinese Gold Panda melt value today",
     "about": "China's gold bullion coin, with a new panda each year. Since 2016 it's been struck in 30 grams of .999 gold, about 0.96 oz. Pandas dated 1982 to 2015 hold a full troy ounce.",
-    "description": "How much gold is in a 30 g Chinese Gold Panda, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in a 30 g Chinese Gold Panda, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "chinese-gold-panda-1-oz",
@@ -640,7 +1029,8 @@
     "years": "1982 to 2015",
     "title": "1 oz Chinese Gold Panda melt value today",
     "about": "The Gold Panda as it was struck from 1982 to 2015, a full troy ounce of .999 gold with a new panda each year. In 2016 China moved to 30 gram coins, so a Panda dated before then holds more gold than one dated after.",
-    "description": "How much gold is in a 1 oz Chinese Gold Panda from 1982 to 2015, what it's worth at live spot, and its weight and purity."
+    "description": "How much gold is in a 1 oz Chinese Gold Panda from 1982 to 2015, what it's worth at live spot, and its weight and purity.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "british-sovereign",
@@ -656,7 +1046,8 @@
     "years": "1817 to today",
     "title": "Gold Sovereign value today",
     "about": "Struck since 1817 and still made today. It's easy to sell almost anywhere in the world, and as UK legal tender it's free of capital gains tax for UK residents.",
-    "description": "How much gold is in a British Sovereign, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in a British Sovereign, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "mexican-50-pesos",
@@ -672,7 +1063,8 @@
     "years": "1921 to 1947",
     "title": "Mexican 50 Pesos gold coin value today",
     "about": "The Centenario, first struck in 1921 for a hundred years of Mexican independence and one of the heaviest gold coins ever made for circulation. Most you'll find are restrikes dated 1947, which is fine for bullion.",
-    "description": "How much gold is in a Mexican 50 Pesos gold coin, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in a Mexican 50 Pesos gold coin, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "20-dollar-double-eagle",
@@ -688,7 +1080,8 @@
     "years": "1850 to 1933",
     "title": "$20 gold Double Eagle value today",
     "about": "The $20 gold piece, in the Liberty design from 1850 to 1907 and the Saint-Gaudens design from 1907 to 1933. Common dates usually sell above melt because collectors want them too.",
-    "description": "How much gold is in a $20 Double Eagle, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in a $20 Double Eagle, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "10-dollar-eagle",
@@ -704,7 +1097,8 @@
     "years": "1838 to 1933",
     "title": "$10 gold Eagle value today",
     "about": "The $10 gold piece, in the Liberty design until 1907 and the Indian Head design from 1907 to 1933. Like other gold from before 1933, it usually sells above melt.",
-    "description": "How much gold is in a $10 Eagle, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in a $10 Eagle, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "5-dollar-half-eagle",
@@ -720,7 +1114,8 @@
     "years": "1839 to 1929",
     "title": "$5 gold Half Eagle value today",
     "about": "The $5 gold piece, struck in several designs until 1929. Old US gold usually sells above melt, and some dates are worth much more.",
-    "description": "How much gold is in a $5 Half Eagle, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in a $5 Half Eagle, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "2-50-dollar-quarter-eagle",
@@ -736,7 +1131,8 @@
     "years": "1840 to 1929",
     "title": "$2.50 gold Quarter Eagle value today",
     "about": "The $2.50 gold piece, last struck in 1929. Like other old US gold, it usually sells above its melt value.",
-    "description": "How much gold is in a $2.50 Quarter Eagle, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in a $2.50 Quarter Eagle, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "swiss-20-francs",
@@ -752,7 +1148,8 @@
     "years": "1897 to 1949",
     "title": "Swiss 20 Francs gold coin value today",
     "about": "Best known as the Vreneli, struck from 1897 to 1949. It's a common way to buy gold in small pieces in Europe.",
-    "description": "How much gold is in a Swiss 20 Francs gold coin, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much gold is in a Swiss 20 Francs gold coin, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "french-20-francs",
@@ -767,7 +1164,8 @@
     "mint": "Paris Mint",
     "title": "French 20 Francs Rooster gold value today",
     "about": "Often called the Rooster after the design struck from 1899 to 1914. It holds the same gold as the Swiss 20 francs, since both followed the same standard.",
-    "description": "How much gold is in a French 20 Francs gold coin, what it's worth at live spot, and its weight and purity."
+    "description": "How much gold is in a French 20 Francs gold coin, what it's worth at live spot, and its weight and purity.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "1-gram-gold-bar",
@@ -780,7 +1178,8 @@
     "purity": ".9999 fine",
     "title": "1 gram gold bar value today",
     "about": "The smallest gold bar most dealers sell, about the size of a fingernail. The premium over spot is high for its size, so it works better as a start or a gift than as an efficient way to buy.",
-    "description": "What a 1 gram gold bar is worth at live gold spot, with its weight and purity and what to know before you buy or sell one."
+    "description": "What a 1 gram gold bar is worth at live gold spot, with its weight and purity and what to know before you buy or sell one.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "10-gram-gold-bar",
@@ -793,7 +1192,8 @@
     "purity": ".9999 fine",
     "title": "10 gram gold bar value today",
     "about": "Ten grams of .9999 gold, a little under a third of an ounce. It's a common size in Europe and Asia.",
-    "description": "What a 10 gram gold bar is worth at live gold spot, with its weight and purity and what to know before you buy or sell one."
+    "description": "What a 10 gram gold bar is worth at live gold spot, with its weight and purity and what to know before you buy or sell one.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "1-oz-gold-bar",
@@ -806,7 +1206,8 @@
     "purity": ".9999 fine",
     "title": "1 oz gold bar value today",
     "about": "One troy ounce of .9999 gold from a refiner like PAMP, Valcambi or the Perth Mint. Bars usually cost a little less over spot than one ounce coins, and most come sealed with an assay card.",
-    "description": "What a 1 oz gold bar is worth at live gold spot, with its weight and purity and what to know before you buy or sell one."
+    "description": "What a 1 oz gold bar is worth at live gold spot, with its weight and purity and what to know before you buy or sell one.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "1-kilo-gold-bar",
@@ -819,7 +1220,8 @@
     "purity": ".9999 fine",
     "title": "1 kilo gold bar value today",
     "about": "A kilogram of gold, which is 32.15 troy ounces. The premium per ounce is low, but it's a lot of money in one piece and you can't sell part of it.",
-    "description": "What a 1 kilo gold bar is worth at live gold spot, with its weight and purity and what to know before you buy or sell one."
+    "description": "What a 1 kilo gold bar is worth at live gold spot, with its weight and purity and what to know before you buy or sell one.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "american-platinum-eagle",
@@ -835,7 +1237,8 @@
     "years": "1997 to today",
     "title": "American Platinum Eagle melt value today",
     "about": "The US Mint's platinum bullion coin and the only US coin made of platinum.",
-    "description": "How much platinum is in an American Platinum Eagle, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much platinum is in an American Platinum Eagle, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "canadian-platinum-maple-leaf",
@@ -849,7 +1252,8 @@
     "mint": "Royal Canadian Mint",
     "title": "Canadian Platinum Maple Leaf melt value today",
     "about": "The Royal Canadian Mint's platinum bullion coin, first struck in 1988.",
-    "description": "How much platinum is in a Canadian Platinum Maple Leaf, what it's worth at live spot, and its weight and purity."
+    "description": "How much platinum is in a Canadian Platinum Maple Leaf, what it's worth at live spot, and its weight and purity.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "1-oz-platinum-bar",
@@ -862,7 +1266,8 @@
     "purity": ".9995 fine",
     "title": "1 oz platinum bar value today",
     "about": "One troy ounce of .9995 platinum. Platinum usually carries a bigger premium than gold because much less of it trades as bullion.",
-    "description": "What a 1 oz platinum bar is worth at live platinum spot, with its weight and purity and what to know before you buy or sell one."
+    "description": "What a 1 oz platinum bar is worth at live platinum spot, with its weight and purity and what to know before you buy or sell one.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "american-palladium-eagle",
@@ -878,7 +1283,8 @@
     "years": "2017 to today",
     "title": "American Palladium Eagle melt value today",
     "about": "The US Mint's palladium coin, with Adolph Weinman's Winged Liberty from the Mercury dime on the front.",
-    "description": "How much palladium is in an American Palladium Eagle, what it's worth at live spot, and its weight, purity and years."
+    "description": "How much palladium is in an American Palladium Eagle, what it's worth at live spot, and its weight, purity and years.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "canadian-palladium-maple-leaf",
@@ -892,7 +1298,8 @@
     "mint": "Royal Canadian Mint",
     "title": "Canadian Palladium Maple Leaf melt value today",
     "about": "The Royal Canadian Mint's palladium bullion coin, made in much smaller numbers than the gold and silver Maples.",
-    "description": "How much palladium is in a Canadian Palladium Maple Leaf, what it's worth at live spot, and its weight and purity."
+    "description": "How much palladium is in a Canadian Palladium Maple Leaf, what it's worth at live spot, and its weight and purity.",
+    "modified": "2026-10-09"
   },
   {
     "slug": "1-oz-palladium-bar",
@@ -905,6 +1312,7 @@
     "purity": ".9995 fine",
     "title": "1 oz palladium bar value today",
     "about": "One troy ounce of .9995 palladium. Most palladium goes into catalytic converters, so its price swings harder than gold or silver.",
-    "description": "What a 1 oz palladium bar is worth at live palladium spot, with its weight and purity and what to know before you buy or sell one."
+    "description": "What a 1 oz palladium bar is worth at live palladium spot, with its weight and purity and what to know before you buy or sell one.",
+    "modified": "2026-10-09"
   }
 ]

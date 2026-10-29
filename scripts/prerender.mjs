@@ -7,12 +7,15 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { plainDashes, usableOneLiner } from '../api/_lib/signal-text.js';
+import { coinBody, coinLd, junkBody, junkLd, ounces, sitemapRow, usableSnapshot } from './coin-html.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const SITE = 'https://troystack.ai';
 const seo = JSON.parse(readFileSync(path.join(root, 'src/lib/seo.json'), 'utf8'));
 const coins = JSON.parse(readFileSync(path.join(root, 'src/lib/coins.json'), 'utf8'));
+const coinCopy = JSON.parse(readFileSync(path.join(root, 'src/lib/coinCopy.json'), 'utf8'));
+const junkPage = JSON.parse(readFileSync(path.join(root, 'src/lib/junkSilverPage.json'), 'utf8'));
 const template = readFileSync(path.join(dist, 'index.html'), 'utf8');
 
 const escape = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -49,6 +52,9 @@ function render(route, meta, body, ld, extra = {}) {
   // Crawlers that don't run JavaScript, which includes most AI ones, read the
   // page's facts from here. With JavaScript on, browsers ignore it.
   if (body) html = setTag(html, /<noscript>[^<]*<\/noscript>/, `<noscript>${body}</noscript>`);
+  // Pages whose facts should be read as page content, not as a no-script
+  // fallback, carry them inside #root. The app replaces them when it mounts.
+  if (extra.rootBody) html = setTag(html, /<div id="root"><\/div>/, `<div id="root">${extra.rootBody}</div>`);
   // Structured data search engines read, like the breadcrumb a result shows.
   const blocks = (Array.isArray(ld) ? ld : ld ? [ld] : []).map((item) => `<script type="application/ld+json">${scriptJson(item)}</script>`).join('');
   if (blocks) html = setTag(html, /<\/head>/, `${blocks}</head>`);
@@ -89,6 +95,19 @@ function plainExcerpt(text, max = 160) {
   return `${cut.slice(0, lastSpace > max * 0.6 ? lastSpace : max).replace(/[,;:.\s]+$/, '')}…`;
 }
 
+/** Spot at build time for the coin pages' opening line. Offline builds leave the number out. */
+async function loadSpot() {
+  if (process.env.PRERENDER_PRICES === 'off') return null;
+  try {
+    const res = await fetch('https://api.troystack.ai/v1/prices', { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error(`prices ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.warn(`prerender: spot snapshot skipped (${err.message})`);
+    return null;
+  }
+}
+
 async function loadSignalArticles() {
   // The browser tests build offline, so they skip the live article list.
   if (process.env.PRERENDER_SIGNAL === 'off') return [];
@@ -110,53 +129,30 @@ async function loadSignalArticles() {
 }
 
 const NEEDS_JS = '<p>TroyStack needs JavaScript to show live prices and talk to Troy.</p>';
-const ounces = (oz) => String(oz >= 10 ? +oz.toFixed(2) : +oz.toFixed(4));
-const metalName = (m) => m[0].toUpperCase() + m.slice(1);
-
-function coinBody(c) {
-  const specs = [
-    [`${metalName(c.metal)} content`, `${ounces(c.fineOzt)} troy oz`],
-    ['Purity', c.purity],
-    c.grossGrams != null ? ['Total weight', `${c.grossGrams} g`] : null,
-    c.face ? ['Face value', c.face] : null,
-    c.mint ? ['Issued by', c.mint] : null,
-    c.years ? ['Years', c.years] : null,
-  ].filter(Boolean);
-  return [
-    `<h1>${escape(c.name)}</h1>`,
-    `<p>${escape(c.about)}</p>`,
-    `<ul>${specs.map(([k, v]) => `<li>${escape(k)}: ${escape(v)}</li>`).join('')}</ul>`,
-    `<p>Melt value is the ${escape(c.metal)} content times live spot. <a href="/coins">All coin and bar values</a></p>`,
-    NEEDS_JS,
-  ].join('');
-}
 
 function coinsIndexBody() {
   const items = coins.map((c) => `<li><a href="/coins/${c.slug}">${escape(c.name)}</a>, ${ounces(c.fineOzt)} troy oz of ${escape(c.metal)}</li>`).join('');
   return `<h1>Coin and bar values</h1><ul>${items}</ul>${NEEDS_JS}`;
 }
 
-/** Search results show where a coin page sits, under Coin and bar values. */
-function coinBreadcrumb(c) {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Coin and bar values', item: `${SITE}/coins` },
-      { '@type': 'ListItem', position: 2, name: c.name, item: `${SITE}/coins/${c.slug}` },
-    ],
-  };
-}
-
 const pages = { ...seo, '/prices': seo['/prices/gold'] };
 const bodies = { '/coins': coinsIndexBody() };
 const structured = { '/': SOFTWARE, '/app': SOFTWARE };
 const extras = {};
+// The date each page last changed, for the sitemap. Pages without one leave it out.
+const modified = {};
+const spot = await loadSpot();
 for (const c of coins) {
-  pages[`/coins/${c.slug}`] = { title: c.title, description: c.description };
-  bodies[`/coins/${c.slug}`] = coinBody(c);
-  structured[`/coins/${c.slug}`] = coinBreadcrumb(c);
+  const route = `/coins/${c.slug}`;
+  pages[route] = { title: c.title, description: c.description };
+  bodies[route] = NEEDS_JS;
+  structured[route] = coinLd(c);
+  extras[route] = { rootBody: coinBody(coins, c, usableSnapshot(spot, c.metal), coinCopy) };
+  modified[route] = c.modified;
 }
+bodies['/tools/junk-silver'] = NEEDS_JS;
+structured['/tools/junk-silver'] = junkLd(junkPage, seo['/tools/junk-silver']);
+extras['/tools/junk-silver'] = { rootBody: junkBody(junkPage, coins, usableSnapshot(spot, 'silver'), coinCopy) };
 
 const signalArticles = await loadSignalArticles();
 for (const article of signalArticles) {
@@ -171,6 +167,8 @@ for (const article of signalArticles) {
   bodies[route] = `<h1>${escape(title)}</h1><p>${escape(description)}</p><p>${commentary}</p><p>Troy is an AI. This is his analysis and opinion, not financial advice.</p>${NEEDS_JS}`;
   structured[route] = articleLd(article, title, description);
   extras[route] = { ogType: 'article', image: article.image_url || undefined };
+  const published = String(article.published_at || article.created_at || '').slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(published)) modified[route] = published;
 }
 
 let count = 0;
@@ -205,11 +203,11 @@ for (const [alias, page] of Object.entries(SAME_AS)) {
   writeFileSync(path.join(dist, `${alias.slice(1)}.html`), readFileSync(path.join(dist, `${page.slice(1)}.html`)));
 }
 
-// The sitemap lists the same public pages.
-const today = new Date().toISOString().slice(0, 10);
+// The sitemap lists the same public pages. lastmod is the date a page's own
+// content last changed, never the build date, so search engines can trust it.
 const urls = Object.keys(pages)
   .filter((route) => !(route in SAME_AS))
-  .map((route) => `  <url><loc>${SITE}${route === '/' ? '/' : route}</loc><lastmod>${today}</lastmod></url>`)
+  .map((route) => sitemapRow(`${SITE}${route === '/' ? '/' : route}`, modified[route]))
   .join('\n');
 writeFileSync(path.join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
 

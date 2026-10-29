@@ -1,0 +1,39 @@
+{
+  "h1": "Junk silver melt value calculator",
+  "faq": [
+    {
+      "q": "How much silver is in one dollar face of junk silver?",
+      "a": "Ten dimes, four quarters or two halves from 1964 or earlier weigh 25 grams together and are 90% silver, which works out to 0.7234 troy oz of pure silver. That's the figure for coins as struck. Worn coins have lost a little metal, so the trade often uses a lower number."
+    },
+    {
+      "q": "Should I use 0.7234 or 0.715 ounces per dollar of face?",
+      "a": "0.7234 is what new coins held when the Mint struck them. 0.715 is a dealer convention that allows for wear on circulated coins, and it's not a mint figure. This calculator's face value mode uses 0.715, which matches how most dealers price bags. Use 0.7234 for uncirculated coins."
+    },
+    {
+      "q": "What does times face mean?",
+      "a": "Dealers often quote junk silver as a multiple of face value. A quote of 20 times face means each dollar of face value costs twenty dollars. Compare that multiple with the melt value of one dollar face on this page to see how far above or below melt the quote sits."
+    },
+    {
+      "q": "How much silver is in a 1,000 dollar face bag?",
+      "a": "A bag of 1,000 dollars face in 90% dimes, quarters or halves holds about 715 troy ounces of silver by the circulated convention, or about 723 if the coins were new. Enter 1000 in face value mode to see its live melt value."
+    },
+    {
+      "q": "Which years are silver?",
+      "a": "US dimes, quarters and half dollars dated 1964 or earlier are 90% silver. Kennedy halves from 1965 to 1970 are 40% silver. War nickels from 1942 to 1945 hold 35% silver. Silver dollars like the Morgan and Peace are 90% silver."
+    },
+    {
+      "q": "Are 1965 and later coins silver?",
+      "a": "Dimes and quarters from 1965 on are copper and nickel with no silver. Kennedy halves from 1965 to 1970 are 40% silver, and circulating halves from 1971 on hold none, apart from collector proof issues. The edge is a quick check, since a copper stripe means a clad coin."
+    },
+    {
+      "q": "What is 40% silver worth?",
+      "a": "A 1965 to 1970 Kennedy half holds about 0.1479 troy oz of silver, so it's worth about 40% as much in melt as a 1964 half. Enter your count in the 40% Kennedy halves field above to see the live total."
+    }
+  ],
+  "sources": [
+    {
+      "label": "NGC, U.S. Silver Coin Melt Values",
+      "url": "https://www.ngccoin.com/price-guide/coin-melt-values.aspx"
+    }
+  ]
+}

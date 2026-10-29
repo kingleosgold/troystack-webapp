@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSpotMap } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -8,6 +9,8 @@ import { coinsInGroup } from '../lib/coins';
 import { Card, Field, Input, PageHeader, Segmented } from '../ui/primitives';
 import { SpotNotice } from '../ui/SpotNotice';
 import { AppStoreButton } from '../ui/AppStore';
+import PAGE from '../lib/junkSilverPage.json';
+import COPY from '../lib/coinCopy.json';
 
 /** Silver per coin in troy ounces, the same figures the API's calculator uses. */
 const COINS = [
@@ -19,8 +22,10 @@ const COINS = [
   { id: 'nickels', name: 'War nickels', detail: 'Jefferson, 1942 to 1945', oz: 0.05626, face: 0.05 },
 ] as const;
 
-/** Silver in $1 face value of 90% dimes, quarters or halves, the figure dealers quote. */
+/** Silver in $1 face value of circulated 90% dimes, quarters or halves, the figure dealers quote. */
 const OZ_PER_DOLLAR_FACE = 0.715;
+/** The same $1 face as struck: 25 g of coins at 90% silver. */
+const OZ_PER_DOLLAR_FACE_STRUCK = 0.7234;
 
 type Mode = 'coins' | 'face';
 
@@ -46,7 +51,7 @@ export default function ToolJunkSilver() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-6 sm:pt-8">
-      <PageHeader eyebrow="Tools" title="Junk silver calculator" subtitle="US dimes, quarters and halves from 1964 and earlier are 90% silver. Here's what they're worth at today's spot." />
+      <PageHeader eyebrow="Tools" title={PAGE.h1} subtitle="US dimes, quarters and halves from 1964 and earlier are 90% silver. Here's what they're worth at today's spot." />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_320px]">
         <Card className="p-5">
           <Segmented<Mode>
@@ -93,8 +98,12 @@ export default function ToolJunkSilver() {
               <dd className="text-fg tnum">{money(faceTotal)}</dd>
             </div>
             <div className="flex justify-between gap-3">
-              <dt className="text-fg-3">Per $1 face (90%)</dt>
+              <dt className="text-fg-3">Per $1 face, circulated</dt>
               <dd className="text-fg tnum">{shown(OZ_PER_DOLLAR_FACE * spot)}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-fg-3">Per $1 face, as struck</dt>
+              <dd className="text-fg tnum">{shown(OZ_PER_DOLLAR_FACE_STRUCK * spot)}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-fg-3">Silver spot</dt>
@@ -127,6 +136,37 @@ export default function ToolJunkSilver() {
           ))}
         </div>
       </section>
+      <section className="mt-8" aria-labelledby="junk-faq">
+        <h2 id="junk-faq" className="mb-3 text-[15px] font-semibold text-fg">
+          Questions people ask
+        </h2>
+        <div className="divide-y divide-line rounded-xl border border-line bg-surface">
+          {PAGE.faq.map((f) => (
+            <details key={f.q} className="group px-4 py-3">
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-3 text-[14px] font-semibold text-fg [&::-webkit-details-marker]:hidden">
+                <h3>{f.q}</h3>
+                <ChevronDown size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-fg-3 transition-transform group-open:rotate-180" />
+              </summary>
+              <p className="mt-2 text-[14px] leading-relaxed text-fg-2">{f.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+      <footer className="mt-8 border-t border-line pt-4 text-[12px] leading-relaxed text-fg-3">
+        <p>
+          {COPY.method} Specs from{' '}
+          {PAGE.sources.map((s, i) => (
+            <span key={s.url}>
+              {i > 0 && ' and '}
+              <a href={s.url} target="_blank" rel="noopener" className="font-semibold text-fg-2 hover:text-fg">
+                {s.label}
+              </a>
+            </span>
+          ))}
+          . Circulated uses 0.715 troy oz per dollar of face, a dealer convention for worn coins, not a mint figure. As struck uses 0.7234.
+        </p>
+        <p className="mt-1">{COPY.noAdvice}</p>
+      </footer>
     </div>
   );
 }

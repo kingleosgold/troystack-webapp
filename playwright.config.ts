@@ -43,6 +43,7 @@ export default defineConfig({
       VITE_STRIPE_GOLD_YEARLY_PRICE_ID: 'price_e2e_yearly',
       VITE_STRIPE_GOLD_LIFETIME_PRICE_ID: 'price_e2e_lifetime',
       PRERENDER_SIGNAL: 'off',
+      PRERENDER_PRICES: 'off',
     },
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
