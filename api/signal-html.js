@@ -3,7 +3,7 @@
 // and Article JSON-LD, or a real 404 when the API says the slug is unknown.
 // When the API fails it answers 503 with the app shell, so a reader still gets
 // the app and a crawler retries instead of caching the wrong page.
-import { plainDashes, usableOneLiner } from './_lib/signal-text.js';
+import { homeLocation, isRecap, plainDashes, usableOneLiner } from './_lib/signal-text.js';
 
 const SITE = 'https://troystack.com';
 
@@ -85,6 +85,17 @@ export default async function handler(req, res) {
     return;
   }
 
+  if (article) {
+    const home = homeLocation(article, String(article.slug || slug));
+    if (home) {
+      res.statusCode = 301;
+      res.setHeader('Location', home);
+      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=86400');
+      res.end();
+      return;
+    }
+  }
+
   let html;
   try {
     html = await readStatic(req, '/index.html');
@@ -118,7 +129,8 @@ export default async function handler(req, res) {
     author: { '@type': 'Organization', name: 'TroyStack', url: SITE },
     publisher: { '@type': 'Organization', name: 'Mancini Tech Solutions, LLC', url: SITE },
   };
-  html = html.replace('</head>', () => `<script type="application/ld+json">${scriptJson(ld)}</script></head>`);
+  const robots = isRecap(article) ? '' : '<meta name="robots" content="noindex, follow" />';
+  html = html.replace('</head>', () => `${robots}<script type="application/ld+json">${scriptJson(ld)}</script></head>`);
 
   await send(200, html);
 }

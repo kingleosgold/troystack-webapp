@@ -2,7 +2,7 @@
 
 > Live gold, silver, platinum and palladium prices, a tracker for the metal you own, and Troy, who reads the metals news every day and answers questions about it. On the web at troystack.com and on iPhone, with one account.
 
-TroyStack is made by Mancini Tech Solutions, LLC. Troy's answers are analysis and opinion, not financial advice.
+TroyStack is made by Mancini Tech Solutions, LLC. Troy is an AI. His answers are analysis and opinion, not financial advice.
 
 ## Pages
 

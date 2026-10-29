@@ -6,7 +6,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { plainDashes, usableOneLiner } from '../api/_lib/signal-text.js';
+import { homeLocation, isRecap, plainDashes, usableOneLiner } from '../api/_lib/signal-text.js';
 import { coinBody, coinLd, junkBody, junkLd, ounces, sitemapRow, usableSnapshot } from './coin-html.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -48,6 +48,7 @@ function render(route, meta, body, ld, extra = {}) {
     html = setTag(html, /<meta property="og:image" content="[^"]*" \/>/, `<meta property="og:image" content="${image}" />`);
     html = setTag(html, /<meta name="twitter:image" content="[^"]*" \/>/, `<meta name="twitter:image" content="${image}" />`);
   }
+  if (extra.noindex) html = setTag(html, /<\/head>/, '<meta name="robots" content="noindex, follow" /></head>');
   if (extra.ogType) html = setTag(html, /<meta property="og:type" content="[^"]*" \/>/, `<meta property="og:type" content="${escape(extra.ogType)}" />`);
   // Crawlers that don't run JavaScript, which includes most AI ones, read the
   // page's facts from here. With JavaScript on, browsers ignore it.
@@ -164,6 +165,8 @@ const signalArticles = await loadSignalArticles();
 for (const article of signalArticles) {
   const slug = String(article.slug || '');
   if (!/^[a-z0-9-]{1,120}$/i.test(slug)) continue;
+  // A folded news item gets no file, so api/signal-html answers its 301.
+  if (homeLocation(article, slug)) continue;
   // A one-liner cut to a word or two falls back to the commentary, as in the app.
   const title = plainDashes(article.title) || 'The Signal';
   const description = plainExcerpt(plainDashes(usableOneLiner(article.troy_one_liner) || article.troy_commentary || article.title || ''));
@@ -172,7 +175,7 @@ for (const article of signalArticles) {
   const commentary = escape(plainExcerpt(plainDashes(article.troy_commentary || ''), 4000));
   bodies[route] = `<h1>${escape(title)}</h1><p>${escape(description)}</p><p>${commentary}</p><p>Troy is an AI. This is his analysis and opinion, not financial advice.</p>${NEEDS_JS}`;
   structured[route] = articleLd(article, title, description);
-  extras[route] = { ogType: 'article', image: article.image_url || undefined };
+  extras[route] = { ogType: 'article', image: article.image_url || undefined, noindex: !isRecap(article) };
   const published = String(article.published_at || article.created_at || '').slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(published)) modified[route] = published;
 }
@@ -212,7 +215,8 @@ for (const [alias, page] of Object.entries(SAME_AS)) {
 // The sitemap lists the same public pages. lastmod is the date a page's own
 // content last changed, never the build date, so search engines can trust it.
 const urls = Object.keys(pages)
-  .filter((route) => !(route in SAME_AS))
+  // News items are noindex, so the sitemap leaves them out, as signal-sitemap.xml does.
+  .filter((route) => !(route in SAME_AS) && !extras[route]?.noindex)
   .concat(MARKETING, MARKETING_ONLY)
   .map((route) => sitemapRow(`${SITE}${route === '/' ? '/' : route}`, modified[route]))
   .join('\n');

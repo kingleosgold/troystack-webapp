@@ -38,6 +38,26 @@ describe('signal-html', () => {
     expect(res.body).toContain('<link rel="canonical" href="https://troystack.com/signal/gold-2026-10-20" />');
   });
 
+  it('keeps a news item out of the index and lets a recap in', async () => {
+    const news = await run('gold-2026-10-20', () => json({ article: { slug: 'gold-2026-10-20', title: 'Gold', troy_commentary: 'Body.' } }));
+    expect(news.body).toContain('<meta name="robots" content="noindex, follow" />');
+    const recap = await run('stack-signal-2026-10-20', () => json({ article: { slug: 'stack-signal-2026-10-20', title: 'The Stack Signal', is_stack_signal: true, troy_commentary: 'Body.' } }));
+    expect(recap.statusCode).toBe(200);
+    expect(recap.body).not.toContain('noindex');
+  });
+
+  it("sends a news item folded into its day's recap to its block there", async () => {
+    const res = await run('fed-2026-10-08', () => json({ article: { slug: 'fed-2026-10-08', title: 'Fed', home_slug: 'stack-signal-2026-10-08' } }));
+    expect(res.statusCode).toBe(301);
+    expect(res.headers.Location).toBe('/signal/stack-signal-2026-10-08#fed-2026-10-08');
+    for (const home of ['fed-2026-10-08', '../x', null]) {
+      const own = await run('fed-2026-10-08', () => json({ article: { slug: 'fed-2026-10-08', title: 'Fed', home_slug: home } }));
+      expect(own.statusCode).toBe(200);
+    }
+    const recap = await run('stack-signal-2026-10-08', () => json({ article: { slug: 'stack-signal-2026-10-08', title: 'Recap', is_stack_signal: true, home_slug: 'other' } }));
+    expect(recap.statusCode).toBe(200);
+  });
+
   it('skips a one-liner cut to a word or two', async () => {
     const res = await run('fed-2026-10-08', () => json({ article: { slug: 'fed-2026-10-08', title: 'Fed minutes', troy_one_liner: 'Gold shines as', troy_commentary: 'Gold fell after the minutes.' } }));
     expect(res.body).toContain('<meta name="description" content="Gold fell after the minutes." />');
