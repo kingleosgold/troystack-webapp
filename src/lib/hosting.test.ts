@@ -18,14 +18,24 @@ describe('Vercel routing', () => {
   it("serves troystack-marketing's pages from the marketing project", () => {
     const MARKETING = 'https://stacktrackergold-web.vercel.app';
     const rules: Array<{ source: string; destination: string }> = vercel.rewrites ?? [];
-    for (const path of ['/privacy', '/terms', '/calculator', '/speculation', '/signal', '/signal/:slug', '/signal-sitemap.xml', '/api/prices', '/api/signal', '/api/signal/:slug', '/ios-swap.js', '/llms.txt']) {
+    for (const path of ['/privacy', '/terms', '/calculator', '/speculation', '/signal-sitemap.xml', '/api/prices', '/api/signal', '/api/signal/:slug', '/ios-swap.js']) {
       expect(rules.find((rule) => rule.source === path)?.destination, path).toBe(`${MARKETING}${path}`);
     }
   });
 
   it('keeps no redirect on a path marketing serves', () => {
     const sources: string[] = (vercel.redirects ?? []).map((rule: { source: string }) => rule.source);
-    for (const path of ['/privacy', '/terms', '/calculator', '/speculation', '/signal']) expect(sources).not.toContain(path);
+    for (const path of ['/privacy', '/terms', '/calculator', '/speculation']) expect(sources).not.toContain(path);
+  });
+
+  it("keeps the app's own Signal pages, which answer a new article's slug or 404", () => {
+    const rule = (vercel.rewrites ?? []).find((item: { source: string }) => item.source === '/signal/:slug');
+    expect(rule?.destination).toBe('/api/signal-html?slug=:slug');
+  });
+
+  it('sends www.troystack.com to troystack.com', () => {
+    const rule = (vercel.redirects ?? []).find((item: { has?: Array<{ value: string }> }) => item.has?.[0]?.value === 'www.troystack.com');
+    expect(rule).toMatchObject({ source: '/:path*', destination: 'https://troystack.com/:path*', permanent: true });
   });
 
   it('keeps signed-in app routes on the shell', () => {

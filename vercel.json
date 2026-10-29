@@ -11,6 +11,12 @@
     { "source": "/chat", "destination": "/troy", "permanent": true },
     { "source": "/c/:conversationId", "destination": "/troy/c/:conversationId", "permanent": false },
     {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.troystack.com" }],
+      "destination": "https://troystack.com/:path*",
+      "permanent": true
+    },
+    {
       "source": "/",
       "has": [{ "type": "host", "value": "www.troystack.ai" }],
       "destination": "https://troystack.ai/",
@@ -29,12 +35,11 @@
     { "source": "/auth", "destination": "/" },
     { "source": "/reset-password", "destination": "/" },
     { "source": "/developers/keys", "destination": "/" },
+    { "source": "/signal/:slug", "destination": "/api/signal-html?slug=:slug" },
     { "source": "/privacy", "destination": "https://stacktrackergold-web.vercel.app/privacy" },
     { "source": "/terms", "destination": "https://stacktrackergold-web.vercel.app/terms" },
     { "source": "/calculator", "destination": "https://stacktrackergold-web.vercel.app/calculator" },
     { "source": "/speculation", "destination": "https://stacktrackergold-web.vercel.app/speculation" },
-    { "source": "/signal", "destination": "https://stacktrackergold-web.vercel.app/signal" },
-    { "source": "/signal/:slug", "destination": "https://stacktrackergold-web.vercel.app/signal/:slug" },
     { "source": "/signal-sitemap.xml", "destination": "https://stacktrackergold-web.vercel.app/signal-sitemap.xml" },
     { "source": "/api/prices", "destination": "https://stacktrackergold-web.vercel.app/api/prices" },
     { "source": "/api/signal", "destination": "https://stacktrackergold-web.vercel.app/api/signal" },
@@ -43,8 +48,7 @@
     { "source": "/icon.png", "destination": "https://stacktrackergold-web.vercel.app/icon.png" },
     { "source": "/screenshots/:file", "destination": "https://stacktrackergold-web.vercel.app/screenshots/:file" },
     { "source": "/og-calculator.png", "destination": "https://stacktrackergold-web.vercel.app/og-calculator.png" },
-    { "source": "/og-speculation.png", "destination": "https://stacktrackergold-web.vercel.app/og-speculation.png" },
-    { "source": "/llms.txt", "destination": "https://stacktrackergold-web.vercel.app/llms.txt" }
+    { "source": "/og-speculation.png", "destination": "https://stacktrackergold-web.vercel.app/og-speculation.png" }
   ],
   "headers": [
     {

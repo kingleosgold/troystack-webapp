@@ -1230,7 +1230,7 @@ test("the sidebar doesn't call an account Free or offer the free week while its 
 });
 
 test('the build leaves marketing pages to troystack-marketing and lists them on troystack.com', async ({ request }) => {
-  for (const file of ['privacy.html', 'terms.html', 'signal.html']) {
+  for (const file of ['privacy.html', 'terms.html']) {
     expect(existsSync(new URL(`../dist/${file}`, import.meta.url)), file).toBe(false);
   }
   const sitemap = await (await request.get('/sitemap.xml')).text();
