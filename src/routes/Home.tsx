@@ -345,9 +345,9 @@ export default function Home() {
         <div className="text-[13px] text-fg-3">
           {greeting()} · {formatLocalDate()}
         </div>
-        <h1 className="mt-1 text-[28px] sm:text-[34px] font-semibold tracking-tight text-fg leading-tight">Your gold and silver, valued live, with an AI analyst on call</h1>
+        <h1 className="mt-1 text-[28px] sm:text-[34px] font-semibold tracking-tight text-fg leading-tight">Your gold and silver, valued live, with Troy on call</h1>
         <p className="mt-1.5 text-[15px] text-fg-2 max-w-2xl">Track every coin and bar at today's spot, and ask Troy what moved the market. Free, no account needed to start.</p>
-        <p className="mt-1.5 text-[14px] text-fg-3">Troy is an AI analyst who reads the market every day.</p>
+        <p className="mt-1.5 text-[14px] text-fg-3">Troy reads the market every day.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           <LinkButton to="/stack?add=1">Add your first coin</LinkButton>
           <LinkButton to="/troy" variant="secondary">Ask Troy</LinkButton>
