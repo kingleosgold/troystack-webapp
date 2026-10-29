@@ -4,7 +4,7 @@
     "description": "Track every coin and bar at today's spot, and ask Troy what moved the market. Free, no account needed to start."
   },
   "/troy": {
-    "title": "Ask Troy, the AI analyst for gold and silver stackers",
+    "title": "Ask Troy, the analyst for gold and silver stackers",
     "description": "Ask Troy what moved gold and silver today, what a coin is worth, or how your stack is doing. Three free questions a day."
   },
   "/stack": {

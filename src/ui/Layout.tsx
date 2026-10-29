@@ -408,7 +408,7 @@ export function Footer() {
           <div className="max-w-sm">
             <Brand />
             <p className="mt-3 text-[13px] text-fg-3">
-              Live metal prices, your stack, and Troy, an AI analyst who reads the market every day. On the web and on iPhone, with one account.
+              Live metal prices, your stack, and Troy, who reads the market every day. On the web and on iPhone, with one account.
             </p>
             <div className="mt-4">
               <AppStoreButton campaign="webapp-footer" size="sm" label="Get the iPhone app" />
