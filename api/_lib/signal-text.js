@@ -20,19 +20,12 @@ export function usableOneLiner(raw) {
   return words >= 5 && s.length >= 25 ? s : '';
 }
 
-// troystack-marketing's Signal rules, which troystack.com has served since
+// troystack-marketing's Signal rule, which troystack.com has served since
 // April, kept so the move to this project doesn't change what's indexed.
 // Troy's recaps are the pages search engines index. A news item is a short
-// take on someone else's headline, so it stays out of the index, and once it
-// folds into its day's recap (home_slug) its page answers 301 to its block
-// there. Anything that isn't a plain slug, or points back at the item, keeps
-// the item's own page.
+// take on someone else's headline, so it stays out of the index. Marketing
+// also sends a news item folded into its day's recap to its block there; the
+// app's recap page doesn't show those blocks yet, so its item keeps its own page.
 export function isRecap(article) {
   return article?.is_stack_signal === true;
-}
-
-export function homeLocation(article, slug) {
-  const home = article?.home_slug;
-  if (isRecap(article) || typeof home !== 'string' || !/^[a-z0-9][a-z0-9-]*$/i.test(home) || home === slug) return null;
-  return `/signal/${home}#${encodeURIComponent(slug)}`;
 }

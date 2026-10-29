@@ -3,7 +3,7 @@
 // and Article JSON-LD, or a real 404 when the API says the slug is unknown.
 // When the API fails it answers 503 with the app shell, so a reader still gets
 // the app and a crawler retries instead of caching the wrong page.
-import { homeLocation, isRecap, plainDashes, usableOneLiner } from './_lib/signal-text.js';
+import { isRecap, plainDashes, usableOneLiner } from './_lib/signal-text.js';
 
 const SITE = 'https://troystack.com';
 
@@ -83,17 +83,6 @@ export default async function handler(req, res) {
   if (missing) {
     await notFound();
     return;
-  }
-
-  if (article) {
-    const home = homeLocation(article, String(article.slug || slug));
-    if (home) {
-      res.statusCode = 301;
-      res.setHeader('Location', home);
-      res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=86400');
-      res.end();
-      return;
-    }
   }
 
   let html;

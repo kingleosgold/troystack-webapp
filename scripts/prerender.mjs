@@ -6,7 +6,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { homeLocation, isRecap, plainDashes, usableOneLiner } from '../api/_lib/signal-text.js';
+import { isRecap, plainDashes, usableOneLiner } from '../api/_lib/signal-text.js';
 import { coinBody, coinLd, junkBody, junkLd, ounces, sitemapRow, usableSnapshot } from './coin-html.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -165,8 +165,6 @@ const signalArticles = await loadSignalArticles();
 for (const article of signalArticles) {
   const slug = String(article.slug || '');
   if (!/^[a-z0-9-]{1,120}$/i.test(slug)) continue;
-  // A folded news item gets no file, so api/signal-html answers its 301.
-  if (homeLocation(article, slug)) continue;
   // A one-liner cut to a word or two falls back to the commentary, as in the app.
   const title = plainDashes(article.title) || 'The Signal';
   const description = plainExcerpt(plainDashes(usableOneLiner(article.troy_one_liner) || article.troy_commentary || article.title || ''));
