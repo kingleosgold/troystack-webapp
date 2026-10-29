@@ -130,7 +130,7 @@ test.describe('coin values', () => {
   test('a coin page arrives with its own title and facts before any script runs', async ({ request }) => {
     const html = await (await request.get('/coins/mercury-dime.html')).text();
     expect(html).toContain('<title>Mercury Dime Melt Value Today | TroyStack</title>');
-    expect(html).toContain('<link rel="canonical" href="https://troystack.ai/coins/mercury-dime" />');
+    expect(html).toContain('<link rel="canonical" href="https://troystack.com/coins/mercury-dime" />');
     // The facts sit in the page itself, not only in a no-script fallback.
     const root = html.slice(html.indexOf('<div id="root">'));
     expect(root).toContain('tight text-fg leading-tight">Mercury dime melt value today</h1>');
@@ -144,13 +144,13 @@ test.describe('coin values', () => {
     const graph = JSON.parse(blocks[0][1])['@graph'];
     expect(graph.map((n: { '@type': string }) => n['@type'])).toEqual(['BreadcrumbList', 'WebPage', 'FAQPage']);
     expect(graph[0].itemListElement.map((i: { name: string; item: string }) => [i.name, i.item])).toEqual([
-      ['Coin and bar values', 'https://troystack.ai/coins'],
-      ['Mercury dime', 'https://troystack.ai/coins/mercury-dime'],
+      ['Coin and bar values', 'https://troystack.com/coins'],
+      ['Mercury dime', 'https://troystack.com/coins/mercury-dime'],
     ]);
     const sitemap = await (await request.get('/sitemap.xml')).text();
-    expect(sitemap).toContain('<url><loc>https://troystack.ai/coins/mercury-dime</loc><lastmod>2026-10-28</lastmod></url>');
+    expect(sitemap).toContain('<url><loc>https://troystack.com/coins/mercury-dime</loc><lastmod>2026-10-28</lastmod></url>');
     // A record this change didn't touch keeps the date it last changed, not the build's.
-    expect(sitemap).toContain('<url><loc>https://troystack.ai/coins/war-nickel</loc><lastmod>2026-10-09</lastmod></url>');
+    expect(sitemap).toContain('<url><loc>https://troystack.com/coins/war-nickel</loc><lastmod>2026-10-09</lastmod></url>');
   });
 
   test('a coin page shows its questions and where its specs come from', async ({ page }) => {
@@ -248,7 +248,7 @@ test.describe('coins struck to different specs over the years', () => {
     expect(current).toContain('<title>30 g Chinese Silver Panda melt value today | TroyStack</title>');
     const sitemap = await (await request.get('/sitemap.xml')).text();
     for (const slug of ['chinese-silver-panda', 'chinese-silver-panda-1-oz', 'british-gold-britannia-1987-2012', 'canadian-gold-maple-leaf-1979-1982']) {
-      expect(sitemap).toContain(`<loc>https://troystack.ai/coins/${slug}</loc>`);
+      expect(sitemap).toContain(`<loc>https://troystack.com/coins/${slug}</loc>`);
     }
   });
 });

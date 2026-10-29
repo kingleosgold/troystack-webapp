@@ -46,6 +46,14 @@ function Row({ title, detail, right, onClick, href, tone }: { title: ReactNode; 
   const cls = 'flex w-full items-center gap-3 px-4 py-3.5 text-left';
   if (href) {
     const external = href.startsWith('http') || href.startsWith('mailto:');
+    // Privacy and terms come from the server, so they load as a page.
+    if (href === PRIVACY_URL || href === TERMS_URL) {
+      return (
+        <a href={href} className={cx(cls, 'hover:bg-surface-2')}>
+          {body}
+        </a>
+      );
+    }
     return external ? (
       <a href={href} className={cx(cls, 'hover:bg-surface-2')} {...(href.startsWith('http') ? { target: '_blank', rel: 'noopener' } : {})}>
         {body}

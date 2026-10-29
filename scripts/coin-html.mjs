@@ -3,7 +3,7 @@
 // without JavaScript. The app replaces it on load with the live page, built
 // from the same coins.json and coinCopy.json.
 
-export const SITE = 'https://troystack.ai';
+export const SITE = 'https://troystack.com';
 
 export const escape = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 

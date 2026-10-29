@@ -408,7 +408,7 @@ export function Footer() {
           <div className="max-w-sm">
             <Brand />
             <p className="mt-3 text-[13px] text-fg-3">
-              Live metal prices, your stack, and Troy, an AI analyst who reads the market every day. On the web and on iPhone, with one account.
+              Live metal prices, your stack, and Troy, who reads the market every day. On the web and on iPhone, with one account.
             </p>
             <div className="mt-4">
               <AppStoreButton campaign="webapp-footer" size="sm" label="Get the iPhone app" />
@@ -426,8 +426,8 @@ export function Footer() {
             <Link to="/gold" className="text-fg-2 hover:text-fg">Gold plans</Link>
             <Link to="/developers" className="text-fg-2 hover:text-fg">API</Link>
             <a href={`mailto:${SUPPORT_EMAIL}`} className="text-fg-2 hover:text-fg">Support</a>
-            <Link to={PRIVACY_URL} className="text-fg-2 hover:text-fg">Privacy</Link>
-            <Link to={TERMS_URL} className="text-fg-2 hover:text-fg">Terms</Link>
+            <a href={PRIVACY_URL} className="text-fg-2 hover:text-fg">Privacy</a>
+            <a href={TERMS_URL} className="text-fg-2 hover:text-fg">Terms</a>
           </div>
         </div>
         <div className="mt-8 border-t border-line pt-5 text-[12px] text-fg-3 space-y-1">

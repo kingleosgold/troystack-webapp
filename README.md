@@ -1,8 +1,8 @@
-# troystack.ai
+# troystack.com
 
 The web side of TroyStack. Live spot for gold, silver, platinum and palladium, Troy's read on what moved them, the Stack Signal and its podcast, calculators, Vault Watch, where to buy and your stack. It's the same account as the iPhone app, so your holdings and your chats with Troy are on both.
 
-Vite, React 19, TypeScript, Tailwind 4 and TanStack Query. Vercel builds it, and `main` is what troystack.ai serves.
+Vite, React 19, TypeScript, Tailwind 4 and TanStack Query. Vercel builds it, and `main` is what troystack.com serves once its domain moves here (troystack.ai until then).
 
 ## Running it
 
@@ -39,4 +39,4 @@ The browser checks answer every API and Supabase call from the fixtures in `e2e/
 
 ## Shipping
 
-Vercel builds a preview for each branch. A merge to `main` goes live on troystack.ai, so it's a deploy.
+Vercel builds a preview for each branch. A merge to `main` goes live, so it's a deploy.

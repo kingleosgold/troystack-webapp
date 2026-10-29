@@ -6,12 +6,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { plainDashes, usableOneLiner } from '../api/_lib/signal-text.js';
 import { coinBody, coinLd, junkBody, junkLd, ounces, sitemapRow, usableSnapshot } from './coin-html.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
-const SITE = 'https://troystack.ai';
+const SITE = 'https://troystack.com';
 const seo = JSON.parse(readFileSync(path.join(root, 'src/lib/seo.json'), 'utf8'));
 const coins = JSON.parse(readFileSync(path.join(root, 'src/lib/coins.json'), 'utf8'));
 const coinCopy = JSON.parse(readFileSync(path.join(root, 'src/lib/coinCopy.json'), 'utf8'));
@@ -72,29 +71,6 @@ const SOFTWARE = {
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
 };
 
-function articleLd(article, title, description) {
-  const url = `${SITE}/signal/${article.slug}`;
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'Article',
-    headline: title,
-    description,
-    datePublished: article.published_at || article.created_at || undefined,
-    mainEntityOfPage: url,
-    image: article.image_url || `${SITE}/og-image.png`,
-    author: { '@type': 'Organization', name: 'TroyStack', url: SITE },
-    publisher: { '@type': 'Organization', name: 'Mancini Tech Solutions, LLC', url: SITE },
-  };
-}
-
-function plainExcerpt(text, max = 160) {
-  const plain = String(text || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\s+/g, ' ').trim();
-  if (plain.length <= max) return plain;
-  const cut = plain.slice(0, max);
-  const lastSpace = cut.lastIndexOf(' ');
-  return `${cut.slice(0, lastSpace > max * 0.6 ? lastSpace : max).replace(/[,;:.\s]+$/, '')}…`;
-}
-
 /** Spot at build time for the coin pages' opening line. Offline builds leave the number out. */
 async function loadSpot() {
   if (process.env.PRERENDER_PRICES === 'off') return null;
@@ -108,26 +84,6 @@ async function loadSpot() {
   }
 }
 
-async function loadSignalArticles() {
-  // The browser tests build offline, so they skip the live article list.
-  if (process.env.PRERENDER_SIGNAL === 'off') return [];
-  try {
-    const articles = [];
-    for (let offset = 0; offset < 1000; offset += 50) {
-      const res = await fetch(`https://api.troystack.ai/v1/stack-signal?limit=50&offset=${offset}`, { signal: AbortSignal.timeout(12000) });
-      if (!res.ok) throw new Error(`list ${res.status}`);
-      const body = await res.json();
-      const batch = Array.isArray(body.articles) ? body.articles : [];
-      articles.push(...batch);
-      if (batch.length < 50) break;
-    }
-    return articles;
-  } catch (err) {
-    console.warn(`prerender: signal articles skipped (${err.message})`);
-    return [];
-  }
-}
-
 const NEEDS_JS = '<p>TroyStack needs JavaScript to show live prices and talk to Troy.</p>';
 
 function coinsIndexBody() {
@@ -135,7 +91,13 @@ function coinsIndexBody() {
   return `<h1>Coin and bar values</h1><ul>${items}</ul>${NEEDS_JS}`;
 }
 
+// troystack.com serves these from troystack-marketing through vercel.json's
+// rewrites. A file here would answer first, so they get none, and the
+// sitemap lists them with the marketing pages that have no app route.
+const MARKETING = ['/privacy', '/terms', '/signal'];
+const MARKETING_ONLY = ['/calculator', '/speculation'];
 const pages = { ...seo, '/prices': seo['/prices/gold'] };
+for (const route of MARKETING) delete pages[route];
 const bodies = { '/coins': coinsIndexBody() };
 const structured = { '/': SOFTWARE, '/app': SOFTWARE };
 const extras = {};
@@ -153,23 +115,6 @@ for (const c of coins) {
 bodies['/tools/junk-silver'] = NEEDS_JS;
 structured['/tools/junk-silver'] = junkLd(junkPage, seo['/tools/junk-silver']);
 extras['/tools/junk-silver'] = { rootBody: junkBody(junkPage, coins, usableSnapshot(spot, 'silver'), coinCopy) };
-
-const signalArticles = await loadSignalArticles();
-for (const article of signalArticles) {
-  const slug = String(article.slug || '');
-  if (!/^[a-z0-9-]{1,120}$/i.test(slug)) continue;
-  // A one-liner cut to a word or two falls back to the commentary, as in the app.
-  const title = plainDashes(article.title) || 'The Signal';
-  const description = plainExcerpt(plainDashes(usableOneLiner(article.troy_one_liner) || article.troy_commentary || article.title || ''));
-  const route = `/signal/${slug}`;
-  pages[route] = { title, description };
-  const commentary = escape(plainExcerpt(plainDashes(article.troy_commentary || ''), 4000));
-  bodies[route] = `<h1>${escape(title)}</h1><p>${escape(description)}</p><p>${commentary}</p><p>Troy is an AI. This is his analysis and opinion, not financial advice.</p>${NEEDS_JS}`;
-  structured[route] = articleLd(article, title, description);
-  extras[route] = { ogType: 'article', image: article.image_url || undefined };
-  const published = String(article.published_at || article.created_at || '').slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(published)) modified[route] = published;
-}
 
 let count = 0;
 for (const [route, meta] of Object.entries(pages)) {
@@ -207,6 +152,7 @@ for (const [alias, page] of Object.entries(SAME_AS)) {
 // content last changed, never the build date, so search engines can trust it.
 const urls = Object.keys(pages)
   .filter((route) => !(route in SAME_AS))
+  .concat(MARKETING, MARKETING_ONLY)
   .map((route) => sitemapRow(`${SITE}${route === '/' ? '/' : route}`, modified[route]))
   .join('\n');
 writeFileSync(path.join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);

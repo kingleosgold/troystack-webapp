@@ -15,7 +15,7 @@ import { Card, EmptyState, ErrorNote, Img, LinkButton, Skeleton } from '../ui/pr
 
 function ShareButton({ title, slug }: { title: string; slug: string }) {
   const [copied, setCopied] = useState(false);
-  const url = `https://troystack.ai/signal/${slug}`;
+  const url = `https://troystack.com/signal/${slug}`;
   return (
     <button
       type="button"

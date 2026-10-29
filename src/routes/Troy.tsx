@@ -766,7 +766,7 @@ export default function Troy() {
             <img src="/troy-96.png" alt="Troy" className="h-8 w-8 rounded-full" width={32} height={32} />
             <div className="min-w-0">
               <div className="text-[14px] font-semibold text-fg">Troy</div>
-              <div className="text-[12px] text-fg-3 truncate">Stack analyst, AI</div>
+              <div className="text-[12px] text-fg-3 truncate">Stack analyst</div>
             </div>
           </div>
           <div className="text-[12px] text-fg-3 text-right">

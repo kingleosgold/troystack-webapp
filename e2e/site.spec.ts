@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { existsSync } from 'node:fs';
 import { mockBackends, SAMPLE_HOLDINGS, signIn, USER_ID } from './mock';
 
 const SHOTS = process.env.E2E_SCREENS === '1';
@@ -43,8 +44,6 @@ const PAGES: Array<[string, string | RegExp]> = [
   ['/delete-account', /Delete your TroyStack account/],
   ['/auth', /Sign in to TroyStack/],
   ['/developers', /TroyStack API/],
-  ['/privacy', /Privacy Policy/],
-  ['/terms', /Terms of Service/],
   ['/nope', /That page isn't here/],
 ];
 
@@ -91,7 +90,7 @@ test('home shows live prices and Troy\'s read', async ({ page }) => {
 test('pages fit a small phone without scrolling sideways', async ({ page }) => {
   await mockBackends(page);
   await page.setViewportSize({ width: 320, height: 700 });
-  for (const path of ['/', '/prices/gold', '/signal', '/tools/melt', '/tools/what-if', '/troy', '/stack', '/app', '/developers', '/privacy', '/terms', '/gold']) {
+  for (const path of ['/', '/prices/gold', '/signal', '/tools/melt', '/tools/what-if', '/troy', '/stack', '/app', '/developers', '/gold']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible({ timeout: 15_000 });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -1228,4 +1227,20 @@ test("the sidebar doesn't call an account Free or offer the free week while its 
   await expect(sidebar.getByText('Free', { exact: true })).toHaveCount(0);
   await expect(sidebar.getByText('Alerts, widgets and Troy on your lock screen.')).toBeVisible();
   await expect(sidebar.getByText(/free week/)).toHaveCount(0);
+});
+
+test('the build leaves marketing pages to troystack-marketing and lists them on troystack.com', async ({ request }) => {
+  for (const file of ['privacy.html', 'terms.html', 'signal.html']) {
+    expect(existsSync(new URL(`../dist/${file}`, import.meta.url)), file).toBe(false);
+  }
+  const sitemap = await (await request.get('/sitemap.xml')).text();
+  for (const path of ['/', '/privacy', '/terms', '/signal', '/calculator', '/speculation', '/coins/mercury-dime']) {
+    expect(sitemap).toContain(`<loc>https://troystack.com${path}</loc>`);
+  }
+  expect(sitemap).not.toContain('troystack.ai');
+  const robots = await (await request.get('/robots.txt')).text();
+  expect(robots).toContain('Sitemap: https://troystack.com/signal-sitemap.xml');
+  const home = await (await request.get('/')).text();
+  expect(home).toContain('<link rel="canonical" href="https://troystack.com/" />');
+  expect(home).not.toMatch(/https:\/\/troystack\.ai/);
 });

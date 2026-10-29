@@ -15,9 +15,17 @@ describe('Vercel routing', () => {
     expect(sources.filter((source) => source.startsWith('/coins'))).toEqual([]);
   });
 
-  it('sends an unknown Signal slug to the page that can answer 404', () => {
-    const rule = (vercel.rewrites ?? []).find((item: { source: string }) => item.source === '/signal/:slug');
-    expect(rule?.destination).toBe('/api/signal-html?slug=:slug');
+  it("serves troystack-marketing's pages from the marketing project", () => {
+    const MARKETING = 'https://stacktrackergold-web.vercel.app';
+    const rules: Array<{ source: string; destination: string }> = vercel.rewrites ?? [];
+    for (const path of ['/privacy', '/terms', '/calculator', '/speculation', '/signal', '/signal/:slug', '/signal-sitemap.xml', '/api/prices', '/api/signal', '/api/signal/:slug', '/ios-swap.js', '/llms.txt']) {
+      expect(rules.find((rule) => rule.source === path)?.destination, path).toBe(`${MARKETING}${path}`);
+    }
+  });
+
+  it('keeps no redirect on a path marketing serves', () => {
+    const sources: string[] = (vercel.redirects ?? []).map((rule: { source: string }) => rule.source);
+    for (const path of ['/privacy', '/terms', '/calculator', '/speculation', '/signal']) expect(sources).not.toContain(path);
   });
 
   it('keeps signed-in app routes on the shell', () => {
