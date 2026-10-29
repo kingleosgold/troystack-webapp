@@ -10,6 +10,7 @@
     { "source": "/junk-silver", "destination": "/tools/junk-silver", "permanent": true },
     { "source": "/chat", "destination": "/troy", "permanent": true },
     { "source": "/c/:conversationId", "destination": "/troy/c/:conversationId", "permanent": false },
+    { "source": "/auth/reset-password", "destination": "/reset-password", "permanent": false },
     {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "www.troystack.com" }],

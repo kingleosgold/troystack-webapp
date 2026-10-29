@@ -38,6 +38,16 @@ describe('Vercel routing', () => {
     expect(rule).toMatchObject({ source: '/:path*', destination: 'https://troystack.com/:path*', permanent: true });
   });
 
+  // The app's reset email lands on troystack.com/auth/reset-password, which the
+  // association file sends into the iOS app. Without the app the browser loads
+  // it, so it goes to the app's own reset page. The browser carries the
+  // fragment, where Supabase puts the reset session, through the redirect.
+  it("sends a reset link opened without the app to the app's reset page", () => {
+    const rule = (vercel.redirects ?? []).find((item: { source: string }) => item.source === '/auth/reset-password');
+    expect(rule).toMatchObject({ destination: '/reset-password', permanent: false });
+    expect(rule.has).toBeUndefined();
+  });
+
   it('keeps signed-in app routes on the shell', () => {
     const sources = (vercel.rewrites ?? []).map((rule: { source: string }) => rule.source);
     for (const path of ['/settings', '/auth', '/reset-password', '/developers/keys', '/troy/c/:conversationId']) {
