@@ -29,6 +29,8 @@ const Auth = lazy(() => import('./routes/Auth'));
 const ResetPassword = lazy(() => import('./routes/ResetPassword'));
 const Developers = lazy(() => import('./routes/Developers'));
 const DeveloperKeys = lazy(() => import('./routes/DeveloperKeys'));
+const Privacy = lazy(() => import('./routes/Privacy'));
+const Terms = lazy(() => import('./routes/Terms'));
 const NotFound = lazy(() => import('./routes/NotFound'));
 
 /** Old chat links were /c/:id. */
@@ -78,6 +80,8 @@ export default function App() {
           <Route path="reset-password" element={<ResetPassword />} />
           <Route path="developers" element={<Developers />} />
           <Route path="developers/keys" element={<DeveloperKeys />} />
+          <Route path="privacy" element={<Privacy />} />
+          <Route path="terms" element={<Terms />} />
 
           {/* Addresses from the old site */}
           <Route path="dashboard" element={<Navigate to="/" replace />} />

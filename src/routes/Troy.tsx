@@ -763,7 +763,7 @@ export default function Troy() {
                 <PanelLeft size={18} />
               </button>
             )}
-            <img src="/troy-96.png" alt="" className="h-8 w-8 rounded-full" width={32} height={32} />
+            <img src="/troy-96.png" alt="Troy" className="h-8 w-8 rounded-full" width={32} height={32} />
             <div className="min-w-0">
               <div className="text-[14px] font-semibold text-fg">Troy</div>
               <div className="text-[12px] text-fg-3 truncate">Stack analyst, AI</div>
@@ -795,7 +795,7 @@ export default function Troy() {
             {brief && brief.userId === user?.id && <BriefCard brief={brief} onRetry={() => void todaysBrief()} onHide={hideBrief} />}
             {isEmpty && !limit && !chatFailed && (
               <div className="flex flex-col items-center text-center pt-6 sm:pt-12">
-                <img src="/troy-96.png" alt="" className="h-20 w-20 rounded-full shadow-card" width={80} height={80} />
+                <img src="/troy-96.png" alt="Troy" className="h-20 w-20 rounded-full shadow-card" width={80} height={80} />
                 <h1 className="mt-4 text-[24px] sm:text-[28px] font-semibold tracking-tight text-fg">Ask Troy anything</h1>
                 <p className="mt-1.5 max-w-md text-[15px] text-fg-2">
                   {signedIn

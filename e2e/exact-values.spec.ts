@@ -90,3 +90,20 @@ test('the gold price page has one address, in the page as served, in the app and
   await page.goto('/prices');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://troystack.ai/prices/gold');
 });
+
+test("a Signal piece opened by a differently cased link takes the API's slug as its address", async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/signal/Evening-Signal-2026-10-08');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://troystack.ai/signal/evening-signal-2026-10-08');
+});
+
+test("the not-found page as served doesn't share as the home page or name a canonical address", async ({ request }) => {
+  const served = await (await request.get('/404.html')).text();
+  expect(served).not.toContain('rel="canonical"');
+  expect(served).not.toContain('property="og:url"');
+  expect(served).toContain('<meta property="og:title" content="Page not found | TroyStack" />');
+  expect(served).toContain('<meta name="twitter:title" content="Page not found | TroyStack" />');
+  expect(served).toContain('<meta property="og:description" content="That page is not on TroyStack." />');
+  expect(served).toContain('<meta name="twitter:description" content="That page is not on TroyStack." />');
+});
