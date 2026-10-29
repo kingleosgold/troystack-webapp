@@ -18,14 +18,14 @@ describe('Vercel routing', () => {
   it("serves troystack-marketing's pages from the marketing project", () => {
     const MARKETING = 'https://stacktrackergold-web.vercel.app';
     const rules: Array<{ source: string; destination: string }> = vercel.rewrites ?? [];
-    for (const path of ['/privacy', '/terms', '/calculator', '/speculation', '/signal-sitemap.xml', '/api/prices', '/api/signal', '/api/signal/:slug', '/ios-swap.js']) {
+    for (const path of ['/privacy', '/terms', '/calculator', '/speculation', '/signal-sitemap.xml', '/api/prices', '/api/signal', '/api/signal/:slug', '/ios-swap.js', '/.well-known/apple-app-site-association']) {
       expect(rules.find((rule) => rule.source === path)?.destination, path).toBe(`${MARKETING}${path}`);
     }
   });
 
   it('keeps no redirect on a path marketing serves', () => {
     const sources: string[] = (vercel.redirects ?? []).map((rule: { source: string }) => rule.source);
-    for (const path of ['/privacy', '/terms', '/calculator', '/speculation']) expect(sources).not.toContain(path);
+    for (const path of ['/privacy', '/terms', '/calculator', '/speculation', '/.well-known/apple-app-site-association']) expect(sources).not.toContain(path);
   });
 
   it("keeps the app's own Signal pages, which answer a new article's slug or 404", () => {
