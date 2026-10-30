@@ -40,3 +40,5 @@ The browser checks answer every API and Supabase call from the fixtures in `e2e/
 ## Shipping
 
 Vercel builds a preview for each branch. A merge to `main` goes live, so it's a deploy.
+
+The build reads Troy's Signal articles from the API for the prerendered pages and the sitemap. If the API can't be read after three tries the build fails and the last deploy keeps serving. To ship while the API is down, set `PRERENDER_SIGNAL=off` for that build, and the sitemap goes out without the Signal pages until the next one.

@@ -109,10 +109,11 @@ async function loadSpot() {
   }
 }
 
-/** One page of the Signal list, tried twice before the build gives up. */
+/** One page of the Signal list, tried three times, a few seconds apart, before the build gives up. */
 async function signalPage(query) {
   let last;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((done) => setTimeout(done, 3000 * attempt));
     try {
       const res = await fetch(`https://api.troystack.ai/v1/stack-signal?${query}`, { signal: AbortSignal.timeout(12000) });
       if (!res.ok) throw new Error(`list ${res.status}`);
@@ -126,7 +127,8 @@ async function signalPage(query) {
 }
 
 // A failed read fails the build, so a deploy never ships a sitemap without
-// Troy's recaps. The deploy before it keeps serving.
+// Troy's recaps. The deploy before it keeps serving. To ship while the API is
+// down, set PRERENDER_SIGNAL=off for that build.
 async function loadSignalArticles() {
   // The browser tests build offline, so they skip the live article list.
   if (process.env.PRERENDER_SIGNAL === 'off') return [];
@@ -244,6 +246,8 @@ const urls = Object.keys(pages)
   // News items are noindex, so the sitemap leaves them out.
   .filter((route) => !(route in SAME_AS) && !extras[route]?.noindex)
   .concat(olderRecaps)
+  // A recap published while the list was read can come back twice.
+  .filter((route, i, all) => all.indexOf(route) === i)
   .map((route) => sitemapRow(`${SITE}${route === '/' ? '/' : route}`, modified[route]))
   .join('\n');
 writeFileSync(path.join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);

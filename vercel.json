@@ -3,6 +3,17 @@
   "trailingSlash": false,
   "redirects": [
     {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.troystack.com"
+        }
+      ],
+      "destination": "https://troystack.com/:path*",
+      "permanent": true
+    },
+    {
       "source": "/dashboard",
       "destination": "/",
       "permanent": true
@@ -61,17 +72,6 @@
       "source": "/signal-sitemap.xml",
       "destination": "/sitemap.xml",
       "permanent": false
-    },
-    {
-      "source": "/:path*",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.troystack.com"
-        }
-      ],
-      "destination": "https://troystack.com/:path*",
-      "permanent": true
     },
     {
       "source": "/",
