@@ -176,6 +176,22 @@ test.describe('Troy for visitors', () => {
   });
 });
 
+test.describe('Troy for an account', () => {
+  test("a dealer card carries the same disclosure line as the app's", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('troy_ai_consent_v1', '{"version":1}'));
+    await signIn(page);
+    await mockBackends(page, { replyPreview: { type: 'dealer_link', data: { url: 'https://www.sdbullion.com/silver', label: 'Shop silver at SD Bullion' } } });
+    await page.goto('/troy');
+    await page.getByRole('textbox', { name: 'Message Troy' }).fill('Where should I buy silver?');
+    await page.getByRole('button', { name: 'Send' }).click();
+    const link = page.getByRole('link', { name: 'Shop silver at SD Bullion' });
+    await expect(link).toHaveAttribute('href', 'https://www.sdbullion.com/silver');
+    await expect(link).toHaveAttribute('rel', /sponsored/);
+    await expect(page.getByText('We may earn a commission from these links.')).toBeVisible();
+    await shot(page, 'troy-dealer-card');
+  });
+});
+
 test.describe('free week', () => {
   test('starts on the web on a computer, or in the App Store on an iPhone', async ({ page }, info) => {
     await mockBackends(page);
