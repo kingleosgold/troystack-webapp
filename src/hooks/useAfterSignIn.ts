@@ -55,8 +55,12 @@ export function useAfterSignIn(): { checkoutOverlay: CheckoutOverlay } {
   // A sign-in link says what to do afterwards. It's kept as soon as the page
   // opens, before the sign-in page's own code has loaded, so neither a trip to
   // Google or Apple nor an account that's already signed in loses it.
+  const wasOnAuthPage = useRef(false);
   useEffect(() => {
-    if (!onAuthPage) return;
+    if (!onAuthPage) {
+      wasOnAuthPage.current = false;
+      return;
+    }
     const params = new URLSearchParams(search);
     const plan = params.get('plan');
     // Only the plan sheet's own link carries on the campaign the sheet kept.
@@ -64,7 +68,12 @@ export function useAfterSignIn(): { checkoutOverlay: CheckoutOverlay } {
     if (params.get('redirect') === 'checkout' && isWebPlan(plan)) {
       rememberCheckout(plan, siteCampaign(params.get('campaign')), Date.now(), params.get('from') === 'sheet');
     }
-    rememberNextPath(params.get('next'));
+    // Arriving from another page without a page to come back to, like the
+    // header's Sign in, drops an older one. The menu's Sign in tapped on this
+    // page, or a new reset link asked for after an old one ran out, keeps it.
+    const next = params.get('next');
+    if (next || (!wasOnAuthPage.current && params.get('mode') !== 'forgot')) rememberNextPath(next);
+    wasOnAuthPage.current = true;
   }, [onAuthPage, search]);
 
   // The plan usually lands in well under a second. This stops checkout
