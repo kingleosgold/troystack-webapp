@@ -8,9 +8,11 @@ import { GAS, OIL_1971, OIL_TODAY, RENT, WAGE, amount, ounces, ratioContext, sta
 import { Button, Card, Field, Input, LinkButton, PageHeader } from '../ui/primitives';
 import { SpotNotice } from '../ui/SpotNotice';
 
+// Up to two decimals, so the ounces named are the ounces valued.
 function oz(n: number): string {
-  if (n >= 10) return `${Math.round(n).toLocaleString('en-US')} oz`;
-  return `${n.toFixed(2)} oz`;
+  const shown = Math.round(n * 100) / 100;
+  if (shown === 0) return `${n.toLocaleString('en-US', { maximumSignificantDigits: 2 })} oz`;
+  return `${shown.toLocaleString('en-US', { minimumFractionDigits: shown < 10 ? 2 : 0, maximumFractionDigits: 2 })} oz`;
 }
 
 /**

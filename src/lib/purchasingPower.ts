@@ -21,10 +21,10 @@ export interface StackPower {
   ratio: number;
 }
 
-/** A typed amount in ounces, or 0 for anything that isn't a positive number. */
+/** A typed amount in ounces, or 0 for anything that isn't a positive number under a billion. */
 export function ounces(value: string | null | undefined): number {
   const n = Number.parseFloat(value ?? '');
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  return Number.isFinite(n) && n > 0 && n < 1e9 ? n : 0;
 }
 
 export function stackPower(goldOz: number, silverOz: number, gold: number, silver: number): StackPower | null {

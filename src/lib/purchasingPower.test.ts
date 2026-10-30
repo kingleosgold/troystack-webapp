@@ -24,6 +24,9 @@ describe('stack purchasing power', () => {
     expect(ounces('-1')).toBe(0);
     expect(ounces('abc')).toBe(0);
     expect(ounces(null)).toBe(0);
+    expect(ounces('1e308')).toBe(0);
+    expect(ounces('999999999')).toBe(999999999);
+    expect(ounces('1e9')).toBe(0);
   });
 
   it('places the ratio against its long-run average', () => {

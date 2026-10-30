@@ -1266,6 +1266,17 @@ test.describe('the purchasing power calculator', () => {
     await expect(page.getByText('oz of silver, if swapped')).toBeVisible();
   });
 
+  test('names the ounces it valued, fractions included', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/calculator?gold=10.5');
+    // 10.5 oz at $4,180.80.
+    await expect(page.getByText('10.5 oz gold is $43,898.40')).toBeVisible();
+    const post = new URL((await page.getByRole('link', { name: 'Post on X' }).getAttribute('href'))!);
+    expect(post.searchParams.get('text')).toContain('My 10.5 oz gold stack buys');
+    await page.locator('#calc-gold').fill('0.001');
+    await expect(page.getByText('0.001 oz gold is $4.18')).toBeVisible();
+  });
+
   test("shows no value from a price that isn't live", async ({ page }) => {
     await mockBackends(page, { missingPrices: ['silver'] });
     await page.goto('/calculator?gold=1');
