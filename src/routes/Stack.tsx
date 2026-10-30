@@ -374,8 +374,8 @@ export default function Stack() {
               where a stack the account doesn't take on its own is offered to
               move in. */}
           <div className="flex shrink-0 items-center gap-2">
-            <Link to="/auth?mode=signup&next=/stack" className="flex-1 sm:flex-none inline-flex h-9 items-center justify-center rounded-lg bg-btn px-4 text-[13px] font-semibold text-btn-fg hover:bg-btn-hover">Make a free account</Link>
-            <Link to="/auth?mode=signin&next=/stack" className="inline-flex h-9 items-center justify-center rounded-lg px-3 text-[13px] font-semibold text-fg-2 hover:text-fg">Sign in</Link>
+            <Link to="/auth?mode=signup&next=/stack" className="flex-1 sm:flex-none inline-flex h-9 items-center justify-center rounded-lg bg-btn px-4 text-[13px] font-semibold text-btn-fg hover:bg-btn-hover focus-visible:outline-fg">Make a free account</Link>
+            <Link to="/auth?mode=signin&next=/stack" aria-label="Sign in to keep this stack" className="inline-flex h-9 items-center justify-center rounded-lg px-3 text-[13px] font-semibold text-fg-2 hover:text-fg focus-visible:outline-fg">Sign in</Link>
           </div>
         </div>
       )}

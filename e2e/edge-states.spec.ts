@@ -667,4 +667,38 @@ test.describe("a visitor's stack page", () => {
     await expect(page).toHaveURL(/\/stack$/);
     await expect(page.getByText('This browser still has 1 holding you added before signing in.')).toBeVisible();
   });
+
+  test('a visitor who backs out of the banner and later signs in from the header lands on the home page', async ({ page }) => {
+    await page.addInitScript((stack) => localStorage.setItem('stacktracker_holdings', stack), GUEST_STACK);
+    await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    await page.goto('/stack');
+    await page.getByRole('link', { name: 'Make a free account' }).click();
+    await expect(page).toHaveURL(/\/auth\?mode=signup&next=\/stack$/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/stack$/);
+    await page.goto('/auth');
+    await page.locator('#auth-email').fill('stacker@example.com');
+    await page.locator('#auth-password').fill('correct-horse');
+    await page.locator('form button[type=submit]').click();
+    await expect(page).toHaveURL(/\/$/);
+  });
+
+  test("keeps the stack as the way back when Sign in is tapped again on the sign-in page", async ({ page }) => {
+    await page.addInitScript((stack) => localStorage.setItem('stacktracker_holdings', stack), GUEST_STACK);
+    await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    await page.goto('/stack');
+    await page.getByText('Saved in this browser only.', { exact: false }).locator('..').getByRole('link', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL(/\/auth\?mode=signin&next=\/stack$/);
+    if (test.info().project.name === 'iphone') {
+      await page.getByRole('button', { name: 'Open menu' }).click();
+      await page.getByRole('dialog', { name: 'TroyStack' }).getByRole('link', { name: 'Sign in' }).click();
+    } else {
+      await page.locator('aside').getByRole('link', { name: 'Sign in' }).click();
+    }
+    await expect(page).toHaveURL(/\/auth$/);
+    await page.locator('#auth-email').fill('stacker@example.com');
+    await page.locator('#auth-password').fill('correct-horse');
+    await page.locator('form button[type=submit]').click();
+    await expect(page).toHaveURL(/\/stack$/);
+  });
 });

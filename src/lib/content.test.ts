@@ -118,6 +118,16 @@ describe('sign-in hand-offs', () => {
     expect(takeNextPath(now)).toBeNull();
   });
 
+  it('drops an older return path when the sign-in page opens without one', () => {
+    const now = Date.parse('2026-10-08T20:00:00Z');
+    rememberNextPath('/stack', now);
+    rememberNextPath(null, now + 60_000);
+    expect(takeNextPath(now + 120_000)).toBeNull();
+    rememberNextPath('/stack', now);
+    rememberNextPath('//evil.example', now + 60_000);
+    expect(takeNextPath(now + 120_000)).toBeNull();
+  });
+
   it('ignores the bare plan names the old site left behind', () => {
     localStorage.setItem('stg_checkout_redirect', 'monthly');
     expect(takeCheckoutIntent()).toBeNull();
