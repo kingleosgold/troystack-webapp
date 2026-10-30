@@ -426,8 +426,8 @@ export function Footer() {
             <Link to="/gold" className="text-fg-2 hover:text-fg">Gold plans</Link>
             <Link to="/developers" className="text-fg-2 hover:text-fg">API</Link>
             <a href={`mailto:${SUPPORT_EMAIL}`} className="text-fg-2 hover:text-fg">Support</a>
-            <a href={PRIVACY_URL} className="text-fg-2 hover:text-fg">Privacy</a>
-            <a href={TERMS_URL} className="text-fg-2 hover:text-fg">Terms</a>
+            <Link to={PRIVACY_URL} className="text-fg-2 hover:text-fg">Privacy</Link>
+            <Link to={TERMS_URL} className="text-fg-2 hover:text-fg">Terms</Link>
           </div>
         </div>
         <div className="mt-8 border-t border-line pt-5 text-[12px] text-fg-3 space-y-1">

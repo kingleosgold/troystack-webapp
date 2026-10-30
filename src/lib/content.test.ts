@@ -85,15 +85,27 @@ describe('sign-in hand-offs', () => {
     expect(takeCheckoutIntent(now + 60_000)).toEqual({ plan: 'monthly', campaign: 'site-pricing' });
   });
 
-  it('keeps the campaign when the sign-in link repeats the plan without one', () => {
+  it("keeps the campaign when the plan sheet's sign-in link repeats the plan without one", () => {
     const now = Date.parse('2026-10-08T20:00:00Z');
     rememberCheckout('yearly', 'webapp-troy-limit', now);
-    rememberCheckout('yearly', undefined, now + 1000);
+    rememberCheckout('yearly', undefined, now + 1000, true);
     expect(takeCheckoutIntent(now + 2000)).toEqual({ plan: 'yearly', campaign: 'webapp-troy-limit' });
 
     rememberCheckout('yearly', 'webapp-troy-limit', now);
-    rememberCheckout('monthly', undefined, now + 1000);
+    rememberCheckout('monthly', undefined, now + 1000, true);
     expect(takeCheckoutIntent(now + 2000)).toEqual({ plan: 'monthly' });
+
+    // A link's own token wins over the kept one.
+    rememberCheckout('yearly', 'webapp-gold', now);
+    rememberCheckout('yearly', 'site-pricing', now + 1000, true);
+    expect(takeCheckoutIntent(now + 2000)).toEqual({ plan: 'yearly', campaign: 'site-pricing' });
+  });
+
+  it("doesn't hand a kept campaign to a different sign-in link for the same plan", () => {
+    const now = Date.parse('2026-10-08T20:00:00Z');
+    rememberCheckout('yearly', 'webapp-gold', now);
+    rememberCheckout('yearly', undefined, now + 10 * 60_000);
+    expect(takeCheckoutIntent(now + 10 * 60_000 + 1000)).toEqual({ plan: 'yearly' });
   });
 
   it('forgets a return path after half an hour, and one saved without a time', () => {
@@ -104,6 +116,16 @@ describe('sign-in hand-offs', () => {
     expect(takeNextPath(now + 60_000)).toBe('/troy');
     localStorage.setItem('stg_auth_next', '/troy');
     expect(takeNextPath(now)).toBeNull();
+  });
+
+  it('drops an older return path when the sign-in page opens without one', () => {
+    const now = Date.parse('2026-10-08T20:00:00Z');
+    rememberNextPath('/stack', now);
+    rememberNextPath(null, now + 60_000);
+    expect(takeNextPath(now + 120_000)).toBeNull();
+    rememberNextPath('/stack', now);
+    rememberNextPath('//evil.example', now + 60_000);
+    expect(takeNextPath(now + 120_000)).toBeNull();
   });
 
   it('ignores the bare plan names the old site left behind', () => {

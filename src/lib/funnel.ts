@@ -9,8 +9,20 @@ import type { WebPlan } from './checkout';
  */
 export type FunnelStep = 'gold_view' | 'plan_tap' | 'signup';
 
+// Crawlers, link previews and headless browsers render the Gold page too, and
+// in its first week they were most of its views. Google's own fetchers,
+// speed tests and Vercel's preview shots don't say bot, so they're named.
+// Only a person's visit counts.
+const AUTOMATED_UA = /bot\/|\+https?:|crawl|spider|slurp|headless|lighthouse|facebookexternalhit|embedly|google-inspectiontool|googleother|google-read-aloud|ptst\/|gtmetrix|vercel-screenshot|^curl\/|^wget\/|python-|node-fetch|axios\//i;
+
+export function isAutomated(nav: Pick<Navigator, 'userAgent' | 'webdriver'> | undefined): boolean {
+  if (!nav) return true;
+  return nav.webdriver === true || AUTOMATED_UA.test(nav.userAgent || '');
+}
+
 export function countStep(step: FunnelStep, plan?: WebPlan | null, campaign?: string | null): void {
   try {
+    if (isAutomated(typeof navigator === 'undefined' ? undefined : navigator)) return;
     void fetch(`${API_BASE}/v1/funnel`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

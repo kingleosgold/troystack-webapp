@@ -629,3 +629,76 @@ test.describe('signing out', () => {
     expect((await keysFor(page))[0]).toBe(true);
   });
 });
+
+test.describe("a visitor's stack page", () => {
+  const GUEST_STACK = JSON.stringify([{ id: 'g1', metal: 'gold', type: 'Gold Buffalo', weight: 1, weightUnit: 'oz', quantity: 1, purchasePrice: 4100, purchaseDate: '2026-10-01', createdAt: '2026-10-01T12:00:00Z', updatedAt: '2026-10-01T12:00:00Z' }]);
+
+  test('opens the sign-up form and comes back to the stack, which moves into the new account', async ({ page }) => {
+    // Seeded once, so a reload after the move doesn't put the stack back.
+    await page.addInitScript((stack) => {
+      if (sessionStorage.getItem('e2e_seeded')) return;
+      sessionStorage.setItem('e2e_seeded', '1');
+      localStorage.setItem('stacktracker_holdings', stack);
+    }, GUEST_STACK);
+    const mock = await mockBackends(page, { holdings: [] });
+    await page.goto('/stack');
+    await expect(page.getByText('Saved in this browser only.', { exact: false })).toBeVisible();
+    await page.getByRole('link', { name: 'Make a free account' }).click();
+    await expect(page).toHaveURL(/\/auth\?mode=signup&next=\/stack$/);
+    await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
+    await page.locator('#auth-email').fill('stacker@example.com');
+    await page.locator('#auth-password').fill('correct-horse');
+    await page.locator('form button[type=submit]').click();
+    await expect(page).toHaveURL(/\/stack$/);
+    await expect.poll(() => JSON.stringify(mock.inserts)).toContain('Gold Buffalo');
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('stacktracker_holdings') ?? '[]').length)).toBe(0);
+  });
+
+  test('offers sign-in beside it, and an account that already has a stack is offered the browser\'s back on the stack page', async ({ page }) => {
+    await page.addInitScript((stack) => localStorage.setItem('stacktracker_holdings', stack), GUEST_STACK);
+    // The account already has holdings, so the browser's aren't moved in on their own.
+    await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    await page.goto('/stack');
+    await page.getByText('Saved in this browser only.', { exact: false }).locator('..').getByRole('link', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL(/\/auth\?mode=signin&next=\/stack$/);
+    await page.locator('#auth-email').fill('stacker@example.com');
+    await page.locator('#auth-password').fill('correct-horse');
+    await page.locator('form button[type=submit]').click();
+    await expect(page).toHaveURL(/\/stack$/);
+    await expect(page.getByText('This browser still has 1 holding you added before signing in.')).toBeVisible();
+  });
+
+  test('a visitor who backs out of the banner and later signs in from the header lands on the home page', async ({ page }) => {
+    await page.addInitScript((stack) => localStorage.setItem('stacktracker_holdings', stack), GUEST_STACK);
+    await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    await page.goto('/stack');
+    await page.getByRole('link', { name: 'Make a free account' }).click();
+    await expect(page).toHaveURL(/\/auth\?mode=signup&next=\/stack$/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/stack$/);
+    await page.goto('/auth');
+    await page.locator('#auth-email').fill('stacker@example.com');
+    await page.locator('#auth-password').fill('correct-horse');
+    await page.locator('form button[type=submit]').click();
+    await expect(page).toHaveURL(/\/$/);
+  });
+
+  test("keeps the stack as the way back when Sign in is tapped again on the sign-in page", async ({ page }) => {
+    await page.addInitScript((stack) => localStorage.setItem('stacktracker_holdings', stack), GUEST_STACK);
+    await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+    await page.goto('/stack');
+    await page.getByText('Saved in this browser only.', { exact: false }).locator('..').getByRole('link', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL(/\/auth\?mode=signin&next=\/stack$/);
+    if (test.info().project.name === 'iphone') {
+      await page.getByRole('button', { name: 'Open menu' }).click();
+      await page.getByRole('dialog', { name: 'TroyStack' }).getByRole('link', { name: 'Sign in' }).click();
+    } else {
+      await page.locator('aside').getByRole('link', { name: 'Sign in' }).click();
+    }
+    await expect(page).toHaveURL(/\/auth$/);
+    await page.locator('#auth-email').fill('stacker@example.com');
+    await page.locator('#auth-password').fill('correct-horse');
+    await page.locator('form button[type=submit]').click();
+    await expect(page).toHaveURL(/\/stack$/);
+  });
+});

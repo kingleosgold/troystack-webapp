@@ -18,6 +18,9 @@ const ToolJunkSilver = lazy(() => import('./routes/ToolJunkSilver'));
 const ToolWhatIf = lazy(() => import('./routes/ToolWhatIf'));
 const ToolStackingHistory = lazy(() => import('./routes/ToolStackingHistory'));
 const ToolRatio = lazy(() => import('./routes/ToolRatio'));
+const Calculator = lazy(() => import('./routes/Calculator'));
+const Privacy = lazy(() => import('./routes/Privacy'));
+const Terms = lazy(() => import('./routes/Terms'));
 const Coins = lazy(() => import('./routes/Coins'));
 const Coin = lazy(() => import('./routes/Coin'));
 const Dealers = lazy(() => import('./routes/Dealers'));
@@ -67,6 +70,7 @@ export default function App() {
           <Route path="tools/what-if" element={<ToolWhatIf />} />
           <Route path="tools/stacking-history" element={<ToolStackingHistory />} />
           <Route path="tools/ratio" element={<ToolRatio />} />
+          <Route path="calculator" element={<Calculator />} />
           <Route path="coins" element={<Coins />} />
           <Route path="coins/:slug" element={<Coin />} />
           <Route path="dealers" element={<Dealers />} />
@@ -78,6 +82,8 @@ export default function App() {
           <Route path="reset-password" element={<ResetPassword />} />
           <Route path="developers" element={<Developers />} />
           <Route path="developers/keys" element={<DeveloperKeys />} />
+          <Route path="privacy" element={<Privacy />} />
+          <Route path="terms" element={<Terms />} />
 
           {/* Addresses from the old site */}
           <Route path="dashboard" element={<Navigate to="/" replace />} />

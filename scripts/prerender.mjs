@@ -136,13 +136,7 @@ function coinsIndexBody() {
   return `<h1>Coin and bar values</h1><ul>${items}</ul>${NEEDS_JS}`;
 }
 
-// troystack.com serves these from troystack-marketing through vercel.json's
-// rewrites. A file here would answer first, so they get none, and the
-// sitemap lists them with the marketing pages that have no app route.
-const MARKETING = ['/privacy', '/terms'];
-const MARKETING_ONLY = ['/calculator', '/speculation'];
 const pages = { ...seo, '/prices': seo['/prices/gold'] };
-for (const route of MARKETING) delete pages[route];
 const bodies = { '/coins': coinsIndexBody() };
 const structured = { '/': SOFTWARE, '/app': SOFTWARE };
 const extras = {};
@@ -213,9 +207,8 @@ for (const [alias, page] of Object.entries(SAME_AS)) {
 // The sitemap lists the same public pages. lastmod is the date a page's own
 // content last changed, never the build date, so search engines can trust it.
 const urls = Object.keys(pages)
-  // News items are noindex, so the sitemap leaves them out, as signal-sitemap.xml does.
+  // News items are noindex, so the sitemap leaves them out.
   .filter((route) => !(route in SAME_AS) && !extras[route]?.noindex)
-  .concat(MARKETING, MARKETING_ONLY)
   .map((route) => sitemapRow(`${SITE}${route === '/' ? '/' : route}`, modified[route]))
   .join('\n');
 writeFileSync(path.join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);

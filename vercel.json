@@ -2,57 +2,126 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "redirects": [
-    { "source": "/dashboard", "destination": "/", "permanent": true },
-    { "source": "/today", "destination": "/", "permanent": true },
-    { "source": "/portfolio", "destination": "/stack", "permanent": true },
-    { "source": "/analytics", "destination": "/stack", "permanent": true },
-    { "source": "/speculate", "destination": "/tools/what-if", "permanent": true },
-    { "source": "/junk-silver", "destination": "/tools/junk-silver", "permanent": true },
-    { "source": "/chat", "destination": "/troy", "permanent": true },
-    { "source": "/c/:conversationId", "destination": "/troy/c/:conversationId", "permanent": false },
-    { "source": "/auth/reset-password", "destination": "/reset-password", "permanent": false },
+    {
+      "source": "/dashboard",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/today",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/portfolio",
+      "destination": "/stack",
+      "permanent": true
+    },
+    {
+      "source": "/analytics",
+      "destination": "/stack",
+      "permanent": true
+    },
+    {
+      "source": "/speculate",
+      "destination": "/tools/what-if",
+      "permanent": true
+    },
+    {
+      "source": "/speculation",
+      "destination": "/tools/what-if",
+      "permanent": true
+    },
+    {
+      "source": "/junk-silver",
+      "destination": "/tools/junk-silver",
+      "permanent": true
+    },
+    {
+      "source": "/chat",
+      "destination": "/troy",
+      "permanent": true
+    },
+    {
+      "source": "/c/:conversationId",
+      "destination": "/troy/c/:conversationId",
+      "permanent": false
+    },
+    {
+      "source": "/auth/reset-password",
+      "destination": "/reset-password",
+      "permanent": false
+    },
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.troystack.com" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "www.troystack.com"
+        }
+      ],
       "destination": "https://troystack.com/:path*",
       "permanent": true
     },
     {
       "source": "/",
-      "has": [{ "type": "host", "value": "www.troystack.ai" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "www.troystack.ai"
+        }
+      ],
       "destination": "https://troystack.ai/",
       "permanent": true
     },
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.troystack.ai" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "www.troystack.ai"
+        }
+      ],
       "destination": "https://troystack.ai/:path*",
       "permanent": true
     }
   ],
   "rewrites": [
-    { "source": "/troy/c/:conversationId", "destination": "/" },
-    { "source": "/settings", "destination": "/" },
-    { "source": "/auth", "destination": "/" },
-    { "source": "/reset-password", "destination": "/" },
-    { "source": "/developers/keys", "destination": "/" },
-    { "source": "/signal/:slug", "destination": "/api/signal-html?slug=:slug" },
-    { "source": "/privacy", "destination": "https://stacktrackergold-web.vercel.app/privacy" },
-    { "source": "/terms", "destination": "https://stacktrackergold-web.vercel.app/terms" },
-    { "source": "/calculator", "destination": "https://stacktrackergold-web.vercel.app/calculator" },
-    { "source": "/speculation", "destination": "https://stacktrackergold-web.vercel.app/speculation" },
-    { "source": "/signal-sitemap.xml", "destination": "https://stacktrackergold-web.vercel.app/signal-sitemap.xml" },
-    { "source": "/api/prices", "destination": "https://stacktrackergold-web.vercel.app/api/prices" },
-    { "source": "/api/signal", "destination": "https://stacktrackergold-web.vercel.app/api/signal" },
-    { "source": "/api/signal/:slug", "destination": "https://stacktrackergold-web.vercel.app/api/signal/:slug" },
-    { "source": "/ios-swap.js", "destination": "https://stacktrackergold-web.vercel.app/ios-swap.js" },
-    { "source": "/.well-known/apple-app-site-association", "destination": "https://stacktrackergold-web.vercel.app/.well-known/apple-app-site-association" },
-    { "source": "/icon.png", "destination": "https://stacktrackergold-web.vercel.app/icon.png" },
-    { "source": "/screenshots/:file", "destination": "https://stacktrackergold-web.vercel.app/screenshots/:file" },
-    { "source": "/og-calculator.png", "destination": "https://stacktrackergold-web.vercel.app/og-calculator.png" },
-    { "source": "/og-speculation.png", "destination": "https://stacktrackergold-web.vercel.app/og-speculation.png" }
+    {
+      "source": "/troy/c/:conversationId",
+      "destination": "/"
+    },
+    {
+      "source": "/settings",
+      "destination": "/"
+    },
+    {
+      "source": "/auth",
+      "destination": "/"
+    },
+    {
+      "source": "/reset-password",
+      "destination": "/"
+    },
+    {
+      "source": "/developers/keys",
+      "destination": "/"
+    },
+    {
+      "source": "/signal/:slug",
+      "destination": "/api/signal-html?slug=:slug"
+    }
   ],
   "headers": [
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
     {
       "source": "/assets/(.*)",
       "headers": [

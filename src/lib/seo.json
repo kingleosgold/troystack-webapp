@@ -47,6 +47,10 @@
     "title": "Gold to silver ratio today, with history",
     "description": "How many ounces of silver one ounce of gold buys at live spot, with the ratio charted over one year, five years and back to 1915."
   },
+  "/calculator": {
+    "title": "What does your gold and silver actually buy?",
+    "description": "Enter your gold and silver and see what it buys at live spot in barrels of oil, months of rent and hours of labor, and how that compares to 1971."
+  },
   "/coins": {
     "title": "Coin and bar melt values at live spot",
     "description": "Melt value for Silver Eagles, Maple Leafs, Krugerrands, Morgan dollars, junk silver, old US gold and common bars, with each one's weight and purity."
@@ -66,6 +70,14 @@
   "/delete-account": {
     "title": "Delete your TroyStack account",
     "description": "How to delete your TroyStack account and what it holds, what's kept, and what happens to an App Store, Google Play or web subscription."
+  },
+  "/privacy": {
+    "title": "Privacy Policy",
+    "description": "What TroyStack collects, who it is shared with, and how to delete your account. Mancini Tech Solutions, LLC."
+  },
+  "/terms": {
+    "title": "Terms of Service",
+    "description": "Terms for TroyStack, including TroyStack Gold at $4.99 a month, $39.99 a year, or $99.99 once. Mancini Tech Solutions, LLC."
   },
   "/developers": {
     "title": "TroyStack API and MCP server for precious metals data",

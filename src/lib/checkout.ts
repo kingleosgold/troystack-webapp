@@ -83,13 +83,15 @@ function readIntent(now: number): StoredIntent | null {
 }
 
 /**
- * Keeps the plan picked before signing in. The sign-in link may not repeat
- * the campaign, so a campaign already kept for the same plan stays with it.
+ * Keeps the plan picked before signing in. The plan sheet keeps its campaign
+ * here and sends a sign-in link that doesn't repeat it, so that link asks with
+ * `keepCampaign` for a campaign already kept for the same plan to stay. Any
+ * other link without a campaign starts the plan with none.
  */
-export function rememberCheckout(plan: WebPlan, campaign?: CheckoutCampaign, now = Date.now()): void {
+export function rememberCheckout(plan: WebPlan, campaign?: CheckoutCampaign, now = Date.now(), keepCampaign = false): void {
   try {
     let kept = campaign;
-    if (!kept) {
+    if (!kept && keepCampaign) {
       const existing = readIntent(now);
       if (existing?.plan === plan) kept = existing.campaign;
     }
@@ -142,7 +144,8 @@ export function takeCheckoutIntent(now = Date.now()): { plan: WebPlan; campaign?
 }
 
 // Where to land after signing in, for half an hour at most. Only paths on
-// this site count.
+// this site count. Each visit to the sign-in page sets it again, so one
+// without a page of its own, like the header's Sign in, drops an older one.
 const NEXT_KEY = 'stg_auth_next';
 
 export function safeNextPath(next: string | null | undefined): string | null {
@@ -154,6 +157,7 @@ export function rememberNextPath(next: string | null | undefined, now = Date.now
   const safe = safeNextPath(next);
   try {
     if (safe) localStorage.setItem(NEXT_KEY, JSON.stringify({ path: safe, at: now }));
+    else localStorage.removeItem(NEXT_KEY);
   } catch {
     // fine, they land on the home page
   }
@@ -181,6 +185,46 @@ export function takeNextPath(now = Date.now()): string | null {
   }
 }
 
+// The plan this tab last tapped on the Gold page, and under which campaign.
+// It's how checkout knows the view and tap already counted, so a back-out
+// can say so, and only for someone who came through the Gold page. A tap
+// older than the half hour a sign-up or checkout intent lasts no longer
+// counts, so the same tab back much later counts its view again.
+const GOLD_TAP_KEY = 'stg_gold_tap';
+
+export function rememberGoldTap(plan: WebPlan, campaign: CheckoutCampaign, now = Date.now()): void {
+  try {
+    sessionStorage.setItem(GOLD_TAP_KEY, JSON.stringify({ plan, campaign, at: now }));
+  } catch {
+    // the back-out counts again, as before
+  }
+}
+
+export function goldTap(now = Date.now()): { plan: WebPlan; campaign: string } | null {
+  try {
+    const raw = sessionStorage.getItem(GOLD_TAP_KEY);
+    if (!raw || !raw.startsWith('{')) return null;
+    const parsed = JSON.parse(raw) as { plan?: unknown; campaign?: unknown; at?: unknown };
+    const at = typeof parsed.at === 'number' ? parsed.at : 0;
+    if (now - at > INTENT_TTL_MS || at > now + 60_000) return null;
+    if (!isWebPlan(parsed.plan) || typeof parsed.campaign !== 'string') return null;
+    return { plan: parsed.plan, campaign: parsed.campaign };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The plan someone back from Stripe already tapped on the Gold page, when the
+ * address says back=1 and this tab's tap was under the same campaign. Their
+ * view and that tap already counted, so the page counts neither again.
+ */
+export function backedOutPlan(back: string | null, campaign: string, now = Date.now()): WebPlan | undefined {
+  if (back !== '1') return undefined;
+  const before = goldTap(now);
+  return before?.campaign === campaign ? before.plan : undefined;
+}
+
 /**
  * Sends the browser to Stripe Checkout. True once it's on its way. False when
  * `stillWanted` says no by the time checkout answers, as when another account
@@ -196,12 +240,26 @@ export async function startCheckout(
   const priceId = PRICE_IDS[plan];
   if (!priceId) throw new Error('Web checkout is not set up here yet.');
   const origin = window.location.origin;
+  // Someone who picked a plan on the Gold page and backs out of Stripe lands
+  // on the plans again, with a troystack.com link's token when they came by
+  // one, so a second try still counts for the page that sent them. Checkout
+  // often opens from /auth after sign-up, which would send them home instead.
+  // Anyone else goes back to the page they were on. back=1 tells the Gold page
+  // this visitor's view and plan tap already counted there, which is only so
+  // when this tab tapped a plan on it under the same campaign.
+  const site = siteCampaign(campaign);
+  const counted = campaign !== undefined && goldTap()?.campaign === campaign ? 'back=1' : '';
+  const back = site
+    ? `/gold?campaign=${site}${counted ? `&${counted}` : ''}`
+    : campaign === 'webapp-gold'
+      ? `/gold${counted ? `?${counted}` : ''}`
+      : window.location.pathname;
   const { url } = await postJson<{ url: string }>('/v1/stripe/create-checkout-session', {
     user_id: userId,
     price_id: priceId,
     campaign,
     success_url: `${origin}/settings?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}${window.location.pathname}`,
+    cancel_url: `${origin}${back}`,
   }, { token });
   if (!url) throw new Error('Checkout did not start.');
   if (!stillWanted()) return false;

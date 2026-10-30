@@ -6,4 +6,3 @@ Disallow: /reset-password
 Disallow: /developers/keys
 
 Sitemap: https://troystack.com/sitemap.xml
-Sitemap: https://troystack.com/signal-sitemap.xml

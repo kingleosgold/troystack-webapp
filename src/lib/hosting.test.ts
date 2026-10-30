@@ -15,17 +15,27 @@ describe('Vercel routing', () => {
     expect(sources.filter((source) => source.startsWith('/coins'))).toEqual([]);
   });
 
-  it("serves troystack-marketing's pages from the marketing project", () => {
-    const MARKETING = 'https://stacktrackergold-web.vercel.app';
-    const rules: Array<{ source: string; destination: string }> = vercel.rewrites ?? [];
-    for (const path of ['/privacy', '/terms', '/calculator', '/speculation', '/signal-sitemap.xml', '/api/prices', '/api/signal', '/api/signal/:slug', '/ios-swap.js', '/.well-known/apple-app-site-association']) {
-      expect(rules.find((rule) => rule.source === path)?.destination, path).toBe(`${MARKETING}${path}`);
-    }
+  // troystack-marketing's alias sits behind Vercel's sign-in, and the app now
+  // serves privacy, terms and the calculator itself, so nothing goes there.
+  it('sends nothing to the marketing project', () => {
+    expect(JSON.stringify(vercel.rewrites ?? [])).not.toContain('vercel.app');
   });
 
-  it('keeps no redirect on a path marketing serves', () => {
+  it("serves the pages troystack.com's links point at, and sends the old What If page to the app's", () => {
     const sources: string[] = (vercel.redirects ?? []).map((rule: { source: string }) => rule.source);
-    for (const path of ['/privacy', '/terms', '/calculator', '/speculation', '/.well-known/apple-app-site-association']) expect(sources).not.toContain(path);
+    for (const path of ['/privacy', '/terms', '/calculator']) expect(sources).not.toContain(path);
+    const speculation = (vercel.redirects ?? []).find((item: { source: string }) => item.source === '/speculation');
+    expect(speculation).toMatchObject({ destination: '/tools/what-if', permanent: true });
+  });
+
+  // The iOS app opens troystack.com's reset links through this file, so it has
+  // to come from the app's own project once troystack.com is here.
+  it('serves the Apple association file as JSON for the reset link', () => {
+    const file = JSON.parse(readFileSync(new URL('../../public/.well-known/apple-app-site-association', import.meta.url), 'utf8'));
+    expect(file.applinks.details[0].appIDs).toContain('3BKELS5FG9.com.stacktrackerpro.app');
+    expect(file.applinks.details[0].paths).toContain('/auth/reset-password');
+    const header = (vercel.headers ?? []).find((item: { source: string }) => item.source === '/.well-known/apple-app-site-association');
+    expect(header?.headers).toContainEqual({ key: 'Content-Type', value: 'application/json' });
   });
 
   it("keeps the app's own Signal pages, which answer a new article's slug or 404", () => {

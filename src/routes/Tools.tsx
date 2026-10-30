@@ -10,6 +10,7 @@ const TOOLS = [
   { to: '/tools/junk-silver', title: 'Junk silver calculator', body: 'Pre-1965 dimes, quarters and halves, war nickels and Morgan dollars, by the coin or by face value.', icon: <Scale size={20} /> },
   { to: '/tools/what-if', title: 'What if', body: 'Pick prices for each metal and see what your stack, or any amount of metal, would be worth.', icon: <TrendingUp size={20} /> },
   { to: '/tools/stacking-history', title: 'Stacking history', body: 'Put a set amount into gold or silver every month from any year since 1970 and see where it stands today.', icon: <LineChart size={20} /> },
+  { to: '/calculator', title: 'What your stack buys', body: 'Your gold and silver in barrels of oil, months of rent and hours of labor, and next to 1971.', icon: <Calculator size={20} /> },
   { to: '/tools/ratio', title: 'Gold/silver ratio', body: 'How many ounces of silver one ounce of gold buys, and where that sits against the record.', icon: <Calculator size={20} /> },
   { to: '/vault', title: 'Vault Watch', body: 'COMEX registered and eligible stocks for all four metals, updated every trading day.', icon: <Warehouse size={20} /> },
   { to: '/dealers', title: 'Where to buy', body: 'Dealers TroyStack links to, and what to check before you order.', icon: <Store size={20} /> },
