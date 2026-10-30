@@ -1254,6 +1254,15 @@ test.describe('the purchasing power calculator', () => {
     await expect(page.getByText('oz of gold, if swapped')).toBeVisible();
   });
 
+  test('reads a mistyped link as the amount it values, and shows that amount', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/calculator?gold=2abc&silver=-5');
+    await expect(page.locator('#calc-gold')).toHaveValue('2');
+    await expect(page.locator('#calc-silver')).toHaveValue('');
+    await expect(page.getByText('$8,361.60', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('oz of silver, if swapped')).toBeVisible();
+  });
+
   test("shows no value from a price that isn't live", async ({ page }) => {
     await mockBackends(page, { missingPrices: ['silver'] });
     await page.goto('/calculator?gold=1');

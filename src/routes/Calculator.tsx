@@ -8,8 +8,6 @@ import { GAS, OIL_1971, OIL_TODAY, RENT, WAGE, amount, ounces, ratioContext, sta
 import { Button, Card, Field, Input, LinkButton, PageHeader } from '../ui/primitives';
 import { SpotNotice } from '../ui/SpotNotice';
 
-const SHARE_BASE = 'https://troystack.com/calculator';
-
 function oz(n: number): string {
   if (n >= 10) return `${Math.round(n).toLocaleString('en-US')} oz`;
   return `${n.toFixed(2)} oz`;
@@ -24,8 +22,10 @@ function oz(n: number): string {
 export default function Calculator() {
   usePageMeta({ ...SEO['/calculator'], canonical: '/calculator' });
   const [params, setParams] = useSearchParams();
-  const [gold, setGold] = useState(() => (ounces(params.get('gold')) ? params.get('gold')! : ''));
-  const [silver, setSilver] = useState(() => (ounces(params.get('silver')) ? params.get('silver')! : ''));
+  // The field shows the amount the address was read as, so a link with
+  // 1,000 or 2abc in it doesn't leave a blank field over a value.
+  const [gold, setGold] = useState(() => String(ounces(params.get('gold')) || ''));
+  const [silver, setSilver] = useState(() => String(ounces(params.get('silver')) || ''));
   const [copied, setCopied] = useState(false);
   const spot = useSpotMap();
   const priced = spot.priced('gold') && spot.priced('silver');
@@ -44,7 +44,9 @@ export default function Calculator() {
     const q = new URLSearchParams();
     if (goldOz) q.set('gold', String(goldOz));
     if (silverOz) q.set('silver', String(silverOz));
-    return `${SHARE_BASE}${q.toString() ? `?${q}` : ''}`;
+    // The site the page is on, so a link shared before troystack.com moves
+    // over opens this page and not the marketing site's old one.
+    return `${window.location.origin}/calculator${q.toString() ? `?${q}` : ''}`;
   };
   const shareText = () => {
     if (!r) return '';
