@@ -30,6 +30,8 @@ export interface MockOptions {
   failAsks?: number;
   /** A signed-in free account that has used today's questions. */
   chatLimitReached?: boolean;
+  /** The card Troy's signed-in replies carry, as the API sends it. */
+  replyPreview?: Record<string, unknown>;
   /** Deleting a Troy chat fails, as when the connection drops. */
   failDeletes?: boolean;
   /** How many chat deletes fail before they start working. */
@@ -278,7 +280,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       const reply = { id: 'm-reply', role: 'assistant', content: 'Your stack is worth **$6,024** at spot, up **$84** today.', created_at: now };
       const asked = (req.postDataJSON() as { message?: string; content?: string } | null) ?? {};
       chats[id] = [...(chats[id] ?? []), { id: `m-q-${Date.now()}`, role: 'user', content: asked.message ?? asked.content ?? '', created_at: now }, reply];
-      return fulfillJson(route, { message: reply, preview: null });
+      return fulfillJson(route, { message: reply, preview: opts.replyPreview ?? null });
     }
     if (/^\/v1\/troy\/conversations\/[^/]+$/.test(p)) {
       const id = p.split('/').pop() as string;

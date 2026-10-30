@@ -162,7 +162,7 @@ function DealerCard({ data }: { data: Record<string, unknown> }) {
         {label}
         <ExternalLink size={13} aria-hidden="true" />
       </a>
-      <p className="text-[11px] text-fg-3 mt-2">An affiliate link. TroyStack may earn a commission at no cost to you.</p>
+      <p className="text-[11px] text-fg-3 mt-2">We may earn a commission from these links.</p>
     </Frame>
   );
 }
