@@ -208,7 +208,7 @@ function StackCard() {
       )}
       {/* Without live prices, the note above the tiles already says so. */}
       {spot.live && <SpotNotice spot={spot} metals={held} className="mt-3" />}
-      {isGuest && <p className="mt-3 text-[12px] text-fg-3">Saved in this browser. <Link to="/auth" className="font-semibold text-gold">Sign in</Link> to keep it with your account and the app.</p>}
+      {isGuest && <p className="mt-3 text-[12px] text-fg-3">Saved in this browser. <Link to="/auth?mode=signup&next=/stack" className="font-semibold text-gold">Make a free account</Link> or <Link to="/auth?mode=signin&next=/stack" aria-label="Sign in to keep this stack" className="font-semibold text-gold">sign in</Link> to keep it with your account and the app.</p>}
     </Card>
   );
 }

@@ -168,7 +168,7 @@ function ConversationList({ conversations, activeId, isGold, planKnown, onSelect
   );
 }
 
-function LimitCard({ quota, audience, signUpHref = '/auth?next=/troy' }: { quota: Quota; audience: LimitAudience; signUpHref?: string }) {
+function LimitCard({ quota, audience, signUpHref = '/auth?mode=signup&next=/troy', signInHref = '/auth?mode=signin&next=/troy' }: { quota: Quota; audience: LimitAudience; signUpHref?: string; signInHref?: string }) {
   const { openTrial } = useTrial();
   const copy = troyLimitCopy(quota, audience);
   return (
@@ -178,9 +178,16 @@ function LimitCard({ quota, audience, signUpHref = '/auth?next=/troy' }: { quota
       {(audience === 'visitor' || copy.offerGold) && (
         <div className="mt-4 flex flex-wrap gap-2">
           {audience === 'visitor' && (
-            <Link to={signUpHref} className="inline-flex h-10 items-center rounded-xl bg-btn px-4 text-sm font-semibold text-btn-fg hover:bg-btn-hover">
-              Create a free account
-            </Link>
+            <>
+              <Link to={signUpHref} className="inline-flex h-10 items-center rounded-xl bg-btn px-4 text-sm font-semibold text-btn-fg hover:bg-btn-hover">
+                Create a free account
+              </Link>
+              {/* An account that already exists only gets a check your email
+                  notice from the sign-up form, so signing in sits beside it. */}
+              <Link to={signInHref} aria-label="Sign in to ask Troy more" className="inline-flex h-10 items-center rounded-xl px-3 text-sm font-semibold text-fg-2 hover:text-fg">
+                Sign in
+              </Link>
+            </>
           )}
           {copy.offerGold && (
             <Button variant={audience === 'free' ? 'primary' : 'secondary'} onClick={() => openTrial({ reason: `You've used today's ${quota.questionsLimit} free questions.`, campaign: 'webapp-troy-limit' })}>
@@ -317,7 +324,8 @@ export default function Troy() {
   const limit = quotaHit ?? visitorLimit;
   // Signing in from here comes back to the question waiting to be asked.
   const waitingQuestion = search.get('q') ?? turnedAway;
-  const signInHref = waitingQuestion ? `/auth?next=${encodeURIComponent(`/troy?q=${encodeURIComponent(waitingQuestion)}`)}` : '/auth?next=/troy';
+  const nextParam = `next=${encodeURIComponent(waitingQuestion ? `/troy?q=${encodeURIComponent(waitingQuestion)}` : '/troy')}`;
+  const signInHref = `/auth?${nextParam}`;
 
   const conversations = useQuery({
     queryKey: ['troy-conversations', user?.id],
@@ -838,7 +846,7 @@ export default function Troy() {
               <MessageBubble key={m.id} message={m} userId={user?.id} canListen={isGold && m.role === 'assistant'} />
             ))}
             {busy && <TypingIndicator />}
-            {limit && <LimitCard quota={limit} audience={!signedIn ? 'visitor' : !planLoading && !isGold ? 'free' : 'other'} signUpHref={signInHref} />}
+            {limit && <LimitCard quota={limit} audience={!signedIn ? 'visitor' : !planLoading && !isGold ? 'free' : 'other'} signUpHref={`/auth?mode=signup&${nextParam}`} signInHref={`/auth?mode=signin&${nextParam}`} />}
             {error && (
               <div className="rounded-xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg-2" role="alert">
                 {error}
