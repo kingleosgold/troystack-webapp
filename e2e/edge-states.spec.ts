@@ -205,7 +205,8 @@ test.describe("a visitor at the day's limit", () => {
 
     // Signing up from the limit card comes back and asks it.
     await page.getByRole('link', { name: 'Create a free account' }).click();
-    await expect(page).toHaveURL(/\/auth\?next=/);
+    await expect(page).toHaveURL(/\/auth\?mode=signup&next=/);
+    await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
     await page.locator('#auth-email').fill('stacker@example.com');
     await page.locator('#auth-password').fill('correct-horse');
     await page.locator('form button[type=submit]').click();
@@ -224,10 +225,23 @@ test.describe("a visitor at the day's limit", () => {
     await page.getByRole('button', { name: 'Send' }).click();
     await expect(page.getByText("That's today's 3 free questions.")).toBeVisible();
     await expect(page.getByText('0 of 3 free questions left today')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Create a free account' })).toHaveAttribute(
-      'href',
-      `/auth?next=${encodeURIComponent(`/troy?q=${encodeURIComponent('What moved silver today?')}`)}`,
-    );
+    const next = encodeURIComponent(`/troy?q=${encodeURIComponent('What moved silver today?')}`);
+    await expect(page.getByRole('link', { name: 'Create a free account' })).toHaveAttribute('href', `/auth?mode=signup&next=${next}`);
+    await expect(page.getByRole('link', { name: 'Sign in to ask Troy more' })).toHaveAttribute('href', `/auth?mode=signin&next=${next}`);
+  });
+
+  test('can sign in to an account they already have and come back to Troy', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('troy_ai_consent_v1', '{"version":1}'));
+    await mockBackends(page, { visitorQuota: { questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' } });
+    await page.goto('/troy');
+    await expect(page.getByText("That's today's 3 free questions.")).toBeVisible();
+    await page.getByRole('link', { name: 'Sign in to ask Troy more' }).click();
+    await expect(page).toHaveURL(/\/auth\?mode=signin&next=%2Ftroy$/);
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+    await page.locator('#auth-email').fill('stacker@example.com');
+    await page.locator('#auth-password').fill('correct-horse');
+    await page.locator('form button[type=submit]').click();
+    await expect(page).toHaveURL(/\/troy$/);
   });
 });
 
@@ -700,5 +714,26 @@ test.describe("a visitor's stack page", () => {
     await page.locator('#auth-password').fill('correct-horse');
     await page.locator('form button[type=submit]').click();
     await expect(page).toHaveURL(/\/stack$/);
+  });
+
+  test("home's note offers a free account first and brings the visitor to their stack", async ({ page }) => {
+    await page.addInitScript((stack) => {
+      if (sessionStorage.getItem('e2e_seeded')) return;
+      sessionStorage.setItem('e2e_seeded', '1');
+      localStorage.setItem('stacktracker_holdings', stack);
+    }, GUEST_STACK);
+    const mock = await mockBackends(page, { holdings: [] });
+    await page.goto('/');
+    const note = page.getByText('Saved in this browser.', { exact: false });
+    await expect(note).toBeVisible();
+    await expect(note.getByRole('link', { name: 'Sign in to keep this stack' })).toHaveAttribute('href', '/auth?mode=signin&next=/stack');
+    await note.getByRole('link', { name: 'Make a free account' }).click();
+    await expect(page).toHaveURL(/\/auth\?mode=signup&next=\/stack$/);
+    await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
+    await page.locator('#auth-email').fill('stacker@example.com');
+    await page.locator('#auth-password').fill('correct-horse');
+    await page.locator('form button[type=submit]').click();
+    await expect(page).toHaveURL(/\/stack$/);
+    await expect.poll(() => JSON.stringify(mock.inserts)).toContain('Gold Buffalo');
   });
 });
