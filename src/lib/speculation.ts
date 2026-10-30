@@ -38,6 +38,7 @@ export function scenario(goldOz: number, silverOz: number, goldTarget: number, s
 export function targetContext(name: string, target: number, spot: number): string {
   const pct = ((target - spot) / spot) * 100;
   if (Math.abs(pct) < 2) return `${name} is trading right around that today.`;
-  const size = Math.abs(pct) >= 100 ? `${Math.round(Math.abs(pct)).toLocaleString('en-US')}%` : `${Math.abs(pct).toFixed(1)}%`;
+  const tenths = Math.abs(pct).toFixed(1);
+  const size = Number(tenths) >= 100 ? `${Math.round(Math.abs(pct)).toLocaleString('en-US')}%` : `${tenths}%`;
   return pct > 0 ? `${name} would have to rise ${size} from today's spot.` : `That's ${size} below today's spot.`;
 }

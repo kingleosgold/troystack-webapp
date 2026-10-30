@@ -1299,7 +1299,7 @@ test.describe('the price targets page', () => {
     await expect(page.getByText('+$24,795.20 (+243.0%)')).toBeVisible();
     await expect(page.getByText("Gold would have to rise 139% from today's spot.", { exact: false })).toBeVisible();
     await expect(page.getByText('barrels of oil').locator('..')).toContainText('500');
-    await expect(page.getByRole('button', { name: 'Gold target, USD per oz $10,000' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('group', { name: 'Gold target, USD per oz, quick picks' }).getByRole('button', { name: '$10,000' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('keeps the scenario in the address and holds a metal with no target at spot', async ({ page }) => {
@@ -1309,7 +1309,7 @@ test.describe('the price targets page', () => {
     await page.locator('#spec-gold').fill('2');
     await page.locator('#spec-silver').fill('10');
     await expect(page.getByText('Set a target price for a metal you hold.')).toBeVisible();
-    await page.getByRole('button', { name: 'Gold target, USD per oz $5,000' }).click();
+    await page.getByRole('group', { name: 'Gold target, USD per oz, quick picks' }).getByRole('button', { name: '$5,000' }).click();
     await expect(page).toHaveURL(/\/speculation\?gold=2&silver=10&goldTarget=5000$/);
     // 2 at $5,000 and 10 silver held at $60.24.
     await expect(page.getByText('$10,602.40', { exact: true })).toBeVisible();
@@ -1321,5 +1321,13 @@ test.describe('the price targets page', () => {
     await page.goto('/speculation?gold=1&silver=10&goldTarget=5000');
     await expect(page.getByText("There's no live silver price right now, so values that need it are on hold.")).toBeVisible();
     await expect(page.getByText('Value at your targets')).toHaveCount(0);
+  });
+
+  test('names a target field by its label alone, and says nothing of a price for a metal not held', async ({ page }) => {
+    await mockBackends(page, { missingPrices: ['silver'] });
+    await page.goto('/speculation?gold=1&goldTarget=5000');
+    await expect(page.getByLabel('Gold target, USD per oz', { exact: true })).toHaveValue('5000');
+    await expect(page.getByText('$5,000.00', { exact: true })).toBeVisible();
+    await expect(page.getByText(/no live silver price/)).toHaveCount(0);
   });
 });

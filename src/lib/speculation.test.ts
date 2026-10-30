@@ -47,5 +47,6 @@ describe('a target against spot', () => {
     expect(targetContext('Silver', 75, 50)).toBe("Silver would have to rise 50.0% from today's spot.");
     expect(targetContext('Gold', 3000, 4000)).toBe("That's 25.0% below today's spot.");
     expect(targetContext('Gold', 4050, 4000)).toBe('Gold is trading right around that today.');
+    expect(targetContext('Gold', 7999.9, 4000)).toBe("Gold would have to rise 100% from today's spot.");
   });
 });

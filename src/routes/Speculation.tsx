@@ -5,6 +5,7 @@ import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { money, money0 } from '../lib/format';
 import { cx } from '../lib/cx';
+import type { Metal } from '../types/holding';
 import { GAS, OIL_TODAY, RENT, WAGE, amount, ounces } from '../lib/purchasingPower';
 import { GOLD_PRESETS, SILVER_PRESETS, scenario, targetContext } from '../lib/speculation';
 import { Button, Card, Field, Input, LinkButton, PageHeader } from '../ui/primitives';
@@ -79,11 +80,17 @@ export default function Speculation() {
   const held = n('gold') > 0 || n('silver') > 0;
   const targeted = (n('gold') > 0 && n('goldTarget') > 0) || (n('silver') > 0 && n('silverTarget') > 0);
   const hint = spot.awaiting ? null : !held ? 'Enter your gold or silver to start.' : !targeted ? 'Set a target price for a metal you hold.' : null;
-  const loss = r ? r.gain < 0 : false;
+  // A price that's missing only matters for a metal held.
+  const noticeFor: Metal[] = (['gold', 'silver'] as const).filter((m) => !held || n(m) > 0);
+  // A gain that rounds to $0.00 gets no sign and no color.
+  const flat = r ? Math.abs(r.gain) < 0.005 : true;
+  const loss = r ? r.gain < 0 && !flat : false;
+  const sign = flat ? '' : loss ? '-' : '+';
   const spotLine = [spot.priced('gold') && `gold ${money0(spot.prices.gold)}/oz`, spot.priced('silver') && `silver ${money0(spot.prices.silver)}/oz`].filter(Boolean).join(', ');
 
   const input = (k: Key, label: string, placeholder: string, step: string, presets?: number[]) => (
-    <Field label={label} htmlFor={`spec-${k}`}>
+    <div>
+      <Field label={label} htmlFor={`spec-${k}`}>
       <Input
         id={`spec-${k}`}
         type="number"
@@ -95,14 +102,15 @@ export default function Speculation() {
         value={vals[k]}
         onChange={(e) => set(k, e.target.value)}
       />
+      </Field>
+      {/* Outside the label, so the field's name is just its label. */}
       {presets && (
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div role="group" aria-label={`${label}, quick picks`} className="mt-2 flex flex-wrap gap-2">
           {presets.map((p) => (
             <button
               key={p}
               type="button"
               aria-pressed={n(k) === p}
-              aria-label={`${label} ${money0(p)}`}
               onClick={() => set(k, String(p))}
               className={cx(
                 'h-8 rounded-full border px-3 text-[13px] font-semibold tnum',
@@ -114,7 +122,7 @@ export default function Speculation() {
           ))}
         </div>
       )}
-    </Field>
+    </div>
   );
 
   return (
@@ -128,8 +136,8 @@ export default function Speculation() {
         </div>
         <h2 className="mt-5 text-[13px] font-medium text-fg-3">Target prices</h2>
         <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {input('goldTarget', 'Gold target, USD per oz', '10000', '1', GOLD_PRESETS)}
-          {input('silverTarget', 'Silver target, USD per oz', '250', '1', SILVER_PRESETS)}
+          {input('goldTarget', 'Gold target, USD per oz', '10000', 'any', GOLD_PRESETS)}
+          {input('silverTarget', 'Silver target, USD per oz', '250', 'any', SILVER_PRESETS)}
         </div>
         <p className="mt-4 text-[13px] text-fg-3 tnum">
           {spot.awaiting
@@ -138,7 +146,7 @@ export default function Speculation() {
               ? `Live spot. ${spotLine.charAt(0).toUpperCase()}${spotLine.slice(1)}.`
               : null}
         </p>
-        <SpotNotice spot={spot} metals={['gold', 'silver']} className="mt-2" />
+        <SpotNotice spot={spot} metals={noticeFor} className="mt-2" />
         {hint && <p className="mt-2 text-[13px] text-fg-2">{hint}</p>}
       </Card>
 
@@ -152,10 +160,10 @@ export default function Speculation() {
             <Card className="p-5">
               <h2 className="text-[13px] font-medium text-fg-3">Value at your targets</h2>
               <div className="mt-1 text-[34px] font-semibold tracking-tight text-gold tnum">{money(r.projected)}</div>
-              <p className={cx('mt-1 text-[15px] font-semibold tnum', loss ? 'text-down' : 'text-up')}>
-                {loss ? '-' : '+'}
-                {money(Math.abs(r.gain))} ({loss ? '-' : '+'}
-                {Math.abs(r.gainPct).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%)
+              <p className={cx('mt-1 text-[15px] font-semibold tnum', flat ? 'text-fg-2' : loss ? 'text-down' : 'text-up')}>
+                {sign}
+                {money(flat ? 0 : Math.abs(r.gain))} ({sign}
+                {Math.abs(flat ? 0 : r.gainPct).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%)
               </p>
             </Card>
           </div>
