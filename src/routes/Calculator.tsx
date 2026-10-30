@@ -50,8 +50,7 @@ export default function Calculator() {
   };
   const shareText = () => {
     if (!r) return '';
-    const focus = r.silverOz > 0 ? `${oz(r.silverOz)} silver` : `${oz(r.goldOz)} gold`;
-    return `My ${focus} stack buys ${amount(r.barrelsToday)} barrels of oil today. In 1971, the same stack bought ${amount(r.barrels1971)} barrels. Real money holds real value.`;
+    return `My ${stackDesc} stack buys ${amount(r.barrelsToday)} barrels of oil today. In 1971, the same stack bought ${amount(r.barrels1971)} barrels. Real money holds real value.`;
   };
   const copyLink = async () => {
     try {
@@ -74,8 +73,9 @@ export default function Calculator() {
     }
   };
 
-  const valueOr = (n: number) => (spot.awaiting ? '...' : r ? money(n) : priced ? money(0) : 'No price');
+  // Both metals when both are in, since the barrels count the whole stack.
   const stackDesc = r ? [r.goldOz > 0 && `${oz(r.goldOz)} gold`, r.silverOz > 0 && `${oz(r.silverOz)} silver`].filter(Boolean).join(' and ') : '';
+  const valueOr = (n: number) => (spot.awaiting ? '...' : r ? money(n) : priced ? money(0) : 'No price');
   const oilFactor = r ? r.barrelsToday / r.barrels1971 : 0;
 
   return (

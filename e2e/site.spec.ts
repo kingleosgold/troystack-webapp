@@ -1242,6 +1242,9 @@ test.describe('the purchasing power calculator', () => {
     await expect(page.getByText('barrels of oil').locator('..')).toContainText('146');
     await expect(page.getByText('$164.00', { exact: true })).toBeVisible();
     await expect(page.getByText('Live spot. Gold $4,181/oz, silver $60/oz.')).toBeVisible();
+    // The shared line names both metals, since its barrels count both.
+    const post = new URL((await page.getByRole('link', { name: 'Post on X' }).getAttribute('href'))!);
+    expect(post.searchParams.get('text')).toContain('My 1.00 oz gold and 100 oz silver stack buys 146 barrels of oil today.');
   });
 
   test('keeps what was typed in the address, so the link opens the same stack', async ({ page }) => {
