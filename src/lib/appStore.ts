@@ -43,8 +43,6 @@ export const PODCAST_APPLE_URL = 'https://podcasts.apple.com/us/podcast/id681598
 export const PODCAST_RSS_URL = 'https://api.troystack.ai/v1/podcast/feed.xml';
 
 export const SUPPORT_EMAIL = 'support@troystack.com';
-// Served from troystack-marketing (vercel.json), so links to these load the
-// page from the server rather than moving inside the app.
 export const PRIVACY_URL = '/privacy';
 export const TERMS_URL = '/terms';
 

@@ -53,6 +53,16 @@
       "permanent": false
     },
     {
+      "source": "/auth/reset-password/:path*",
+      "destination": "/reset-password",
+      "permanent": false
+    },
+    {
+      "source": "/signal-sitemap.xml",
+      "destination": "/sitemap.xml",
+      "permanent": false
+    },
+    {
       "source": "/:path*",
       "has": [
         {

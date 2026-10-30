@@ -109,24 +109,46 @@ async function loadSpot() {
   }
 }
 
+/** One page of the Signal list, tried twice before the build gives up. */
+async function signalPage(query) {
+  let last;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(`https://api.troystack.ai/v1/stack-signal?${query}`, { signal: AbortSignal.timeout(12000) });
+      if (!res.ok) throw new Error(`list ${res.status}`);
+      const body = await res.json();
+      return Array.isArray(body.articles) ? body.articles : [];
+    } catch (err) {
+      last = err;
+    }
+  }
+  throw last;
+}
+
+// A failed read fails the build, so a deploy never ships a sitemap without
+// Troy's recaps. The deploy before it keeps serving.
 async function loadSignalArticles() {
   // The browser tests build offline, so they skip the live article list.
   if (process.env.PRERENDER_SIGNAL === 'off') return [];
-  try {
-    const articles = [];
-    for (let offset = 0; offset < 1000; offset += 50) {
-      const res = await fetch(`https://api.troystack.ai/v1/stack-signal?limit=50&offset=${offset}`, { signal: AbortSignal.timeout(12000) });
-      if (!res.ok) throw new Error(`list ${res.status}`);
-      const body = await res.json();
-      const batch = Array.isArray(body.articles) ? body.articles : [];
-      articles.push(...batch);
-      if (batch.length < 50) break;
-    }
-    return articles;
-  } catch (err) {
-    console.warn(`prerender: signal articles skipped (${err.message})`);
-    return [];
+  const articles = [];
+  for (let offset = 0; offset < 1000; offset += 50) {
+    const batch = await signalPage(`limit=50&offset=${offset}`);
+    articles.push(...batch);
+    if (batch.length < 50) break;
   }
+  return articles;
+}
+
+/** Every recap, back to the first, for the sitemap. The newest thousand articles of every kind don't reach that far. */
+async function loadAllRecaps() {
+  if (process.env.PRERENDER_SIGNAL === 'off') return [];
+  const recaps = [];
+  for (let offset = 0; offset < 5000; offset += 50) {
+    const batch = await signalPage(`type=signal&limit=50&offset=${offset}`);
+    recaps.push(...batch);
+    if (batch.length < 50) break;
+  }
+  return recaps;
 }
 
 const NEEDS_JS = '<p>TroyStack needs JavaScript to show live prices and talk to Troy.</p>';
@@ -172,6 +194,18 @@ for (const article of signalArticles) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(published)) modified[route] = published;
 }
 
+// Older recaps get a sitemap row without a prerendered file. Their pages
+// come from api/signal-html like any article's.
+const olderRecaps = [];
+for (const recap of await loadAllRecaps()) {
+  const slug = String(recap.slug || '');
+  if (!isRecap(recap) || !/^[a-z0-9-]{1,120}$/i.test(slug) || pages[`/signal/${slug}`]) continue;
+  const route = `/signal/${slug}`;
+  olderRecaps.push(route);
+  const published = String(recap.published_at || recap.created_at || '').slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(published)) modified[route] = published;
+}
+
 let count = 0;
 for (const [route, meta] of Object.entries(pages)) {
   const html = render(route, meta, bodies[route], structured[route], extras[route]);
@@ -209,6 +243,7 @@ for (const [alias, page] of Object.entries(SAME_AS)) {
 const urls = Object.keys(pages)
   // News items are noindex, so the sitemap leaves them out.
   .filter((route) => !(route in SAME_AS) && !extras[route]?.noindex)
+  .concat(olderRecaps)
   .map((route) => sitemapRow(`${SITE}${route === '/' ? '/' : route}`, modified[route]))
   .join('\n');
 writeFileSync(path.join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);

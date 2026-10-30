@@ -45,6 +45,8 @@ const PAGES: Array<[string, string | RegExp]> = [
   ['/delete-account', /Delete your TroyStack account/],
   ['/auth', /Sign in to TroyStack/],
   ['/developers', /TroyStack API/],
+  ['/privacy', /Privacy Policy/],
+  ['/terms', /Terms of Service/],
   ['/nope', /That page isn't here/],
 ];
 
@@ -91,7 +93,7 @@ test('home shows live prices and Troy\'s read', async ({ page }) => {
 test('pages fit a small phone without scrolling sideways', async ({ page }) => {
   await mockBackends(page);
   await page.setViewportSize({ width: 320, height: 700 });
-  for (const path of ['/', '/prices/gold', '/signal', '/tools/melt', '/tools/what-if', '/troy', '/stack', '/app', '/developers', '/gold']) {
+  for (const path of ['/', '/prices/gold', '/signal', '/tools/melt', '/tools/what-if', '/troy', '/stack', '/app', '/developers', '/privacy', '/terms', '/calculator', '/gold']) {
     await page.goto(path);
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible({ timeout: 15_000 });
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
