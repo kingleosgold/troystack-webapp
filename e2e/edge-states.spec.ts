@@ -243,6 +243,22 @@ test.describe("a visitor at the day's limit", () => {
     await page.locator('form button[type=submit]').click();
     await expect(page).toHaveURL(/\/troy$/);
   });
+
+  test('who already has Gold can sign in from the trial sheet and come back to Troy', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('troy_ai_consent_v1', '{"version":1}'));
+    await mockBackends(page, { tier: 'gold', visitorQuota: { questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' } });
+    await page.goto('/troy');
+    await expect(page.getByText("That's today's 3 free questions.")).toBeVisible();
+    await page.getByRole('button', { name: 'Try Gold free for a week' }).click();
+    const sheet = page.getByRole('dialog');
+    await sheet.getByRole('link', { name: 'Sign in with the same account' }).click();
+    await expect(page).toHaveURL(/\/auth\?mode=signin&next=%2Ftroy$/);
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+    await page.locator('#auth-email').fill('stacker@example.com');
+    await page.locator('#auth-password').fill('correct-horse');
+    await page.locator('form button[type=submit]').click();
+    await expect(page).toHaveURL(/\/troy$/);
+  });
 });
 
 test('a second receipt picked while the first is being checked is ignored, so only one scan is counted', async ({ page }) => {

@@ -211,6 +211,7 @@ function PaymentIssue() {
 
 export function TrialSheet({ open, onClose, reason, campaign, plan, start = false }: Props) {
   const { user } = useAuth();
+  const location = useLocation();
   const { isGold, loading: planLoading } = useSubscription();
   // A signed-in account whose plan hasn't loaded may already have Gold, so
   // nothing is sold until it's known.
@@ -316,7 +317,7 @@ export function TrialSheet({ open, onClose, reason, campaign, plan, start = fals
           {!user && (
             <p className="text-[13px] text-fg-3">
               Already have Gold?{' '}
-              <Link to="/auth" onClick={close} className="font-semibold text-gold hover:text-gold-2">
+              <Link to={`/auth?mode=signin&next=${encodeURIComponent(location.pathname)}`} onClick={close} className="font-semibold text-gold hover:text-gold-2">
                 Sign in with the same account
               </Link>{' '}
               and it unlocks here.
