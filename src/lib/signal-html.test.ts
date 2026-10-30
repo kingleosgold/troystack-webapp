@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // @ts-expect-error plain JS Vercel function
 import handler from '../../api/signal-html.js';
 
-const SHELL = '<html><head><title>TroyStack</title><meta name="description" content="home" /><link rel="canonical" href="https://troystack.ai/" /><meta property="og:url" content="x" /><meta property="og:title" content="x" /><meta property="og:description" content="x" /><meta property="og:image" content="x" /><meta property="og:type" content="website" /><meta name="twitter:title" content="x" /><meta name="twitter:description" content="x" /><meta name="twitter:image" content="x" /></head><body></body></html>';
+const SHELL = '<html><head><title>TroyStack</title><meta name="description" content="home" /><link rel="canonical" href="https://troystack.com/" /><meta property="og:url" content="x" /><meta property="og:title" content="x" /><meta property="og:description" content="x" /><meta property="og:image" content="x" /><meta property="og:type" content="website" /><meta name="twitter:title" content="x" /><meta name="twitter:description" content="x" /><meta name="twitter:image" content="x" /></head><body></body></html>';
 
 type Upstream = (url: string) => Promise<Response> | Response;
 
 function run(slug: string, upstream: Upstream) {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-    if (url.startsWith('https://troystack.ai/')) {
+    if (url.startsWith('https://troystack.com/')) {
       return new Response(url.endsWith('/404.html') ? '<title>Page not found</title>' : SHELL, { status: 200 });
     }
     return upstream(url);
@@ -20,7 +20,7 @@ function run(slug: string, upstream: Upstream) {
     setHeader(k: string, v: string) { this.headers[k] = v; },
     end(b: string) { this.body = b; },
   };
-  const req = { query: { slug }, headers: { host: 'troystack.ai', 'x-forwarded-proto': 'https' } };
+  const req = { query: { slug }, headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' } };
   return (handler(req, res) as Promise<void>).then(() => res);
 }
 
@@ -35,7 +35,21 @@ describe('signal-html', () => {
     expect(res.headers['Cache-Control']).toBe('public, max-age=300');
     expect(res.body).toContain('<title>Gold, higher | TroyStack</title>');
     expect(res.body).toContain('<meta name="description" content="Central banks keep buying gold every single month" />');
-    expect(res.body).toContain('<link rel="canonical" href="https://troystack.ai/signal/gold-2026-10-20" />');
+    expect(res.body).toContain('<link rel="canonical" href="https://troystack.com/signal/gold-2026-10-20" />');
+  });
+
+  it('keeps a news item out of the index and lets a recap in', async () => {
+    const news = await run('gold-2026-10-20', () => json({ article: { slug: 'gold-2026-10-20', title: 'Gold', troy_commentary: 'Body.' } }));
+    expect(news.body).toContain('<meta name="robots" content="noindex, follow" />');
+    const recap = await run('stack-signal-2026-10-20', () => json({ article: { slug: 'stack-signal-2026-10-20', title: 'The Stack Signal', is_stack_signal: true, troy_commentary: 'Body.' } }));
+    expect(recap.statusCode).toBe(200);
+    expect(recap.body).not.toContain('noindex');
+  });
+
+  it("keeps a news item folded into its day's recap on its own page, since the app's recap doesn't show it", async () => {
+    const res = await run('fed-2026-10-08', () => json({ article: { slug: 'fed-2026-10-08', title: 'Fed', home_slug: 'stack-signal-2026-10-08' } }));
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('<meta name="robots" content="noindex, follow" />');
   });
 
   it('skips a one-liner cut to a word or two', async () => {
@@ -71,6 +85,6 @@ describe('signal-html with odd article text', () => {
     const res = await run('Gold-2026-10-20', () => json({ article: { slug: 'gold-2026-10-20', title: "Gold at $' and $& and $`", troy_commentary: 'Body.' } }));
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain("<title>Gold at $' and $&amp; and $` | TroyStack</title>");
-    expect(res.body).toContain('<link rel="canonical" href="https://troystack.ai/signal/gold-2026-10-20" />');
+    expect(res.body).toContain('<link rel="canonical" href="https://troystack.com/signal/gold-2026-10-20" />');
   });
 });

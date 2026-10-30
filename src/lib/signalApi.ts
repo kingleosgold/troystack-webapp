@@ -78,7 +78,7 @@ export function normalizeArticle(raw: RawArticle): SignalArticle {
     sources: normalizeSources(raw.sources),
     category: raw.category || 'market',
     imageUrl: raw.image_url || null,
-    isDigest: Boolean(raw.is_stack_signal),
+    isDigest: raw.is_stack_signal === true,
     publishedAt: raw.published_at || raw.created_at || '',
     goldAtPublish: Number(raw.gold_price_at_publish) || null,
     silverAtPublish: Number(raw.silver_price_at_publish) || null,
