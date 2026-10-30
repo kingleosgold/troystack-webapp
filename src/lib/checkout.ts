@@ -144,7 +144,8 @@ export function takeCheckoutIntent(now = Date.now()): { plan: WebPlan; campaign?
 }
 
 // Where to land after signing in, for half an hour at most. Only paths on
-// this site count.
+// this site count. Each visit to the sign-in page sets it again, so one
+// without a page of its own, like the header's Sign in, drops an older one.
 const NEXT_KEY = 'stg_auth_next';
 
 export function safeNextPath(next: string | null | undefined): string | null {
@@ -156,6 +157,7 @@ export function rememberNextPath(next: string | null | undefined, now = Date.now
   const safe = safeNextPath(next);
   try {
     if (safe) localStorage.setItem(NEXT_KEY, JSON.stringify({ path: safe, at: now }));
+    else localStorage.removeItem(NEXT_KEY);
   } catch {
     // fine, they land on the home page
   }
