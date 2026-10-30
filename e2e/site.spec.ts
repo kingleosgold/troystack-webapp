@@ -33,6 +33,7 @@ const PAGES: Array<[string, string | RegExp]> = [
   ['/tools/what-if', /What if/i],
   ['/tools/stacking-history', /Stacking history/i],
   ['/tools/ratio', /ratio/i],
+  ['/calculator', /What does your stack actually buy/],
   ['/coins', /Coin and bar values/],
   ['/coins/morgan-silver-dollar', /Morgan silver dollar/],
   ['/coins/not-a-coin', /That coin isn't here/],
@@ -1228,4 +1229,59 @@ test("the sidebar doesn't call an account Free or offer the free week while its 
   await expect(sidebar.getByText('Free', { exact: true })).toHaveCount(0);
   await expect(sidebar.getByText('Alerts, widgets and Troy on your lock screen.')).toBeVisible();
   await expect(sidebar.getByText(/free week/)).toHaveCount(0);
+});
+
+test.describe('the purchasing power calculator', () => {
+  test('values a shared stack at live spot and against 1971', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/calculator?gold=1&silver=100');
+    await expect(page.locator('#calc-gold')).toHaveValue('1');
+    await expect(page.locator('#calc-silver')).toHaveValue('100');
+    // 1 oz at $4,180.80 and 100 oz at $60.24.
+    await expect(page.getByText('$10,204.80', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('barrels of oil').locator('..')).toContainText('146');
+    await expect(page.getByText('$164.00', { exact: true })).toBeVisible();
+    await expect(page.getByText('Live spot. Gold $4,181/oz, silver $60/oz.')).toBeVisible();
+    // The shared line names both metals, since its barrels count both.
+    const post = new URL((await page.getByRole('link', { name: 'Post on X' }).getAttribute('href'))!);
+    expect(post.searchParams.get('text')).toContain('My 1.00 oz gold and 100 oz silver stack buys 146 barrels of oil today.');
+  });
+
+  test('keeps what was typed in the address, so the link opens the same stack', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/calculator');
+    await expect(page.getByText('Enter an amount of gold or silver to start.')).toBeVisible();
+    await page.locator('#calc-silver').fill('50');
+    await expect(page).toHaveURL(/\/calculator\?silver=50$/);
+    await expect(page.getByText('$3,012.00', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('oz of gold, if swapped')).toBeVisible();
+  });
+
+  test('reads a mistyped link as the amount it values, and shows that amount', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/calculator?gold=2abc&silver=-5');
+    await expect(page.locator('#calc-gold')).toHaveValue('2');
+    await expect(page.locator('#calc-silver')).toHaveValue('');
+    await expect(page.getByText('$8,361.60', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('oz of silver, if swapped')).toBeVisible();
+  });
+
+  test('names the ounces it valued, fractions included', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/calculator?gold=10.5');
+    // 10.5 oz at $4,180.80.
+    await expect(page.getByText('10.5 oz gold is $43,898.40')).toBeVisible();
+    const post = new URL((await page.getByRole('link', { name: 'Post on X' }).getAttribute('href'))!);
+    expect(post.searchParams.get('text')).toContain('My 10.5 oz gold stack buys');
+    await page.locator('#calc-gold').fill('0.001');
+    await expect(page.getByText('0.001 oz gold is $4.18')).toBeVisible();
+  });
+
+  test("shows no value from a price that isn't live", async ({ page }) => {
+    await mockBackends(page, { missingPrices: ['silver'] });
+    await page.goto('/calculator?gold=1');
+    await expect(page.getByText("There's no live silver price right now, so values that need it are on hold.")).toBeVisible();
+    await expect(page.getByText('No price', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('The 1971 comparison')).toHaveCount(0);
+  });
 });

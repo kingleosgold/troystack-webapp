@@ -8,7 +8,7 @@ export default function Privacy() {
   return (
     <article className="mx-auto max-w-3xl px-4 sm:px-6 pt-6 sm:pt-10 text-[15px] leading-relaxed text-fg-2">
       <h1 className="text-[32px] sm:text-[40px] font-semibold tracking-tight text-fg">Privacy Policy</h1>
-      <p className="mt-2 text-[13px] text-fg-3"><strong className="text-fg">Effective: October 19, 2026</strong></p>
+      <p className="mt-2 text-[13px] text-fg-3"><strong className="text-fg">Effective: October 16, 2026</strong></p>
       <p className="mt-6">
         TroyStack is a precious metals portfolio tracking service operated by Mancini Tech Solutions LLC, available as an app for iPhone and Android and on the web at troystack.ai. This policy covers all three. We track what you tell us about your holdings, we use AI to help you understand markets and process receipts, and we use third-party services to deliver that experience. This document tells you what data we collect, who we share it with, and what your rights are. We've tried to write it in plain English.
       </p>
@@ -27,7 +27,6 @@ export default function Privacy() {
         <li>Receipt images you upload for scanning</li>
         <li>Notes and tags you add to holdings</li>
       </ul>
-      <p className="mt-3">Your holdings are stored encrypted. They run the app and Troy, and they're never sold or used for ads. Section 3 lists who receives what.</p>
       <h3 className="mt-6 text-[16px] font-semibold text-fg">Chat and voice data (when you use Troy, our AI assistant)</h3>
       <ul className="mt-2 list-disc space-y-1 pl-5">
         <li>Chat messages you send to Troy</li>
@@ -72,19 +71,19 @@ export default function Privacy() {
               ['Google Play', 'Purchase and subscription status for in-app purchases on Android', 'Payment processing on Android', 'Per Google\'s privacy policy and the Google Play terms'],
               ['Google (Sign in with Google)', 'Google account identifier and email', 'Optional alternative authentication', 'Per Google\'s privacy policy'],
               ['RevenueCat', 'Subscription tier, anonymous user identifier', 'Subscription management for iPhone and Android', 'Per RevenueCat\'s privacy policy'],
-              ['Stripe', 'Payment information for web subscriptions', 'Payment processing. Stripe is PCI-compliant and we never see card numbers', 'Per Stripe\'s privacy policy'],
-              ['Anthropic (Claude)', 'Public news content for Stack Signal articles and the daily market brief. Troy chat messages, with portfolio contents used as context, whenever Claude answers Troy', 'Editorial synthesis, and Troy chat', 'Per Anthropic\'s privacy policy and API data-usage terms (Anthropic states API submissions are not used for training by default)'],
-              ['Google (Gemini)', 'Troy chat messages, with portfolio contents used as context, whenever Gemini answers Troy. Daily brief generation, portfolio intelligence summaries, Stack Signal article scoring, receipt images for OCR', 'Most user-data-touching AI work, and Troy chat', 'Per Google\'s API terms and privacy policy'],
-              ['OpenAI (Whisper, DALL-E)', 'Voice recordings when you use voice input and OpenAI is the active speech-to-text provider. Image prompts for Stack Signal article art, which contain no user data', 'Speech-to-text transcription and article images', 'Per OpenAI\'s privacy policy and API data-usage terms'],
+              ['Stripe', 'Payment information for web subscriptions', 'Payment processing; Stripe is PCI-compliant and we never see card numbers', 'Per Stripe\'s privacy policy'],
+              [<>Anthropic (Claude <code>claude-sonnet-5-5</code>)</>, 'Public news content for Stack Signal articles and the daily market brief. Troy chat messages, with portfolio contents used as context, whenever Claude answers Troy', 'Editorial synthesis, and Troy chat', 'Per Anthropic\'s privacy policy and API data-usage terms (Anthropic states API submissions are not used for training by default)'],
+              [<>Google (Gemini <code>gemini-2.5-flash</code>)</>, 'Troy chat messages, with portfolio contents used as context, whenever Gemini answers Troy. Daily brief generation (initial and regenerate), portfolio intelligence summaries, Stack Signal article scoring, receipt images for OCR', 'Most user-data-touching AI work, and Troy chat', 'Per Google\'s API terms and privacy policy'],
+              ['OpenAI (Whisper, DALL-E 3)', 'Voice recordings when you use voice input and OpenAI is the active speech-to-text provider. Image prompts for Stack Signal article art, which contain no user data', 'Speech-to-text transcription and article images', 'Per OpenAI\'s privacy policy and API data-usage terms (OpenAI\'s default API retention is 30 days at the time of this writing)'],
               ['ElevenLabs', 'Text content of Troy\'s responses when voice output is enabled and ElevenLabs is the active voice provider', 'Text-to-speech synthesis', 'Per ElevenLabs\' privacy policy'],
-              ['xAI (Grok)', 'Voice recordings when you use voice input and xAI is the active speech-to-text provider. Text of Troy\'s responses when xAI is the active voice provider. Podcast scripts built from public market content', 'Speech-to-text and text-to-speech synthesis', 'Per xAI\'s privacy policy'],
+              ['xAI (Grok)', 'Voice recordings when you use voice input and xAI is the active speech-to-text provider. Text content of Troy\'s responses when voice output is enabled and xAI is the active voice provider. Podcast scripts built from public market content', 'Speech-to-text and text-to-speech synthesis', 'Per xAI\'s privacy policy'],
               ['Expo Push Service', 'Push notification routing', 'Transient delivery only, not retained for analysis', 'Per Expo\'s privacy policy'],
               ['Railway, Vercel', 'Application hosting infrastructure', 'Hosting and request handling', 'Per their respective privacy policies'],
-              ['Vercel Analytics', 'Anonymous page view statistics on our pages (not in the app itself)', 'Understand site traffic', 'Per Vercel\'s privacy policy'],
-            ].map((row) => (
-              <tr key={row[0]}>
-                {row.map((cell) => (
-                  <td key={cell} className="border-b border-line py-2 pr-3 align-top">{cell}</td>
+              ['Vercel Analytics', 'Anonymous page view statistics on our marketing pages (not in the app itself)', 'Understand site traffic', 'Per Vercel\'s privacy policy'],
+            ].map((row, r) => (
+              <tr key={r}>
+                {row.map((cell, i) => (
+                  <td key={i} className="border-b border-line py-2 pr-3 align-top">{cell}</td>
                 ))}
               </tr>
             ))}
@@ -105,7 +104,7 @@ export default function Privacy() {
       <ul className="mt-2 list-disc space-y-2 pl-5">
         <li><strong className="text-fg">Access your data:</strong> export available in app settings.</li>
         <li>
-          <strong className="text-fg">Delete your account:</strong> in the iPhone app's settings, or on the web at <Link to="/delete-account" className="font-semibold text-gold hover:text-gold-2">troystack.ai/delete-account</Link>. Deletion is immediate. It removes your holdings, Troy conversations, daily briefs, alerts, notification settings and push tokens, scan history, API keys, article likes and comments, your profile, and your sign-in from our primary systems, and any remaining copies within 30 days. Reports you filed on Troy's replies are kept for review with your account removed from them. Deleting your account doesn't cancel an App Store or Google Play subscription, which you manage in your Apple or Google account. If you pay on the web, cancel that plan first, since we won't delete an account whose web plan is set to renew. Some third-party providers may retain data according to their own policies (listed in Section 3).
+          <strong className="text-fg">Delete your account:</strong> in app settings on iPhone or Android, or on the web at <Link to="/delete-account" className="font-semibold text-gold hover:text-gold-2">troystack.ai/delete-account</Link>. Deletion is immediate. It removes your holdings, Troy conversations, daily briefs, alerts, notification settings and push tokens, scan history, API keys, article likes and comments, your profile, and your sign-in from our primary systems, and any remaining copies within 30 days. Reports you filed on Troy's replies are kept for review with your account removed from them. Deleting your account doesn't cancel an App Store or Google Play subscription, which you manage in your store account. If you pay on the web, cancel that plan first, since we won't delete an account whose web plan is set to renew. Some third-party providers may retain data according to their own policies (listed in Section 3).
         </li>
         <li><strong className="text-fg">Update your information:</strong> editable in app settings.</li>
         <li><strong className="text-fg">Contact us:</strong> <a href={`mailto:${SUPPORT_EMAIL}`} className="font-semibold text-gold hover:text-gold-2">{SUPPORT_EMAIL}</a></li>

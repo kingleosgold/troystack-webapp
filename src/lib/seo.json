@@ -47,6 +47,10 @@
     "title": "Gold to silver ratio today, with history",
     "description": "How many ounces of silver one ounce of gold buys at live spot, with the ratio charted over one year, five years and back to 1915."
   },
+  "/calculator": {
+    "title": "What does your gold and silver actually buy?",
+    "description": "Enter your gold and silver and see what it buys at live spot in barrels of oil, months of rent and hours of labor, and how that compares to 1971."
+  },
   "/coins": {
     "title": "Coin and bar melt values at live spot",
     "description": "Melt value for Silver Eagles, Maple Leafs, Krugerrands, Morgan dollars, junk silver, old US gold and common bars, with each one's weight and purity."
