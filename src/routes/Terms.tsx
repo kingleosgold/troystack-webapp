@@ -8,7 +8,7 @@ export default function Terms() {
   return (
     <article className="mx-auto max-w-3xl px-4 sm:px-6 pt-6 sm:pt-10 text-[15px] leading-relaxed text-fg-2">
       <h1 className="text-[32px] sm:text-[40px] font-semibold tracking-tight text-fg">Terms of Service</h1>
-      <p className="mt-2 text-[13px] text-fg-3"><strong className="text-fg">Effective: October 19, 2026</strong></p>
+      <p className="mt-2 text-[13px] text-fg-3"><strong className="text-fg">Effective: October 15, 2026</strong></p>
 
       <h2 id="introduction" className="mt-10 text-[20px] font-semibold text-fg">1. Introduction</h2>
       <p className="mt-2">These terms govern your use of TroyStack, operated by Mancini Tech Solutions LLC ("we," "us"). By using TroyStack, you agree to these terms.</p>
