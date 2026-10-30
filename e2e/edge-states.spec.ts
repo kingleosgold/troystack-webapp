@@ -629,3 +629,24 @@ test.describe('signing out', () => {
     expect((await keysFor(page))[0]).toBe(true);
   });
 });
+
+test("a visitor's stack page opens the sign-up form and comes back to the stack, where the browser's holdings are offered to move in", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'stacktracker_holdings',
+      JSON.stringify([{ id: 'g1', metal: 'gold', type: 'Gold Buffalo', weight: 1, weightUnit: 'oz', quantity: 1, purchasePrice: 4100, purchaseDate: '2026-10-01', createdAt: '2026-10-01T12:00:00Z', updatedAt: '2026-10-01T12:00:00Z' }]),
+    );
+  });
+  // The account already has holdings, so the browser's aren't moved in on their own.
+  await mockBackends(page, { holdings: SAMPLE_HOLDINGS });
+  await page.goto('/stack');
+  await expect(page.getByText('Saved in this browser only.', { exact: false })).toBeVisible();
+  await page.getByRole('link', { name: 'Make a free account' }).click();
+  await expect(page).toHaveURL(/\/auth\?mode=signup&next=\/stack$/);
+  await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
+  await page.locator('#auth-email').fill('stacker@example.com');
+  await page.locator('#auth-password').fill('correct-horse');
+  await page.locator('form button[type=submit]').click();
+  await expect(page).toHaveURL(/\/stack$/);
+  await expect(page.getByText('This browser still has 1 holding you added before signing in.')).toBeVisible();
+});

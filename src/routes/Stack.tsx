@@ -368,8 +368,11 @@ export default function Stack() {
 
       {isGuest && isConfigured && (
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-line bg-gold-soft px-4 py-3">
-          <p className="text-[14px] text-fg">Saved in this browser only. Sign in and it moves to your account, where the TroyStack app sees it too.</p>
-          <Link to="/auth" className="shrink-0 inline-flex h-9 items-center justify-center rounded-lg bg-btn px-4 text-[13px] font-semibold text-btn-fg hover:bg-btn-hover">Sign in or sign up</Link>
+          <p className="text-[14px] text-fg">Saved in this browser only. Make a free account and it moves there, where the TroyStack app sees it too.</p>
+          {/* A guest here is usually new, so the sign-up form opens first, and
+              they come back to this page, where a stack the account doesn't
+              take on its own is offered to move in. */}
+          <Link to="/auth?mode=signup&next=/stack" className="shrink-0 inline-flex h-9 items-center justify-center rounded-lg bg-btn px-4 text-[13px] font-semibold text-btn-fg hover:bg-btn-hover">Make a free account</Link>
         </div>
       )}
       {!isGuest && leftInBrowser.length > 0 && (
