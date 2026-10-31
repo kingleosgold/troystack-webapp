@@ -1,5 +1,5 @@
 import { devices, expect, test } from '@playwright/test';
-import { mockBackends, signIn } from './mock';
+import { mockBackends, signIn, signInExpired } from './mock';
 
 // The Gold page lists every plan at the checkout's own price, and a plan
 // picked there is the one checkout opens with.
@@ -279,8 +279,28 @@ test.describe('on an Android phone', () => {
   test('a free account sees Try Gold free once its plan loads', async ({ page }) => {
     await signIn(page);
     await mockBackends(page);
-    await page.goto('/prices');
+    await page.goto('/settings');
+    await expect(page.locator('main').getByText('Free', { exact: true }).first()).toBeVisible();
     await expect(page.locator('div.sticky').first().getByRole('link', { name: 'Try Gold free' })).toBeVisible();
+  });
+
+  test("a Gold account never sees Try Gold free while its session restores", async ({ page }) => {
+    await signInExpired(page);
+    await mockBackends(page, { tier: 'gold' });
+    // The refresh is slow, so the page sits a while with no session yet.
+    await page.route('**/auth/v1/token**', async (route) => {
+      await new Promise((r) => setTimeout(r, 1500));
+      await route.fallback();
+    });
+    await page.addInitScript(() => {
+      new MutationObserver(() => {
+        if (document.querySelector('div.sticky a[href="/gold"]')) (window as unknown as { sawTry?: boolean }).sawTry = true;
+      }).observe(document, { childList: true, subtree: true, characterData: true });
+    });
+    await page.goto('/settings');
+    await expect(page.locator('main').getByText('Gold', { exact: true }).first()).toBeVisible();
+    await expect(page.locator('div.sticky').first().getByRole('link', { name: 'Get the app' })).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { sawTry?: boolean }).sawTry ?? false)).toBe(false);
   });
 });
 

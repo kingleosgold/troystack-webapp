@@ -292,10 +292,12 @@ function DesktopTopBar() {
 }
 
 function MobileTopBar({ onMenu }: { onMenu: () => void }) {
+  const { loading: authLoading } = useAuth();
   const { isGold, loading: planLoading } = useSubscription();
   // The App Store only opens on an iPhone or iPad, so any other phone gets the
-  // web free week on /gold, once the plan is known to be Free.
-  const webGold = !isAppleMobile() && !isGold && !planLoading && (webCheckoutReady('monthly') || webCheckoutReady('yearly'));
+  // web free week on /gold, once the plan is known to be Free. A session that
+  // hasn't restored yet reads as a guest, so that waits too.
+  const webGold = !isAppleMobile() && !authLoading && !isGold && !planLoading && (webCheckoutReady('monthly') || webCheckoutReady('yearly'));
   return (
     <div className="lg:hidden sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur">
       <div className="flex h-14 items-center justify-between px-4">
