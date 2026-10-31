@@ -65,7 +65,7 @@ function ReadOnCard() {
       <h2 className="text-[17px] font-semibold text-fg">Troy writes these all day</h2>
       <p className="mt-1.5 text-[14px] text-fg-2">
         {webGold
-          ? 'Gold adds a morning brief he writes around your stack and 30 questions a day with him. The first week is free.'
+          ? "Gold adds a morning brief he writes around your stack and 30 questions a day with him. The first week is free if you're new to Gold."
           : 'In the app he knows your stack, so his read on the news comes with what it means for what you hold.'}
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">

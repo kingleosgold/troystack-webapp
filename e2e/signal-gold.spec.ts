@@ -37,18 +37,40 @@ test('a guest on a computer sees the free week under a piece', async ({ page }, 
   await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
 });
 
-for (const tier of ['gold', 'lifetime'] as const) {
-  test(`an account with ${tier} isn't offered Gold under a piece`, async ({ page }) => {
-    await signIn(page);
-    await mockBackends(page, { tier });
-    // The plan has loaded once Settings names it, then the piece opens in the same tab.
-    await page.goto('/settings');
-    await expect(page.locator('main').getByText(tier === 'lifetime' ? 'Lifetime' : 'Gold', { exact: true }).first()).toBeVisible();
-    await page.goto(PIECE);
-    await expect(card(page).getByRole('link', { name: 'Get TroyStack for iPhone' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toHaveCount(0);
+/** Notes whether the free week button ever showed in the article, from the first paint on. */
+async function watchForTry(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    new MutationObserver(() => {
+      const hit = Array.from(document.querySelectorAll('article button')).some((b) => b.textContent?.includes('Try Gold free for a week'));
+      if (hit) (window as unknown as { sawTry?: boolean }).sawTry = true;
+    }).observe(document, { childList: true, subtree: true, characterData: true });
   });
 }
+
+for (const tier of ['gold', 'lifetime'] as const) {
+  test(`an account with ${tier} isn't offered Gold under a piece`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'the iPhone never sees the free week here');
+    await signIn(page);
+    await mockBackends(page, { tier });
+    await watchForTry(page);
+    const plan = page.waitForResponse((r) => r.url().includes('/rest/v1/profiles'));
+    await page.goto(PIECE);
+    await plan;
+    // The plan has landed. Give the card a moment to settle, then it must still hold back.
+    await page.waitForTimeout(500);
+    await expect(card(page).getByRole('link', { name: 'Get TroyStack for iPhone' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { sawTry?: boolean }).sawTry ?? false)).toBe(false);
+  });
+}
+
+test('a free account on a computer sees the free week once its plan lands', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store button');
+  await signIn(page);
+  await mockBackends(page);
+  await page.goto(PIECE);
+  await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
+});
 
 test('an iPhone keeps the App Store button under a piece', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'iphone', 'only the iPhone project is an iPhone');
@@ -62,6 +84,11 @@ test.describe('on an Android phone', () => {
   const { defaultBrowserType: _browser, ...pixel } = devices['Pixel 7'];
   void _browser;
   test.use(pixel);
+
+  // eslint-disable-next-line no-empty-pattern -- Playwright reads the fixtures from this pattern
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'one run is enough, the device settings are the same in both');
+  });
 
   test("a reader gets the free week and no App Store button, since it can't open", async ({ page }) => {
     await mockBackends(page);
@@ -77,12 +104,7 @@ test.describe('on an Android phone', () => {
       await new Promise((r) => setTimeout(r, 1500));
       await route.fallback();
     });
-    await page.addInitScript(() => {
-      new MutationObserver(() => {
-        const hit = Array.from(document.querySelectorAll('article button')).some((b) => b.textContent?.includes('Try Gold free for a week'));
-        if (hit) (window as unknown as { sawTry?: boolean }).sawTry = true;
-      }).observe(document, { childList: true, subtree: true, characterData: true });
-    });
+    await watchForTry(page);
     await page.goto(PIECE);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     // Wait past the slow refresh, then check the free week never showed.
