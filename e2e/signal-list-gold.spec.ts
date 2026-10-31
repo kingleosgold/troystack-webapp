@@ -114,3 +114,26 @@ test.describe('on an Android phone', () => {
     await expect(page.getByRole('heading', { name: 'Hear it instead' })).toBeVisible();
   });
 });
+
+test("a free account on a computer never sees the phone card first while its plan loads", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store card');
+  await signIn(page);
+  await mockBackends(page);
+  // The plan is slow, so the card sits a while not knowing what to offer.
+  await page.route('**/rest/v1/profiles**', async (route) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    await route.fallback();
+  });
+  await page.addInitScript(() => {
+    new MutationObserver(() => {
+      const hit = Array.from(document.querySelectorAll('aside h2')).some((h) => h.textContent?.includes('Get it on your phone'));
+      if (hit) (window as unknown as { sawPhone?: boolean }).sawPhone = true;
+    }).observe(document, { childList: true, subtree: true, characterData: true });
+  });
+  await page.goto('/signal');
+  // The card holds its place while the plan loads.
+  await expect(page.getByTestId('read-on-pending')).toBeVisible();
+  await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
+  await expect(page.getByTestId('read-on-pending')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { sawPhone?: boolean }).sawPhone ?? false)).toBe(false);
+});

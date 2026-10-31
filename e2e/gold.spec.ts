@@ -284,6 +284,28 @@ test.describe('on an Android phone', () => {
     await expect(page.locator('div.sticky').first().getByRole('link', { name: 'Try Gold free' })).toBeVisible();
   });
 
+  test('a free account never sees Get the app first while its plan loads', async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page);
+    await page.route('**/rest/v1/profiles**', async (route) => {
+      await new Promise((r) => setTimeout(r, 1500));
+      await route.fallback();
+    });
+    await page.addInitScript(() => {
+      new MutationObserver(() => {
+        const bar = document.querySelector('div.sticky');
+        const hit = Array.from(bar?.querySelectorAll('a') ?? []).some((a) => a.textContent?.includes('Get the app'));
+        if (hit) (window as unknown as { sawApp?: boolean }).sawApp = true;
+      }).observe(document, { childList: true, subtree: true, characterData: true });
+    });
+    await page.goto('/prices');
+    const bar = page.locator('div.sticky').first();
+    await expect(bar.getByTestId('nav-gold-pending')).toBeAttached();
+    await expect(bar.getByRole('link', { name: 'Try Gold free' })).toBeVisible();
+    await expect(bar.getByTestId('nav-gold-pending')).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { sawApp?: boolean }).sawApp ?? false)).toBe(false);
+  });
+
   test("a Gold account never sees Try Gold free while its session restores", async ({ page }) => {
     await signInExpired(page);
     await mockBackends(page, { tier: 'gold' });

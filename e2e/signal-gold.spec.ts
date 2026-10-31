@@ -112,3 +112,23 @@ test.describe('on an Android phone', () => {
     expect(await page.evaluate(() => (window as unknown as { sawTry?: boolean }).sawTry ?? false)).toBe(false);
   });
 });
+
+test("a free account on a computer never sees the app's pitch first while its plan loads", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store button');
+  await signIn(page);
+  await mockBackends(page);
+  await page.route('**/rest/v1/profiles**', async (route) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    await route.fallback();
+  });
+  await page.addInitScript(() => {
+    new MutationObserver(() => {
+      const hit = Array.from(document.querySelectorAll('article p')).some((p) => p.textContent?.includes('In the app he knows your stack'));
+      if (hit) (window as unknown as { sawPhone?: boolean }).sawPhone = true;
+    }).observe(document, { childList: true, subtree: true, characterData: true });
+  });
+  await page.goto(PIECE);
+  await expect(page.getByTestId('read-on-pending')).toBeVisible();
+  await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { sawPhone?: boolean }).sawPhone ?? false)).toBe(false);
+});

@@ -45,7 +45,19 @@ function ShareButton({ title, slug }: { title: string; slug: string }) {
 /** The card under each piece. useWebGoldOffer decides what it offers. */
 function ReadOnCard() {
   const { openTrial } = useTrial();
-  const { webGold, showAppStore } = useWebGoldOffer();
+  const { webGold, showAppStore, pending } = useWebGoldOffer();
+  if (pending) {
+    return (
+      <div aria-hidden="true" data-testid="read-on-pending">
+        <Card className="mt-8 p-5 sm:p-6">
+          <Skeleton className="h-6 w-1/2" />
+          <Skeleton className="mt-2.5 h-4 w-full" />
+          <Skeleton className="mt-1.5 h-4 w-2/3" />
+          <Skeleton className="mt-4 h-10 w-48" />
+        </Card>
+      </div>
+    );
+  }
   if (!webGold && !showAppStore) return null;
   return (
     <Card className="mt-8 p-5 sm:p-6">
