@@ -12,6 +12,7 @@ import { money, signedMoney, signedPercent } from '../lib/format';
 import { formatDate, formatLocalDate, formatShortDate, formatTimeET, greeting, leadParagraphs, minutesLabel, whenET } from '../lib/text';
 import { Markdown } from '../lib/markdown';
 import { GOLD, PODCAST_APPLE_URL } from '../lib/appStore';
+import { webCheckoutReady } from '../lib/checkout';
 import { cx } from '../lib/cx';
 import { MetalTile } from '../ui/Market';
 import { ArticleCard, ArticleRowSkeleton } from '../ui/Signal';
@@ -297,6 +298,8 @@ const TOOLS = [
 
 function GetAppSection() {
   const { isGold, loading: planLoading } = useSubscription();
+  // Only monthly and yearly carry the free week, so Lifetime alone doesn't count.
+  const webWeek = webCheckoutReady('monthly') || webCheckoutReady('yearly');
   const features = [
     { icon: <Bell size={17} />, text: 'Price alerts in the iPhone app, on the free plan' },
     { icon: <Camera size={17} />, text: 'Five receipt scans every 30 days, unlimited on Gold' },
@@ -319,10 +322,18 @@ function GetAppSection() {
             ))}
           </ul>
           {/* A plan that hasn't loaded may be Gold, so the free week waits for it. */}
+          {/* The web's own free week sits on the Gold page, the only way in for anyone without an iPhone. */}
           {!isGold && !planLoading && (
-            <p className="mt-5 text-[13px] text-fg-3">
-              Gold starts with a free week, then {GOLD.monthly} a month or {GOLD.yearly} a year.
-            </p>
+            <div className="mt-5">
+              <p className="text-[13px] text-fg-3">
+                Gold starts with a free week, then {GOLD.monthly} a month or {GOLD.yearly} a year.
+              </p>
+              {webWeek && (
+                <LinkButton to="/gold" variant="secondary" size="sm" className="mt-3">
+                  Start the free week on the web
+                </LinkButton>
+              )}
+            </div>
           )}
         </div>
         <div className="flex items-center justify-center bg-surface-2 p-6 sm:p-8 border-t lg:border-t-0 lg:border-l border-line">
