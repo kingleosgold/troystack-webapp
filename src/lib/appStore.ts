@@ -17,6 +17,7 @@ export type Campaign =
   | 'webapp-troy-limit'
   | 'webapp-troy-history'
   | 'webapp-signal'
+  | 'webapp-signal-list'
   | 'webapp-podcast'
   | 'webapp-prices'
   | 'webapp-alerts'
