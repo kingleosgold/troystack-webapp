@@ -145,3 +145,17 @@ test("a troystack.com link straight to checkout backs out to the plans and count
   await page.goto(checkouts[0].cancel_url as string);
   await expect.poll(() => steps.filter((x) => x.step === 'gold_view')).toEqual([{ step: 'gold_view', campaign: 'site-pricing' }]);
 });
+
+test("a troystack.com visitor sent to sign-up from the plans keeps the link's token on the way back", async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/gold?campaign=site-pricing');
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=lifetime&from=sheet&next=%2Fgold%3Fcampaign%3Dsite-pricing$/);
+});
+
+test('a plain Gold page visit sends sign-up back to the bare plans', async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/gold?back=1&x=1');
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=lifetime&from=sheet&next=%2Fgold$/);
+});

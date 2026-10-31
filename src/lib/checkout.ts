@@ -64,6 +64,17 @@ export function siteCampaign(value: string | null | undefined): CheckoutCampaign
   return typeof value === 'string' && /^site-[a-z0-9-]{1,32}$/.test(value) ? (value as CheckoutCampaign) : undefined;
 }
 
+/**
+ * Where the plan sheet sends someone back to after sign-in. It's the page
+ * they were on, keeping a troystack.com site-* token from its address so the
+ * Gold page counts the return under the link that sent them. Nothing else in
+ * the address rides along, so a back=1 or any other value isn't replayed.
+ */
+export function sheetReturnPath(pathname: string, search: string): string {
+  const campaign = siteCampaign(new URLSearchParams(search).get('campaign'));
+  return campaign ? `${pathname}?campaign=${campaign}` : pathname;
+}
+
 interface StoredIntent {
   plan: WebPlan;
   at: number;
