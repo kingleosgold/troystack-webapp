@@ -216,3 +216,34 @@ test('a token that is not a troystack.com page counts as the Gold page', async (
   await expect.poll(() => steps.length).toBe(1);
   expect(steps[0]).toEqual({ step: 'gold_view', campaign: 'webapp-gold' });
 });
+
+test("home's Gold block opens the web free week as well as the App Store", async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/');
+  const link = page.getByRole('link', { name: 'Start the free week on the web' });
+  await expect(link).toBeVisible();
+  await link.click();
+  await expect(page).toHaveURL(/\/gold$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Troy, all day, around your stack');
+  await expect(page.getByLabel('Plans').getByRole('button', { name: 'Start free week' }).first()).toBeVisible();
+});
+
+for (const tier of ['gold', 'lifetime'] as const) {
+  test(`home doesn't offer the free week to an account with ${tier}`, async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier });
+    await page.goto('/');
+    // The account row names the plan only once it has loaded, which is when the block would show the link.
+    await expect(page.locator('a[href="/settings"][title*="@"]').getByText(tier === 'lifetime' ? 'Lifetime' : 'Gold', { exact: true })).toBeAttached();
+    await expect(page.getByText('Your stack and Troy, in your pocket')).toBeVisible();
+    await expect(page.getByText(/Gold starts with a free week/)).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Start the free week on the web' })).toHaveCount(0);
+  });
+}
+
+test('a free account sees the web free week on home once its plan loads', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page);
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Start the free week on the web' })).toBeVisible();
+});
