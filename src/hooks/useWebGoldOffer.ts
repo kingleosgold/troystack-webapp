@@ -23,7 +23,7 @@ export type WebGoldOffer = {
  * session still restoring reads as a guest. Android gets no App Store button.
  */
 export function useWebGoldOffer(): WebGoldOffer {
-  const { loading: authLoading } = useAuth();
+  const { loading: authLoading, sessionUnreadable } = useAuth();
   const { isGold, loading: planLoading, unreadable } = useSubscription();
   const apple = isAppleMobile();
   // Only monthly and yearly carry the free week, so Lifetime alone doesn't count.
@@ -32,7 +32,8 @@ export function useWebGoldOffer(): WebGoldOffer {
   const webGold = offerable && known;
   // A plan that can't be read isn't offered the free week, since it may be
   // Gold, and the card falls back to the App Store rather than wait on retries.
-  const pending = offerable && !known && !unreadable;
+  // So does a stored session that can't be read, since it may be Gold too.
+  const pending = offerable && !known && !unreadable && !sessionUnreadable;
   const showAppStore = apple || !isAndroid();
   return { webGold, showAppStore, pending };
 }

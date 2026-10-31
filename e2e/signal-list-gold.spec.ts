@@ -148,11 +148,11 @@ test("an account whose plan can't be read gets the phone card, not a card that w
   await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toHaveCount(0);
 });
 
-test("a guest whose session can't be read still gets the free week, not a card that waits forever", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store card');
-  await mockBackends(page);
-  // Every request for supabase-js's lock fails, as when another tab holds it
-  // past the timeout, so reading the session at startup rejects.
+/**
+ * Every request for supabase-js's lock fails, as when another tab holds it
+ * past the timeout, so reading the session at startup rejects.
+ */
+async function failSessionLock(page: import('@playwright/test').Page) {
   await page.addInitScript(() => {
     const locks = navigator.locks;
     const request = locks.request.bind(locks) as (...args: unknown[]) => Promise<unknown>;
@@ -161,6 +161,12 @@ test("a guest whose session can't be read still gets the free week, not a card t
         ? Promise.reject(new Error('Acquiring an exclusive Navigator LockManager lock timed out'))
         : request(name, ...rest);
   });
+}
+
+test("a guest whose session can't be read still gets the free week, not a card that waits forever", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store card');
+  await mockBackends(page);
+  await failSessionLock(page);
   await page.goto('/signal');
   await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
   await expect(page.getByTestId('read-on-pending')).toHaveCount(0);
@@ -200,4 +206,17 @@ test("an account signing back in after its plan couldn't be read waits on the pl
   release();
   await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { sawPhone?: boolean }).sawPhone ?? false)).toBe(false);
+});
+
+test("a stored session that can't be read gets the phone card, never the free week, since it may be Gold", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store card');
+  await signIn(page);
+  await mockBackends(page, { tier: 'gold' });
+  await failSessionLock(page);
+  await watchForTry(page);
+  await page.goto('/signal');
+  await expect(page.getByRole('heading', { name: 'Get it on your phone' })).toBeVisible();
+  await expect(page.getByTestId('read-on-pending')).toHaveCount(0);
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => (window as unknown as { sawTry?: boolean }).sawTry ?? false)).toBe(false);
 });
