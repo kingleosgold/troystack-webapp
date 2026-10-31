@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { excerpt, plainDashes } from './text';
 import { normalizeArticle, usableOneLiner } from './signalApi';
 import { parsePodcastFeed } from './podcastApi';
-import { rememberCheckout, rememberNextPath, safeNextPath, siteCampaign, takeCheckoutIntent, takeNextPath } from './checkout';
+import { rememberCheckout, rememberNextPath, safeNextPath, sheetReturnPath, siteCampaign, takeCheckoutIntent, takeNextPath } from './checkout';
 import { appStoreUrl } from './appStore';
 
 describe('copy clean-up', () => {
@@ -141,6 +141,18 @@ describe('sign-in hand-offs', () => {
     rememberNextPath('/stack?import=1');
     expect(takeNextPath()).toBe('/stack?import=1');
     expect(takeNextPath()).toBeNull();
+  });
+
+  it("sends the plan sheet's sign-in back to the page with only its troystack.com token", () => {
+    expect(sheetReturnPath('/gold', '?campaign=site-pricing')).toBe('/gold?campaign=site-pricing&back=1');
+    expect(sheetReturnPath('/gold', '?campaign=site-pricing&back=1')).toBe('/gold?campaign=site-pricing&back=1');
+    expect(sheetReturnPath('/gold', '?back=1&campaign=site-signal&x=1')).toBe('/gold?campaign=site-signal&back=1');
+    expect(sheetReturnPath('/gold', '?campaign=webapp-trial&x=1')).toBe('/gold?back=1');
+    expect(sheetReturnPath('/gold', '?campaign=site-%2F%2Fevil')).toBe('/gold?back=1');
+    expect(sheetReturnPath('/troy', '?campaign=site-x&q=hi')).toBe('/troy?campaign=site-x');
+    expect(sheetReturnPath('/troy', '')).toBe('/troy');
+    expect(sheetReturnPath('/signal/a-piece', '?x=1')).toBe('/signal/a-piece');
+    expect(safeNextPath(sheetReturnPath('/gold', '?campaign=site-pricing'))).toBe('/gold?campaign=site-pricing&back=1');
   });
 });
 

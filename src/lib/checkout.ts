@@ -64,6 +64,22 @@ export function siteCampaign(value: string | null | undefined): CheckoutCampaign
   return typeof value === 'string' && /^site-[a-z0-9-]{1,32}$/.test(value) ? (value as CheckoutCampaign) : undefined;
 }
 
+/**
+ * Where the plan sheet sends someone back to after sign-in. It's the page
+ * they were on, keeping a troystack.com site-* token from its address so the
+ * Gold page counts the return under the link that sent them. Back on the Gold
+ * page it also says back=1, so a tab that already counted its view and tap
+ * there doesn't count them again. Nothing else in the address rides along.
+ */
+export function sheetReturnPath(pathname: string, search: string): string {
+  const params = new URLSearchParams();
+  const campaign = siteCampaign(new URLSearchParams(search).get('campaign'));
+  if (campaign) params.set('campaign', campaign);
+  if (pathname === '/gold') params.set('back', '1');
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
 interface StoredIntent {
   plan: WebPlan;
   at: number;

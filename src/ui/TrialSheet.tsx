@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { Button, Sheet } from './primitives';
 import { InstallPath } from './AppStore';
 import { GOLD, isAndroid, isAppleMobile } from '../lib/appStore';
-import { CHECKOUT_WAIT, checkoutBlock, forgetCheckout, openBillingPortal, openCheckout, rememberCheckout, webCheckoutReady, webPlans, type CheckoutCampaign, type WebPlan } from '../lib/checkout';
+import { CHECKOUT_WAIT, checkoutBlock, forgetCheckout, openBillingPortal, openCheckout, rememberCheckout, sheetReturnPath, webCheckoutReady, webPlans, type CheckoutCampaign, type WebPlan } from '../lib/checkout';
 import { cx } from '../lib/cx';
 import { GOLD_FEATURES } from '../lib/gold';
 import { stillSignedInAs } from '../lib/account';
@@ -85,7 +85,7 @@ function WebCheckout({
     if (!user) {
       rememberCheckout(plan, campaign);
       onClose();
-      navigate(`/auth?redirect=checkout&plan=${plan}&from=sheet&next=${encodeURIComponent(location.pathname)}`);
+      navigate(`/auth?redirect=checkout&plan=${plan}&from=sheet&next=${encodeURIComponent(sheetReturnPath(location.pathname, location.search))}`);
       return;
     }
     setBusy(true);
@@ -319,7 +319,7 @@ export function TrialSheet({ open, onClose, reason, campaign, plan, start = fals
               Already have Gold?{' '}
               {/* They're signing in to the Gold they have, so a plan picked earlier isn't bought on the way back. */}
               <Link
-                to={`/auth?mode=signin&next=${encodeURIComponent(location.pathname)}`}
+                to={`/auth?mode=signin&next=${encodeURIComponent(sheetReturnPath(location.pathname, location.search))}`}
                 onClick={() => {
                   forgetCheckout();
                   close();
