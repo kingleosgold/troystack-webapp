@@ -306,6 +306,16 @@ test.describe('on an Android phone', () => {
     expect(await page.evaluate(() => (window as unknown as { sawApp?: boolean }).sawApp ?? false)).toBe(false);
   });
 
+  test("an account whose plan can't be read gets Get the app, not an empty slot", async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { failProfileRead: true });
+    await page.goto('/prices');
+    const bar = page.locator('div.sticky').first();
+    await expect(bar.getByRole('link', { name: 'Get the app' })).toBeVisible();
+    await expect(bar.getByTestId('nav-gold-pending')).toHaveCount(0);
+    await expect(bar.getByRole('link', { name: 'Try Gold free' })).toHaveCount(0);
+  });
+
   test("a Gold account never sees Try Gold free while its session restores", async ({ page }) => {
     await signInExpired(page);
     await mockBackends(page, { tier: 'gold' });

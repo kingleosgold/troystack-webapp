@@ -130,5 +130,6 @@ test("a free account on a computer never sees the app's pitch first while its pl
   await page.goto(PIECE);
   await expect(page.getByTestId('read-on-pending')).toBeVisible();
   await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
+  await expect(page.getByTestId('read-on-pending')).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { sawPhone?: boolean }).sawPhone ?? false)).toBe(false);
 });

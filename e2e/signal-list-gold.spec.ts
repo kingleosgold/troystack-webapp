@@ -137,3 +137,13 @@ test("a free account on a computer never sees the phone card first while its pla
   await expect(page.getByTestId('read-on-pending')).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { sawPhone?: boolean }).sawPhone ?? false)).toBe(false);
 });
+
+test("an account whose plan can't be read gets the phone card, not a card that waits on retries", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store card');
+  await signIn(page);
+  await mockBackends(page, { failProfileRead: true });
+  await page.goto('/signal');
+  await expect(page.getByRole('heading', { name: 'Get it on your phone' })).toBeVisible();
+  await expect(page.getByTestId('read-on-pending')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toHaveCount(0);
+});
