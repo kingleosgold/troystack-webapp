@@ -11,7 +11,12 @@ import { Markdown } from '../lib/markdown';
 import { ArticleCard } from '../ui/Signal';
 import { EpisodePlayer } from '../ui/Podcast';
 import { AppStoreButton } from '../ui/AppStore';
-import { Card, EmptyState, ErrorNote, Img, LinkButton, Skeleton } from '../ui/primitives';
+import { Button, Card, EmptyState, ErrorNote, Img, LinkButton, Skeleton } from '../ui/primitives';
+import { useAuth } from '../contexts/AuthContext';
+import { useTrial } from '../contexts/TrialContext';
+import { useSubscription } from '../hooks/useSubscription';
+import { isAndroid, isAppleMobile } from '../lib/appStore';
+import { webCheckoutReady } from '../lib/checkout';
 
 function ShareButton({ title, slug }: { title: string; slug: string }) {
   const [copied, setCopied] = useState(false);
@@ -37,6 +42,43 @@ function ShareButton({ title, slug }: { title: string; slug: string }) {
       {copied ? <Check size={14} aria-hidden="true" /> : <Share2 size={14} aria-hidden="true" />}
       {copied ? 'Link copied' : 'Share'}
     </button>
+  );
+}
+
+/**
+ * The card under each piece. The App Store only opens on an iPhone or iPad, so
+ * anyone else without Gold gets the web free week, once the session and the
+ * plan are known, since a session still restoring reads as a guest. Android
+ * gets no App Store button at all.
+ */
+function ReadOnCard() {
+  const { loading: authLoading } = useAuth();
+  const { isGold, loading: planLoading } = useSubscription();
+  const { openTrial } = useTrial();
+  const apple = isAppleMobile();
+  // Only monthly and yearly carry the free week, so Lifetime alone doesn't count.
+  const webGold = !apple && !authLoading && !planLoading && !isGold && (webCheckoutReady('monthly') || webCheckoutReady('yearly'));
+  const showAppStore = apple || !isAndroid();
+  if (!webGold && !showAppStore) return null;
+  return (
+    <Card className="mt-8 p-5 sm:p-6">
+      <h2 className="text-[17px] font-semibold text-fg">Troy writes these all day</h2>
+      <p className="mt-1.5 text-[14px] text-fg-2">
+        {webGold
+          ? 'Gold adds a morning brief he writes around your stack and 30 questions a day with him. The first week is free.'
+          : 'In the app he knows your stack, so his read on the news comes with what it means for what you hold.'}
+      </p>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        {webGold && (
+          <Button onClick={() => openTrial({ reason: 'Gold adds a morning brief from Troy written around your stack.', campaign: 'webapp-signal' })}>
+            Try Gold free for a week
+          </Button>
+        )}
+        {showAppStore && (
+          <AppStoreButton campaign="webapp-signal" label="Get TroyStack for iPhone" variant={webGold ? 'dark' : 'primary'} size={webGold ? 'sm' : 'md'} />
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -133,13 +175,7 @@ export default function Article() {
             </section>
           )}
 
-          <Card className="mt-8 p-5 sm:p-6">
-            <h2 className="text-[17px] font-semibold text-fg">Troy writes these all day</h2>
-            <p className="mt-1.5 text-[14px] text-fg-2">In the app he knows your stack, so his read on the news comes with what it means for what you hold.</p>
-            <div className="mt-4">
-              <AppStoreButton campaign="webapp-signal" label="Get TroyStack for iPhone" />
-            </div>
-          </Card>
+          <ReadOnCard />
         </article>
       )}
 
