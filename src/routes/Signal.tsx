@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useLatestDigest, useSignalFeed } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { useWebGoldOffer } from '../hooks/useWebGoldOffer';
+import { useTrial } from '../contexts/TrialContext';
 import SEO from '../lib/seo.json';
 import { SIGNAL_CATEGORIES } from '../lib/signalApi';
 import { excerpt, formatDate, formatTimeET } from '../lib/text';
@@ -33,6 +35,36 @@ function DigestFeature() {
         Read Troy's full take <ArrowRight size={14} aria-hidden="true" />
       </span>
     </Link>
+  );
+}
+
+/**
+ * The side card on the Signal list. An iPhone keeps the App Store. Anyone else
+ * without Gold gets the web free week, and a computer keeps the App Store as a
+ * second, smaller door. Android without the free week gets no card, since the
+ * App Store can't open there.
+ */
+function ReadOnCard() {
+  const { openTrial } = useTrial();
+  const { webGold, showAppStore } = useWebGoldOffer();
+  if (!webGold && !showAppStore) return null;
+  return (
+    <Card className="p-5">
+      <h2 className="text-[15px] font-semibold text-fg">{webGold ? "Troy's read on your own stack" : 'Get it on your phone'}</h2>
+      <p className="mt-1.5 text-[14px] text-fg-2">
+        {webGold
+          ? "Gold adds a brief he writes around your stack each morning and 30 questions a day with him. The first week is free if you're new to Gold."
+          : "The app can send you a push when Troy flags big news. It's capped, so it won't nag."}
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        {webGold && (
+          <Button size="sm" onClick={() => openTrial({ reason: 'Gold adds a morning brief from Troy written around your stack.', campaign: 'webapp-signal' })}>
+            Try Gold free for a week
+          </Button>
+        )}
+        {showAppStore && <AppStoreButton campaign="webapp-signal" size="sm" label="Get the app" variant={webGold ? 'dark' : 'primary'} />}
+      </div>
+    </Card>
   );
 }
 
@@ -91,13 +123,7 @@ export default function Signal() {
           )}
         </div>
         <aside className="space-y-4">
-          <Card className="p-5">
-            <h2 className="text-[15px] font-semibold text-fg">Get it on your phone</h2>
-            <p className="mt-1.5 text-[14px] text-fg-2">The app can send you a push when Troy flags big news. It's capped, so it won't nag.</p>
-            <div className="mt-3">
-              <AppStoreButton campaign="webapp-signal" size="sm" label="Get the app" />
-            </div>
-          </Card>
+          <ReadOnCard />
           <Card className="p-5">
             <h2 className="text-[15px] font-semibold text-fg">Hear it instead</h2>
             <p className="mt-1.5 text-[14px] text-fg-2">The Stack Signal podcast is Troy's morning brief, a few minutes long, every day.</p>
