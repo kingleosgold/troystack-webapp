@@ -1,5 +1,5 @@
 import { devices, expect, test } from '@playwright/test';
-import { mockBackends, signIn, signInExpired } from './mock';
+import { mockBackends, sessionFor, signIn, signInElsewhereAs, signInExpired, signOutElsewhere } from './mock';
 
 // The side card on the Signal list. The App Store only opens on an iPhone or
 // iPad, so anyone else without Gold gets the web free week there.
@@ -146,4 +146,77 @@ test("an account whose plan can't be read gets the phone card, not a card that w
   await expect(page.getByRole('heading', { name: 'Get it on your phone' })).toBeVisible();
   await expect(page.getByTestId('read-on-pending')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toHaveCount(0);
+});
+
+/**
+ * Every request for supabase-js's lock fails, as when another tab holds it
+ * past the timeout, so reading the session at startup rejects.
+ */
+async function failSessionLock(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    const locks = navigator.locks;
+    const request = locks.request.bind(locks) as (...args: unknown[]) => Promise<unknown>;
+    (locks as unknown as { request: (...args: unknown[]) => Promise<unknown> }).request = (name: unknown, ...rest: unknown[]) =>
+      typeof name === 'string' && name.startsWith('lock:sb-')
+        ? Promise.reject(new Error('Acquiring an exclusive Navigator LockManager lock timed out'))
+        : request(name, ...rest);
+  });
+}
+
+test("a guest whose session can't be read still gets the free week, not a card that waits forever", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store card');
+  await mockBackends(page);
+  await failSessionLock(page);
+  await page.goto('/signal');
+  await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
+  await expect(page.getByTestId('read-on-pending')).toHaveCount(0);
+});
+
+test("an account signing back in after its plan couldn't be read waits on the plan, and never shows the phone card", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store card');
+  await signIn(page, { once: true });
+  await mockBackends(page);
+  // The first plan read fails, so the card falls back to the phone card.
+  let failing = true;
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/rest/v1/profiles**', async (route) => {
+    if (failing) return route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"upstream connect error"}' });
+    await held;
+    await route.fallback().catch(() => undefined);
+  });
+  await page.goto('/signal');
+  await expect(page.getByRole('heading', { name: 'Get it on your phone' })).toBeVisible();
+  // Signed out in another tab, the card offers the free week to the guest.
+  await signOutElsewhere(page);
+  await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
+  // The same account signs back in from another tab while its plan is slow.
+  failing = false;
+  await page.evaluate(() => {
+    (window as unknown as { sawPhone?: boolean }).sawPhone = false;
+    new MutationObserver(() => {
+      const hit = Array.from(document.querySelectorAll('aside h2')).some((h) => h.textContent?.includes('Get it on your phone'));
+      if (hit) (window as unknown as { sawPhone?: boolean }).sawPhone = true;
+    }).observe(document, { childList: true, subtree: true, characterData: true });
+  });
+  await signInElsewhereAs(page, sessionFor());
+  await expect(page.getByTestId('read-on-pending')).toBeVisible();
+  release();
+  await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { sawPhone?: boolean }).sawPhone ?? false)).toBe(false);
+});
+
+test("a stored session that can't be read gets the phone card, never the free week, since it may be Gold", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store card');
+  await signIn(page);
+  await mockBackends(page, { tier: 'gold' });
+  await failSessionLock(page);
+  await watchForTry(page);
+  await page.goto('/signal');
+  await expect(page.getByRole('heading', { name: 'Get it on your phone' })).toBeVisible();
+  await expect(page.getByTestId('read-on-pending')).toHaveCount(0);
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => (window as unknown as { sawTry?: boolean }).sawTry ?? false)).toBe(false);
 });

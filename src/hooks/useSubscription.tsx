@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { syncSubscription } from '../services/api';
+import { stillSignedInAs } from '../lib/account';
 
 export type SubscriptionTier = 'free' | 'gold' | 'lifetime';
 
@@ -77,8 +78,15 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const readRef = useRef(0);
   const retryRef = useRef<number | null>(null);
   const [retryTick, setRetryTick] = useState(0);
-  // The account whose newest plan read failed, cleared once one succeeds.
+  // The account whose newest plan read failed, cleared once one succeeds or
+  // the account changes, so an account signing back in within the tab starts
+  // out waiting on its plan rather than marked unreadable.
   const [failedFor, setFailedFor] = useState<string | null>(null);
+  const [failedSeenFor, setFailedSeenFor] = useState<string | null>(userId);
+  if (failedSeenFor !== userId) {
+    setFailedSeenFor(userId);
+    setFailedFor(null);
+  }
 
   const fetchTier = useCallback(
     (options?: { force?: boolean }): Promise<boolean> => {
@@ -93,7 +101,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         retryRef.current = null;
       }
       return readPlan(userId).then((next) => {
-        if (read !== readRef.current) return next !== null;
+        // A read that answers after its account signed out, or after a newer
+        // read started, sets nothing.
+        if (read !== readRef.current || !stillSignedInAs(userId)) return next !== null;
         if (next) {
           setPlan(next);
           setFailedFor(null);
