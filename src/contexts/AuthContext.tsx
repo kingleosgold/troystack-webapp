@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { setSignedInAs } from '../lib/account';
+import { setSignedInAs, signedInAs } from '../lib/account';
 import { clearStackCopies } from '../services/stackCopy';
 import { dropQueuedChanges } from '../services/pendingWrites';
 
@@ -41,12 +41,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSignedInAs(session?.user?.id ?? null);
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth.getSession().then(
+      ({ data: { session } }) => {
+        setSignedInAs(session?.user?.id ?? null);
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      },
+      () => {
+        // The session couldn't be read, as when another tab holds supabase-js's
+        // lock past its timeout. Sign-in stops loading anyway, so pages and the
+        // Gold cards don't wait on it forever. Whoever the listener below has
+        // already reported stays signed in, and nobody otherwise, until it
+        // reports a change.
+        setSignedInAs(signedInAs());
+        setLoading(false);
+      },
+    );
 
     // Listen for auth changes
     const {

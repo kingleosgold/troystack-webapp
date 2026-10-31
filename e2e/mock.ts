@@ -538,7 +538,11 @@ export async function signOutElsewhere(page: Page) {
  * supabase-js does on a real sign-in.
  */
 export async function signInElsewhere(page: Page) {
-  const session = sessionFor(sessionUser(FREE_USER_ID, 'free@example.com'));
+  await signInElsewhereAs(page, sessionFor(sessionUser(FREE_USER_ID, 'free@example.com')));
+}
+
+/** Signs this browser in from another tab with `session`, as signInElsewhere does. */
+export async function signInElsewhereAs(page: Page, session: ReturnType<typeof sessionFor>) {
   await page.evaluate((value) => {
     localStorage.setItem('sb-e2e-auth-token', value);
     const channel = new BroadcastChannel('sb-e2e-auth-token');
