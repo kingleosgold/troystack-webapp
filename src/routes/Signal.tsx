@@ -50,7 +50,7 @@ function ReadOnCard() {
   if (!webGold && !showAppStore) return null;
   return (
     <Card className="p-5">
-      <h2 className="text-[15px] font-semibold text-fg">{webGold ? "Get Troy's morning brief" : 'Get it on your phone'}</h2>
+      <h2 className="text-[15px] font-semibold text-fg">{webGold ? "Troy's read on your own stack" : 'Get it on your phone'}</h2>
       <p className="mt-1.5 text-[14px] text-fg-2">
         {webGold
           ? "Gold adds a brief he writes around your stack each morning and 30 questions a day with him. The first week is free if you're new to Gold."

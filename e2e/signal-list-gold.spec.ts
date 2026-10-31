@@ -5,7 +5,7 @@ import { mockBackends, signIn, signInExpired } from './mock';
 // iPad, so anyone else without Gold gets the web free week there.
 
 function card(page: import('@playwright/test').Page) {
-  return page.locator('aside').getByRole('heading', { name: /Get Troy's morning brief|Get it on your phone/ }).locator('..');
+  return page.locator('aside').getByRole('heading', { name: /Troy's read on your own stack|Get it on your phone/ }).locator('..');
 }
 
 /** Notes whether the free week button ever showed in the side column, from the first paint on. */
@@ -28,7 +28,7 @@ test("a computer's reader gets the free week beside the list, carrying the Signa
   });
   await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
   await page.goto('/signal');
-  await expect(page.getByRole('heading', { name: "Get Troy's morning brief" })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "Troy's read on your own stack" })).toBeVisible();
   // The App Store stays as the other door on a computer.
   await expect(card(page).getByRole('link', { name: 'Get the app' })).toBeVisible();
   await card(page).getByRole('button', { name: 'Try Gold free for a week' }).click();
@@ -88,6 +88,14 @@ test.describe('on an Android phone', () => {
     await expect(page.locator('aside').getByRole('link', { name: 'Get the app' })).toHaveCount(0);
   });
 
+  test('a free account gets the free week once its plan lands', async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page);
+    await page.goto('/signal');
+    await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
+    await expect(page.locator('aside').getByRole('link', { name: 'Get the app' })).toHaveCount(0);
+  });
+
   test('a Gold account sees no card, and never the free week while its session restores', async ({ page }) => {
     await signInExpired(page);
     await mockBackends(page, { tier: 'gold' });
@@ -100,7 +108,7 @@ test.describe('on an Android phone', () => {
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await page.waitForTimeout(2500);
     expect(await page.evaluate(() => (window as unknown as { sawTry?: boolean }).sawTry ?? false)).toBe(false);
-    await expect(page.locator('aside').getByRole('heading', { name: /Get Troy's morning brief|Get it on your phone/ })).toHaveCount(0);
+    await expect(page.locator('aside').getByRole('heading', { name: /Troy's read on your own stack|Get it on your phone/ })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Hear it instead' })).toBeVisible();
   });
 });
