@@ -27,7 +27,8 @@ import { useTheme } from '../hooks/useTheme';
 import { METALS, METAL_LABEL, METAL_VAR } from '../lib/metals';
 import { money, signedPercent, changeTone } from '../lib/format';
 import { cx } from '../lib/cx';
-import { appStoreUrl, PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL } from '../lib/appStore';
+import { appStoreUrl, isAppleMobile, PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL } from '../lib/appStore';
+import { webCheckoutReady } from '../lib/checkout';
 import { buttonClass } from '../lib/cx';
 import { AppStoreButton, QrCode } from './AppStore';
 import { MarketStatus } from './Market';
@@ -291,12 +292,23 @@ function DesktopTopBar() {
 }
 
 function MobileTopBar({ onMenu }: { onMenu: () => void }) {
+  const { isGold, loading: planLoading } = useSubscription();
+  // The App Store only opens on an iPhone or iPad, so any other phone gets the
+  // web free week on /gold, once the plan is known to be Free.
+  const webGold = !isAppleMobile() && !isGold && !planLoading && (webCheckoutReady('monthly') || webCheckoutReady('yearly'));
   return (
     <div className="lg:hidden sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur">
       <div className="flex h-14 items-center justify-between px-4">
         <Brand />
         <div className="flex items-center gap-2">
-          <AppStoreButton campaign="webapp-nav" size="sm" label="Get the app" />
+          {webGold ? (
+            <Link to="/gold" className={buttonClass('primary', 'sm', 'shadow-sm')}>
+              <Crown size={14} aria-hidden="true" />
+              Try Gold free
+            </Link>
+          ) : (
+            <AppStoreButton campaign="webapp-nav" size="sm" label="Get the app" />
+          )}
           <button type="button" onClick={onMenu} className="h-9 w-9 flex items-center justify-center rounded-lg text-fg-2 hover:bg-surface-2" aria-label="Open menu">
             <MenuIcon size={20} />
           </button>
