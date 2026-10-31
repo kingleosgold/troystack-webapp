@@ -47,7 +47,19 @@ function DigestFeature() {
  */
 function ReadOnCard() {
   const { openTrial } = useTrial();
-  const { webGold, showAppStore } = useWebGoldOffer();
+  const { webGold, showAppStore, pending } = useWebGoldOffer();
+  if (pending) {
+    return (
+      <div aria-hidden="true" data-testid="read-on-pending">
+        <Card className="p-5">
+          <Skeleton className="h-5 w-3/4" />
+          <Skeleton className="mt-2.5 h-4 w-full" />
+          <Skeleton className="mt-1.5 h-4 w-5/6" />
+          <Skeleton className="mt-4 h-8 w-40" />
+        </Card>
+      </div>
+    );
+  }
   if (!webGold && !showAppStore) return null;
   return (
     <Card className="p-5">
