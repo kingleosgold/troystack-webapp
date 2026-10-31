@@ -12,11 +12,8 @@ import { ArticleCard } from '../ui/Signal';
 import { EpisodePlayer } from '../ui/Podcast';
 import { AppStoreButton } from '../ui/AppStore';
 import { Button, Card, EmptyState, ErrorNote, Img, LinkButton, Skeleton } from '../ui/primitives';
-import { useAuth } from '../contexts/AuthContext';
 import { useTrial } from '../contexts/TrialContext';
-import { useSubscription } from '../hooks/useSubscription';
-import { isAndroid, isAppleMobile } from '../lib/appStore';
-import { webCheckoutReady } from '../lib/checkout';
+import { useWebGoldOffer } from '../hooks/useWebGoldOffer';
 
 function ShareButton({ title, slug }: { title: string; slug: string }) {
   const [copied, setCopied] = useState(false);
@@ -45,20 +42,10 @@ function ShareButton({ title, slug }: { title: string; slug: string }) {
   );
 }
 
-/**
- * The card under each piece. The App Store only opens on an iPhone or iPad, so
- * anyone else without Gold gets the web free week, once the session and the
- * plan are known, since a session still restoring reads as a guest. Android
- * gets no App Store button at all.
- */
+/** The card under each piece. useWebGoldOffer decides what it offers. */
 function ReadOnCard() {
-  const { loading: authLoading } = useAuth();
-  const { isGold, loading: planLoading } = useSubscription();
   const { openTrial } = useTrial();
-  const apple = isAppleMobile();
-  // Only monthly and yearly carry the free week, so Lifetime alone doesn't count.
-  const webGold = !apple && !authLoading && !planLoading && !isGold && (webCheckoutReady('monthly') || webCheckoutReady('yearly'));
-  const showAppStore = apple || !isAndroid();
+  const { webGold, showAppStore } = useWebGoldOffer();
   if (!webGold && !showAppStore) return null;
   return (
     <Card className="mt-8 p-5 sm:p-6">
