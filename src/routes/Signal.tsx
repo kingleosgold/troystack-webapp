@@ -42,7 +42,8 @@ function DigestFeature() {
  * The side card on the Signal list. An iPhone keeps the App Store. Anyone else
  * without Gold gets the web free week, and a computer keeps the App Store as a
  * second, smaller door. Android without the free week gets no card, since the
- * App Store can't open there.
+ * App Store can't open there. Its token is its own, so its checkouts and
+ * installs can be told apart from a Signal piece's.
  */
 function ReadOnCard() {
   const { openTrial } = useTrial();
@@ -58,11 +59,11 @@ function ReadOnCard() {
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {webGold && (
-          <Button size="sm" onClick={() => openTrial({ reason: 'Gold adds a morning brief from Troy written around your stack.', campaign: 'webapp-signal' })}>
+          <Button size="sm" onClick={() => openTrial({ reason: 'Gold adds a morning brief from Troy written around your stack.', campaign: 'webapp-signal-list' })}>
             Try Gold free for a week
           </Button>
         )}
-        {showAppStore && <AppStoreButton campaign="webapp-signal" size="sm" label="Get the app" variant={webGold ? 'dark' : 'primary'} />}
+        {showAppStore && <AppStoreButton campaign="webapp-signal-list" size="sm" label="Get the app" variant={webGold ? 'dark' : 'primary'} />}
       </div>
     </Card>
   );

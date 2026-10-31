@@ -18,7 +18,7 @@ async function watchForTry(page: import('@playwright/test').Page) {
   });
 }
 
-test("a computer's reader gets the free week beside the list, carrying the Signal's campaign", async ({ page }, testInfo) => {
+test("a computer's reader gets the free week beside the list, carrying the list's own campaign", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store button');
   await signIn(page);
   await mockBackends(page);
@@ -35,7 +35,7 @@ test("a computer's reader gets the free week beside the list, carrying the Signa
   await page.getByRole('dialog').getByRole('button', { name: 'Start my free week' }).click();
   await expect(page).toHaveURL(/checkout\.stripe\.com/);
   expect(checkouts).toHaveLength(1);
-  expect(checkouts[0].campaign).toBe('webapp-signal');
+  expect(checkouts[0].campaign).toBe('webapp-signal-list');
 });
 
 test('a guest on a computer sees the free week beside the list', async ({ page }, testInfo) => {
@@ -68,6 +68,8 @@ test('an iPhone keeps the App Store card beside the list', async ({ page }, test
   await page.goto('/signal');
   await expect(page.getByRole('heading', { name: 'Get it on your phone' })).toBeVisible();
   await expect(card(page).getByRole('link', { name: 'Get the app' })).toBeVisible();
+  // The list's installs count under its own token, apart from a piece's.
+  await expect(card(page).getByRole('link', { name: 'Get the app' })).toHaveAttribute('href', /[?&]ct=webapp-signal-list&/);
   await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toHaveCount(0);
 });
 
