@@ -144,13 +144,15 @@ describe('sign-in hand-offs', () => {
   });
 
   it("sends the plan sheet's sign-in back to the page with only its troystack.com token", () => {
-    expect(sheetReturnPath('/gold', '?campaign=site-pricing')).toBe('/gold?campaign=site-pricing');
-    expect(sheetReturnPath('/gold', '?campaign=site-pricing&back=1')).toBe('/gold?campaign=site-pricing');
-    expect(sheetReturnPath('/gold', '?back=1&campaign=site-signal&x=1')).toBe('/gold?campaign=site-signal');
-    expect(sheetReturnPath('/gold', '?campaign=webapp-trial')).toBe('/gold');
-    expect(sheetReturnPath('/gold', '?campaign=site-%2F%2Fevil')).toBe('/gold');
+    expect(sheetReturnPath('/gold', '?campaign=site-pricing')).toBe('/gold?campaign=site-pricing&back=1');
+    expect(sheetReturnPath('/gold', '?campaign=site-pricing&back=1')).toBe('/gold?campaign=site-pricing&back=1');
+    expect(sheetReturnPath('/gold', '?back=1&campaign=site-signal&x=1')).toBe('/gold?campaign=site-signal&back=1');
+    expect(sheetReturnPath('/gold', '?campaign=webapp-trial&x=1')).toBe('/gold?back=1');
+    expect(sheetReturnPath('/gold', '?campaign=site-%2F%2Fevil')).toBe('/gold?back=1');
+    expect(sheetReturnPath('/troy', '?campaign=site-x&q=hi')).toBe('/troy?campaign=site-x');
     expect(sheetReturnPath('/troy', '')).toBe('/troy');
-    expect(safeNextPath(sheetReturnPath('/gold', '?campaign=site-pricing'))).toBe('/gold?campaign=site-pricing');
+    expect(sheetReturnPath('/signal/a-piece', '?x=1')).toBe('/signal/a-piece');
+    expect(safeNextPath(sheetReturnPath('/gold', '?campaign=site-pricing'))).toBe('/gold?campaign=site-pricing&back=1');
   });
 });
 

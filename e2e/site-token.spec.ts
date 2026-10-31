@@ -146,16 +146,37 @@ test("a troystack.com link straight to checkout backs out to the plans and count
   await expect.poll(() => steps.filter((x) => x.step === 'gold_view')).toEqual([{ step: 'gold_view', campaign: 'site-pricing' }]);
 });
 
-test("a troystack.com visitor sent to sign-up from the plans keeps the link's token on the way back", async ({ page }) => {
-  await mockBackends(page);
+test("a troystack.com visitor sent to sign-up from the plans comes back under the link's token, counted once", async ({ page }) => {
+  // An account that already has Gold signs up from the sheet, so no checkout
+  // opens and the sign-in lands back on the plans.
+  await mockBackends(page, { tier: 'gold' });
+  const checkouts = watch(page);
+  const views: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') {
+      const body = r.postDataJSON() as { step?: string; campaign?: string };
+      if (body.step === 'gold_view') views.push(body.campaign ?? '');
+    }
+  });
   await page.goto('/gold?campaign=site-pricing');
+  await expect.poll(() => views).toEqual(['site-pricing']);
   await page.getByRole('button', { name: 'Get Lifetime' }).click();
-  await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=lifetime&from=sheet&next=%2Fgold%3Fcampaign%3Dsite-pricing$/);
+  await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=lifetime&from=sheet&next=%2Fgold%3Fcampaign%3Dsite-pricing%26back%3D1$/);
+  await page.getByRole('button', { name: 'Have an account? Sign in' }).click();
+  await page.locator('#auth-email').fill('stacker@example.com');
+  await page.locator('#auth-password').fill('correct-horse');
+  await page.locator('form button[type=submit]').click();
+  await expect(page).toHaveURL(/\/gold\?campaign=site-pricing$/);
+  await expect(page.getByText('You have Gold on this account.')).toBeVisible();
+  // Give a second view time to fire if it were going to.
+  await page.waitForTimeout(500);
+  expect(views).toEqual(['site-pricing']);
+  expect(checkouts).toHaveLength(0);
 });
 
-test('a plain Gold page visit sends sign-up back to the bare plans', async ({ page }) => {
+test('a plain Gold page visit sends sign-up back to the plans with nothing else from its address', async ({ page }) => {
   await mockBackends(page);
-  await page.goto('/gold?back=1&x=1');
+  await page.goto('/gold?campaign=webapp-trial&x=1');
   await page.getByRole('button', { name: 'Get Lifetime' }).click();
-  await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=lifetime&from=sheet&next=%2Fgold$/);
+  await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=lifetime&from=sheet&next=%2Fgold%3Fback%3D1$/);
 });

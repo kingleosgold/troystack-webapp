@@ -67,12 +67,17 @@ export function siteCampaign(value: string | null | undefined): CheckoutCampaign
 /**
  * Where the plan sheet sends someone back to after sign-in. It's the page
  * they were on, keeping a troystack.com site-* token from its address so the
- * Gold page counts the return under the link that sent them. Nothing else in
- * the address rides along, so a back=1 or any other value isn't replayed.
+ * Gold page counts the return under the link that sent them. Back on the Gold
+ * page it also says back=1, so a tab that already counted its view and tap
+ * there doesn't count them again. Nothing else in the address rides along.
  */
 export function sheetReturnPath(pathname: string, search: string): string {
+  const params = new URLSearchParams();
   const campaign = siteCampaign(new URLSearchParams(search).get('campaign'));
-  return campaign ? `${pathname}?campaign=${campaign}` : pathname;
+  if (campaign) params.set('campaign', campaign);
+  if (pathname === '/gold') params.set('back', '1');
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
 }
 
 interface StoredIntent {
