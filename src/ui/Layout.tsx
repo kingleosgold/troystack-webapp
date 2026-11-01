@@ -30,7 +30,7 @@ import { money, signedPercent, changeTone } from '../lib/format';
 import { cx } from '../lib/cx';
 import { appStoreUrl, PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL } from '../lib/appStore';
 import { buttonClass } from '../lib/cx';
-import { AppStoreButton, QrCode } from './AppStore';
+import { AppStoreButton, NewTabNote, QrCode } from './AppStore';
 import { MarketStatus } from './Market';
 import { Sheet } from './primitives';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -158,6 +158,7 @@ function SidebarAppCard() {
       </div>
       <a href={appStoreUrl('webapp-sidebar')} target="_blank" rel="noopener" className="mt-3 block text-center text-[12px] font-semibold text-gold hover:text-gold-2">
         Open the App Store
+        <NewTabNote />
       </a>
     </div>
   );

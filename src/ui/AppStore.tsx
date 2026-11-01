@@ -76,6 +76,14 @@ interface AppStoreButtonProps {
   fullWidth?: boolean;
 }
 
+/**
+ * Told only to screen readers, since every App Store link opens a new tab and
+ * a sighted reader sees the tab appear.
+ */
+export function NewTabNote() {
+  return <span className="sr-only"> (opens in a new tab)</span>;
+}
+
 /** Opens the App Store listing with this surface's campaign token. */
 export function AppStoreButton({ campaign, label = 'Get the app', size = 'md', variant = 'primary', className, fullWidth }: AppStoreButtonProps) {
   const sizes = { sm: 'h-8 px-3 text-[13px] rounded-lg', md: 'h-10 px-4 text-sm rounded-xl', lg: 'h-12 px-5 text-[15px] rounded-xl' };
@@ -98,6 +106,7 @@ export function AppStoreButton({ campaign, label = 'Get the app', size = 'md', v
     >
       <Smartphone size={size === 'sm' ? 14 : 16} aria-hidden="true" />
       {label}
+      <NewTabNote />
     </a>
   );
 }
@@ -112,6 +121,7 @@ export function AppStoreTextLink({ campaign, lead = 'Have an iPhone?', label = '
       {lead}{' '}
       <a href={appStoreUrl(campaign)} target="_blank" rel="noopener" className="font-semibold text-gold underline underline-offset-2 hover:text-gold-2">
         {label}
+        <NewTabNote />
       </a>
     </p>
   );
