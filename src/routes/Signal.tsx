@@ -10,8 +10,7 @@ import { SIGNAL_CATEGORIES } from '../lib/signalApi';
 import { excerpt, formatDate, formatTimeET } from '../lib/text';
 import { cx } from '../lib/cx';
 import { ArticleCard, ArticleRowSkeleton } from '../ui/Signal';
-import { AppStoreButton } from '../ui/AppStore';
-import { appStoreUrl } from '../lib/appStore';
+import { AppStoreButton, AppStoreTextLink } from '../ui/AppStore';
 import { Button, Card, ErrorNote, PageHeader, Skeleton } from '../ui/primitives';
 
 function DigestFeature() {
@@ -81,12 +80,7 @@ function ReadOnCard() {
           </Button>
           {/* On a computer the App Store is the quieter second door, with a line saying who it's for. */}
           {showAppStore && (
-            <p className="mt-2.5 text-center text-[13px] text-fg-3">
-              Have an iPhone?{' '}
-              <a href={appStoreUrl('webapp-signal-list')} target="_blank" rel="noopener" className="font-semibold text-gold underline underline-offset-2 hover:text-gold-2">
-                Get the app
-              </a>
-            </p>
+            <AppStoreTextLink campaign="webapp-signal-list" className="mt-2.5 text-center" />
           )}
         </>
       ) : (
