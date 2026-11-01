@@ -15,6 +15,20 @@ export const supabase = createClient(
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 /**
+ * Where supabase-js keeps this project's session in localStorage. It names the
+ * key after the first label of the project's host, so a key left by another
+ * Supabase project on the same site (sb-other-auth-token) isn't ours.
+ */
+export function authStorageKey(url: string | undefined = supabaseUrl): string | undefined {
+  if (!url) return undefined;
+  try {
+    return `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * The signed-in session's access token, refreshed by supabase-js when it has
  * expired, or undefined when nobody is signed in. Routes that act for a user
  * id check it names that same user.
