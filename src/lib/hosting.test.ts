@@ -41,9 +41,16 @@ describe('Vercel routing', () => {
     expect(rule?.destination).toBe('/api/signal-html?slug=:slug');
   });
 
-  it('sends www.troystack.com to troystack.com', () => {
-    const rule = (vercel.redirects ?? []).find((item: { has?: Array<{ value: string }> }) => item.has?.[0]?.value === 'www.troystack.com');
-    expect(rule).toMatchObject({ source: '/:path*', destination: 'https://troystack.com/:path*', permanent: true });
+  // Vercel's /:path* with a host condition doesn't catch the bare root (live,
+  // www.troystack.com/ answers 200 while its subpaths 308), so / gets its own
+  // rule, the same way www.troystack.ai does.
+  it('sends www.troystack.com to troystack.com, its home page included', () => {
+    const rules = (vercel.redirects ?? []).filter((item: { has?: Array<{ value: string }> }) => item.has?.[0]?.value === 'www.troystack.com');
+    expect(rules).toEqual([
+      expect.objectContaining({ source: '/', destination: 'https://troystack.com/', permanent: true }),
+      expect.objectContaining({ source: '/:path*', destination: 'https://troystack.com/:path*', permanent: true }),
+    ]);
+    expect((vercel.redirects ?? [])[0]).toBe(rules[0]);
   });
 
   // The app's reset email lands on troystack.com/auth/reset-password, which the
