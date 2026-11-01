@@ -21,11 +21,9 @@ describe('Vercel routing', () => {
     expect(JSON.stringify(vercel.rewrites ?? [])).not.toContain('vercel.app');
   });
 
-  it("serves the pages troystack.com's links point at, and sends the old What If page to the app's", () => {
+  it("serves the pages troystack.com's links point at itself, /speculation included", () => {
     const sources: string[] = (vercel.redirects ?? []).map((rule: { source: string }) => rule.source);
-    for (const path of ['/privacy', '/terms', '/calculator']) expect(sources).not.toContain(path);
-    const speculation = (vercel.redirects ?? []).find((item: { source: string }) => item.source === '/speculation');
-    expect(speculation).toMatchObject({ destination: '/tools/what-if', permanent: true });
+    for (const path of ['/privacy', '/terms', '/calculator', '/speculation']) expect(sources).not.toContain(path);
   });
 
   // The iOS app opens troystack.com's reset links through this file, so it has

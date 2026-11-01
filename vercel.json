@@ -39,11 +39,6 @@
       "permanent": true
     },
     {
-      "source": "/speculation",
-      "destination": "/tools/what-if",
-      "permanent": true
-    },
-    {
       "source": "/junk-silver",
       "destination": "/tools/junk-silver",
       "permanent": true

@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { Button, Sheet } from './primitives';
 import { InstallPath } from './AppStore';
 import { GOLD, isAndroid, isAppleMobile } from '../lib/appStore';
-import { CHECKOUT_WAIT, checkoutBlock, openBillingPortal, openCheckout, rememberCheckout, webCheckoutReady, webPlans, type CheckoutCampaign, type WebPlan } from '../lib/checkout';
+import { CHECKOUT_WAIT, checkoutBlock, forgetCheckout, openBillingPortal, openCheckout, rememberCheckout, sheetReturnPath, webCheckoutReady, webPlans, type CheckoutCampaign, type WebPlan } from '../lib/checkout';
 import { cx } from '../lib/cx';
 import { GOLD_FEATURES } from '../lib/gold';
 import { stillSignedInAs } from '../lib/account';
@@ -85,7 +85,7 @@ function WebCheckout({
     if (!user) {
       rememberCheckout(plan, campaign);
       onClose();
-      navigate(`/auth?redirect=checkout&plan=${plan}&from=sheet&next=${encodeURIComponent(location.pathname)}`);
+      navigate(`/auth?redirect=checkout&plan=${plan}&from=sheet&next=${encodeURIComponent(sheetReturnPath(location.pathname, location.search))}`);
       return;
     }
     setBusy(true);
@@ -211,6 +211,7 @@ function PaymentIssue() {
 
 export function TrialSheet({ open, onClose, reason, campaign, plan, start = false }: Props) {
   const { user } = useAuth();
+  const location = useLocation();
   const { isGold, loading: planLoading } = useSubscription();
   // A signed-in account whose plan hasn't loaded may already have Gold, so
   // nothing is sold until it's known.
@@ -316,7 +317,15 @@ export function TrialSheet({ open, onClose, reason, campaign, plan, start = fals
           {!user && (
             <p className="text-[13px] text-fg-3">
               Already have Gold?{' '}
-              <Link to="/auth" onClick={close} className="font-semibold text-gold hover:text-gold-2">
+              {/* They're signing in to the Gold they have, so a plan picked earlier isn't bought on the way back. */}
+              <Link
+                to={`/auth?mode=signin&next=${encodeURIComponent(sheetReturnPath(location.pathname, location.search))}`}
+                onClick={() => {
+                  forgetCheckout();
+                  close();
+                }}
+                className="font-semibold text-gold hover:text-gold-2"
+              >
                 Sign in with the same account
               </Link>{' '}
               and it unlocks here.

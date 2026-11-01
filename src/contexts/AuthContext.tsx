@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { setSignedInAs } from '../lib/account';
+import { setSignedInAs, signedInAs } from '../lib/account';
 import { clearStackCopies } from '../services/stackCopy';
 import { dropQueuedChanges } from '../services/pendingWrites';
 
@@ -10,6 +10,11 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  /**
+   * A session is stored but couldn't be read, so loading stays true. Anything
+   * waiting on sign-in only to pick what to show can fall back instead.
+   */
+  sessionUnreadable: boolean;
   isConfigured: boolean;
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null; needsConfirmation: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
@@ -26,11 +31,21 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Whether supabase-js has a session stored in this browser. */
+function hasStoredSession(): boolean {
+  try {
+    return Object.keys(localStorage).some((key) => /^sb-.+-auth-token$/.test(key));
+  } catch {
+    return false;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   // Without Supabase there's no session to wait for.
   const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [sessionUnreadable, setSessionUnreadable] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -41,12 +56,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSignedInAs(session?.user?.id ?? null);
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth.getSession().then(
+      ({ data: { session } }) => {
+        setSignedInAs(session?.user?.id ?? null);
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      },
+      () => {
+        // The session couldn't be read, as when another tab holds supabase-js's
+        // lock past its timeout, and supabase-js can't read it again in this
+        // page. With a session stored here someone may be signed in, so
+        // sign-in keeps loading rather than call them a guest, and the Gold
+        // cards stop waiting on it. With none stored nobody is signed in, so
+        // sign-in stops loading with whoever the listener below has reported.
+        if (hasStoredSession()) {
+          setSessionUnreadable(true);
+          return;
+        }
+        setSignedInAs(signedInAs());
+        setLoading(false);
+      },
+    );
 
     // Listen for auth changes
     const {
@@ -190,6 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     session,
     loading,
+    sessionUnreadable,
     isConfigured: isSupabaseConfigured,
     signUp,
     signIn,

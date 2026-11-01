@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useSignOut } from '../contexts/SignOutContext';
 import { useSubscription } from '../hooks/useSubscription';
+import { useWebGoldOffer } from '../hooks/useWebGoldOffer';
 import { useSpotMap } from '../hooks/queries';
 import { useTheme } from '../hooks/useTheme';
 import { METALS, METAL_LABEL, METAL_VAR } from '../lib/metals';
@@ -291,12 +292,28 @@ function DesktopTopBar() {
 }
 
 function MobileTopBar({ onMenu }: { onMenu: () => void }) {
+  // The App Store only opens on an iPhone or iPad, so any other phone gets the
+  // web free week on /gold once the plan is known to be Free. Until then the
+  // slot holds its place empty, so it doesn't show Get the app and then swap.
+  const { webGold, pending } = useWebGoldOffer();
   return (
     <div className="lg:hidden sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur">
       <div className="flex h-14 items-center justify-between px-4">
         <Brand />
         <div className="flex items-center gap-2">
-          <AppStoreButton campaign="webapp-nav" size="sm" label="Get the app" />
+          {pending ? (
+            <span className={buttonClass('primary', 'sm', 'invisible')} aria-hidden="true" data-testid="nav-gold-pending">
+              <Crown size={14} />
+              Try Gold free
+            </span>
+          ) : webGold ? (
+            <Link to="/gold" className={buttonClass('primary', 'sm', 'shadow-sm')}>
+              <Crown size={14} aria-hidden="true" />
+              Try Gold free
+            </Link>
+          ) : (
+            <AppStoreButton campaign="webapp-nav" size="sm" label="Get the app" />
+          )}
           <button type="button" onClick={onMenu} className="h-9 w-9 flex items-center justify-center rounded-lg text-fg-2 hover:bg-surface-2" aria-label="Open menu">
             <MenuIcon size={20} />
           </button>

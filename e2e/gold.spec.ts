@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { mockBackends, signIn } from './mock';
+import { devices, expect, test } from '@playwright/test';
+import { mockBackends, signIn, signInExpired } from './mock';
 
 // The Gold page lists every plan at the checkout's own price, and a plan
 // picked there is the one checkout opens with.
@@ -215,4 +215,132 @@ test('a token that is not a troystack.com page counts as the Gold page', async (
   await page.goto('/gold?campaign=webapp-troy-limit');
   await expect.poll(() => steps.length).toBe(1);
   expect(steps[0]).toEqual({ step: 'gold_view', campaign: 'webapp-gold' });
+});
+
+test("home's Gold block opens the web free week as well as the App Store", async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/');
+  const link = page.getByRole('link', { name: 'Start the free week on the web' });
+  await expect(link).toBeVisible();
+  await link.click();
+  await expect(page).toHaveURL(/\/gold$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Troy, all day, around your stack');
+  await expect(page.getByLabel('Plans').getByRole('button', { name: 'Start free week' }).first()).toBeVisible();
+});
+
+for (const tier of ['gold', 'lifetime'] as const) {
+  test(`home doesn't offer the free week to an account with ${tier}`, async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier });
+    await page.goto('/');
+    // The account row names the plan only once it has loaded, which is when the block would show the link.
+    await expect(page.locator('a[href="/settings"][title*="@"]').getByText(tier === 'lifetime' ? 'Lifetime' : 'Gold', { exact: true })).toBeAttached();
+    await expect(page.getByText('Your stack and Troy, in your pocket')).toBeVisible();
+    await expect(page.getByText(/Gold starts with a free week/)).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Start the free week on the web' })).toHaveCount(0);
+  });
+}
+
+test('a free account sees the web free week on home once its plan loads', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page);
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Start the free week on the web' })).toBeVisible();
+});
+
+test.describe('on an Android phone', () => {
+  const { defaultBrowserType: _browser, ...pixel } = devices['Pixel 7'];
+  void _browser;
+  test.use(pixel);
+
+  test("the top bar opens the web free week, since the App Store link can't", async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/prices');
+    const bar = page.locator('div.sticky').first();
+    await expect(bar.getByRole('link', { name: 'Get the app' })).toHaveCount(0);
+    await bar.getByRole('link', { name: 'Try Gold free' }).click();
+    await expect(page).toHaveURL(/\/gold$/);
+    await expect(page.getByLabel('Plans').getByRole('button', { name: 'Start free week' }).first()).toBeVisible();
+  });
+
+  for (const tier of ['gold', 'lifetime'] as const) {
+    test(`the top bar doesn't offer Gold to an account with ${tier}`, async ({ page }) => {
+      await signIn(page);
+      await mockBackends(page, { tier });
+      // The plan has loaded once Settings names it.
+      await page.goto('/settings');
+      const bar = page.locator('div.sticky').first();
+      await expect(page.locator('main').getByText(tier === 'lifetime' ? 'Lifetime' : 'Gold', { exact: true }).first()).toBeVisible();
+      await expect(bar.getByRole('link', { name: 'Try Gold free' })).toHaveCount(0);
+      await expect(bar.getByRole('link', { name: 'Get the app' })).toBeVisible();
+    });
+  }
+
+  test('a free account sees Try Gold free once its plan loads', async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page);
+    await page.goto('/settings');
+    await expect(page.locator('main').getByText('Free', { exact: true }).first()).toBeVisible();
+    await expect(page.locator('div.sticky').first().getByRole('link', { name: 'Try Gold free' })).toBeVisible();
+  });
+
+  test('a free account never sees Get the app first while its plan loads', async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page);
+    await page.route('**/rest/v1/profiles**', async (route) => {
+      await new Promise((r) => setTimeout(r, 1500));
+      await route.fallback();
+    });
+    await page.addInitScript(() => {
+      new MutationObserver(() => {
+        const bar = document.querySelector('div.sticky');
+        const hit = Array.from(bar?.querySelectorAll('a') ?? []).some((a) => a.textContent?.includes('Get the app'));
+        if (hit) (window as unknown as { sawApp?: boolean }).sawApp = true;
+      }).observe(document, { childList: true, subtree: true, characterData: true });
+    });
+    await page.goto('/prices');
+    const bar = page.locator('div.sticky').first();
+    await expect(bar.getByTestId('nav-gold-pending')).toBeAttached();
+    await expect(bar.getByRole('link', { name: 'Try Gold free' })).toBeVisible();
+    await expect(bar.getByTestId('nav-gold-pending')).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { sawApp?: boolean }).sawApp ?? false)).toBe(false);
+  });
+
+  test("an account whose plan can't be read gets Get the app, not an empty slot", async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { failProfileRead: true });
+    await page.goto('/prices');
+    const bar = page.locator('div.sticky').first();
+    await expect(bar.getByRole('link', { name: 'Get the app' })).toBeVisible();
+    await expect(bar.getByTestId('nav-gold-pending')).toHaveCount(0);
+    await expect(bar.getByRole('link', { name: 'Try Gold free' })).toHaveCount(0);
+  });
+
+  test("a Gold account never sees Try Gold free while its session restores", async ({ page }) => {
+    await signInExpired(page);
+    await mockBackends(page, { tier: 'gold' });
+    // The refresh is slow, so the page sits a while with no session yet.
+    await page.route('**/auth/v1/token**', async (route) => {
+      await new Promise((r) => setTimeout(r, 1500));
+      await route.fallback();
+    });
+    await page.addInitScript(() => {
+      new MutationObserver(() => {
+        if (document.querySelector('div.sticky a[href="/gold"]')) (window as unknown as { sawTry?: boolean }).sawTry = true;
+      }).observe(document, { childList: true, subtree: true, characterData: true });
+    });
+    await page.goto('/settings');
+    await expect(page.locator('main').getByText('Gold', { exact: true }).first()).toBeVisible();
+    await expect(page.locator('div.sticky').first().getByRole('link', { name: 'Get the app' })).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { sawTry?: boolean }).sawTry ?? false)).toBe(false);
+  });
+});
+
+test('an iPhone keeps the App Store button in the top bar', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'the phone top bar only shows below the desktop width');
+  await mockBackends(page);
+  await page.goto('/prices');
+  const bar = page.locator('div.sticky').first();
+  await expect(bar.getByRole('link', { name: 'Get the app' })).toBeVisible();
+  await expect(bar.getByRole('link', { name: 'Try Gold free' })).toHaveCount(0);
 });

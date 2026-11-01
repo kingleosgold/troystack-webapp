@@ -35,6 +35,7 @@ const PAGES: Array<[string, string | RegExp]> = [
   ['/tools/stacking-history', /Stacking history/i],
   ['/tools/ratio', /ratio/i],
   ['/calculator', /What does your stack actually buy/],
+  ['/speculation', /What if your stack was worth more/],
   ['/coins', /Coin and bar values/],
   ['/coins/morgan-silver-dollar', /Morgan silver dollar/],
   ['/coins/not-a-coin', /That coin isn't here/],
@@ -174,6 +175,22 @@ test.describe('Troy for visitors', () => {
     await page.goto('/troy?q=What%20is%20junk%20silver%20worth');
     await expect(page.getByText('What is junk silver worth')).toBeVisible();
     await expect(page.getByText(/The move came after the Fed minutes/)).toBeVisible();
+  });
+});
+
+test.describe('Troy for an account', () => {
+  test("a dealer card carries the same disclosure line as the app's", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('troy_ai_consent_v1', '{"version":1}'));
+    await signIn(page);
+    await mockBackends(page, { replyPreview: { type: 'dealer_link', data: { url: 'https://www.sdbullion.com/silver', label: 'Shop silver at SD Bullion' } } });
+    await page.goto('/troy');
+    await page.getByRole('textbox', { name: 'Message Troy' }).fill('Where should I buy silver?');
+    await page.getByRole('button', { name: 'Send' }).click();
+    const link = page.getByRole('link', { name: 'Shop silver at SD Bullion' });
+    await expect(link).toHaveAttribute('href', 'https://www.sdbullion.com/silver');
+    await expect(link).toHaveAttribute('rel', /sponsored/);
+    await expect(page.getByText('We may earn a commission from these links.')).toBeVisible();
+    await shot(page, 'troy-dealer-card');
   });
 });
 
@@ -1237,14 +1254,13 @@ test('the build writes privacy, terms and the calculator and lists them on troys
     expect(existsSync(new URL(`../dist/${file}`, import.meta.url)), file).toBe(true);
   }
   const sitemap = await (await request.get('/sitemap.xml')).text();
-  for (const path of ['/', '/privacy', '/terms', '/signal', '/calculator', '/coins/mercury-dime']) {
+  for (const path of ['/', '/privacy', '/terms', '/signal', '/calculator', '/speculation', '/coins/mercury-dime']) {
     expect(sitemap).toContain(`<loc>https://troystack.com${path}</loc>`);
   }
   expect(sitemap).not.toContain('troystack.ai');
   const robots = await (await request.get('/robots.txt')).text();
   expect(robots).toContain('Sitemap: https://troystack.com/sitemap.xml');
   expect(robots).not.toContain('signal-sitemap');
-  expect(sitemap).not.toContain('/speculation');
   const home = await (await request.get('/')).text();
   expect(home).toContain('<link rel="canonical" href="https://troystack.com/" />');
   expect(home).not.toMatch(/https:\/\/troystack\.ai/);
@@ -1302,5 +1318,50 @@ test.describe('the purchasing power calculator', () => {
     await expect(page.getByText("There's no live silver price right now, so values that need it are on hold.")).toBeVisible();
     await expect(page.getByText('No price', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('The 1971 comparison')).toHaveCount(0);
+  });
+});
+
+test.describe('the price targets page', () => {
+  test('values a shared scenario against live spot', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/speculation?gold=1&silver=100&goldTarget=10000&silverTarget=250');
+    await expect(page.locator('#spec-gold')).toHaveValue('1');
+    await expect(page.locator('#spec-goldTarget')).toHaveValue('10000');
+    // 1 oz at $4,180.80 and 100 oz at $60.24 today, 1 at $10,000 and 100 at $250 then.
+    await expect(page.getByText('$10,204.80', { exact: true })).toBeVisible();
+    await expect(page.getByText('$35,000.00', { exact: true })).toBeVisible();
+    await expect(page.getByText('+$24,795.20 (+243.0%)')).toBeVisible();
+    await expect(page.getByText("Gold would have to rise 139% from today's spot.", { exact: false })).toBeVisible();
+    await expect(page.getByText('barrels of oil').locator('..')).toContainText('500');
+    await expect(page.getByRole('group', { name: 'Gold target, USD per oz, quick picks' }).getByRole('button', { name: '$10,000' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('keeps the scenario in the address and holds a metal with no target at spot', async ({ page }) => {
+    await mockBackends(page);
+    await page.goto('/speculation');
+    await expect(page.getByText('Enter your gold or silver to start.')).toBeVisible();
+    await page.locator('#spec-gold').fill('2');
+    await page.locator('#spec-silver').fill('10');
+    await expect(page.getByText('Set a target price for a metal you hold.')).toBeVisible();
+    await page.getByRole('group', { name: 'Gold target, USD per oz, quick picks' }).getByRole('button', { name: '$5,000' }).click();
+    await expect(page).toHaveURL(/\/speculation\?gold=2&silver=10&goldTarget=5000$/);
+    // 2 at $5,000 and 10 silver held at $60.24.
+    await expect(page.getByText('$10,602.40', { exact: true })).toBeVisible();
+    await expect(page.getByText('No target, so it stays at spot.')).toBeVisible();
+  });
+
+  test("values nothing from a price that isn't live", async ({ page }) => {
+    await mockBackends(page, { missingPrices: ['silver'] });
+    await page.goto('/speculation?gold=1&silver=10&goldTarget=5000');
+    await expect(page.getByText("There's no live silver price right now, so values that need it are on hold.")).toBeVisible();
+    await expect(page.getByText('Value at your targets')).toHaveCount(0);
+  });
+
+  test('names a target field by its label alone, and says nothing of a price for a metal not held', async ({ page }) => {
+    await mockBackends(page, { missingPrices: ['silver'] });
+    await page.goto('/speculation?gold=1&goldTarget=5000');
+    await expect(page.getByLabel('Gold target, USD per oz', { exact: true })).toHaveValue('5000');
+    await expect(page.getByText('$5,000.00', { exact: true })).toBeVisible();
+    await expect(page.getByText(/no live silver price/)).toHaveCount(0);
   });
 });

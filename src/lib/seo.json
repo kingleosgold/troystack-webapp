@@ -51,6 +51,10 @@
     "title": "What does your gold and silver actually buy?",
     "description": "Enter your gold and silver and see what it buys at live spot in barrels of oil, months of rent and hours of labor, and how that compares to 1971."
   },
+  "/speculation": {
+    "title": "Gold and silver price what-if calculator",
+    "description": "Enter your gold and silver, set target prices, and see what your stack could be worth and what it would buy, against live spot."
+  },
   "/coins": {
     "title": "Coin and bar melt values at live spot",
     "description": "Melt value for Silver Eagles, Maple Leafs, Krugerrands, Morgan dollars, junk silver, old US gold and common bars, with each one's weight and purity."
