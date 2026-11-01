@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from 'react';
 import { plainDashes } from './text';
+import { NewTabNote } from '../ui/NewTabNote';
 
 /**
  * A small, safe markdown renderer for Troy's replies and articles. It
@@ -28,6 +29,7 @@ function renderInline(text: string, keyBase: string): ReactNode[] {
         out.push(
           <a key={key} href={m[2]} target="_blank" rel="noopener noreferrer">
             {plainDashes(m[1])}
+            <NewTabNote />
           </a>,
         );
       } else {
@@ -37,6 +39,7 @@ function renderInline(text: string, keyBase: string): ReactNode[] {
       out.push(
         <a key={key} href={token} target="_blank" rel="noopener noreferrer">
           {token.replace(/^https?:\/\//, '').slice(0, 48)}
+          <NewTabNote />
         </a>,
       );
     }

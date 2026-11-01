@@ -3,6 +3,7 @@ import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { postJson } from '../lib/apiClient';
 import { Card, PageHeader } from '../ui/primitives';
+import { NewTabNote } from '../ui/NewTabNote';
 
 interface Dealer {
   name: string;
@@ -68,6 +69,7 @@ export default function Dealers() {
                   className="inline-flex h-8 items-center rounded-lg border border-line px-3 text-[13px] font-medium text-fg-2 hover:border-gold hover:text-gold"
                 >
                   {l.label}
+                  <NewTabNote />
                 </a>
               ))}
             </div>
@@ -80,6 +82,7 @@ export default function Dealers() {
             >
               Visit {d.name}
               <ExternalLink size={14} aria-hidden="true" />
+              <NewTabNote />
             </a>
           </Card>
         ))}

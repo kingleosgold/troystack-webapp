@@ -18,6 +18,7 @@ import { MetalTile } from '../ui/Market';
 import { ArticleCard, ArticleRowSkeleton } from '../ui/Signal';
 import { EpisodePlayer, EpisodeMeta } from '../ui/Podcast';
 import { InstallPath } from '../ui/AppStore';
+import { NewTabNote } from '../ui/NewTabNote';
 import { Card, ErrorNote, Img, LinkButton, SectionHeader, Skeleton } from '../ui/primitives';
 import { SpotNotice } from '../ui/SpotNotice';
 
@@ -281,7 +282,7 @@ function PodcastCard() {
       )}
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-[13px] font-semibold">
         <Link to="/podcast" className="text-gold hover:text-gold-2">All episodes</Link>
-        <a href={PODCAST_APPLE_URL} target="_blank" rel="noopener noreferrer" className="text-fg-2 hover:text-fg">Apple Podcasts</a>
+        <a href={PODCAST_APPLE_URL} target="_blank" rel="noopener noreferrer" className="text-fg-2 hover:text-fg">Apple Podcasts<NewTabNote /></a>
       </div>
     </Card>
   );

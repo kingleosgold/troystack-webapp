@@ -7,6 +7,7 @@ import { money, money0 } from '../lib/format';
 import { GAS, OIL_1971, OIL_TODAY, RENT, WAGE, amount, ounces, ratioContext, stackPower } from '../lib/purchasingPower';
 import { Button, Card, Field, Input, LinkButton, PageHeader } from '../ui/primitives';
 import { SpotNotice } from '../ui/SpotNotice';
+import { NewTabNote } from '../ui/NewTabNote';
 
 // Up to two decimals, so the ounces named are the ounces valued.
 function oz(n: number): string {
@@ -205,6 +206,7 @@ export default function Calculator() {
                 className="inline-flex h-9 items-center rounded-lg px-3 text-[13px] font-semibold text-fg-2 hover:text-fg"
               >
                 Post on X
+                <NewTabNote />
               </a>
             </div>
           </Card>

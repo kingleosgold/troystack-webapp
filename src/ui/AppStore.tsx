@@ -3,6 +3,7 @@ import { Smartphone } from 'lucide-react';
 import { appStoreUrl, isAppleMobile } from '../lib/appStore';
 import type { CheckoutCampaign } from '../lib/checkout';
 import { cx } from '../lib/cx';
+import { NewTabNote } from './NewTabNote';
 
 type QrLib = typeof import('qrcode');
 
@@ -76,13 +77,7 @@ interface AppStoreButtonProps {
   fullWidth?: boolean;
 }
 
-/**
- * Told only to screen readers, since every App Store link opens a new tab and
- * a sighted reader sees the tab appear.
- */
-export function NewTabNote() {
-  return <span className="sr-only"> (opens in a new tab)</span>;
-}
+export { NewTabNote };
 
 /** Opens the App Store listing with this surface's campaign token. */
 export function AppStoreButton({ campaign, label = 'Get the app', size = 'md', variant = 'primary', className, fullWidth }: AppStoreButtonProps) {

@@ -8,6 +8,7 @@ import { METAL_LABEL, OZT_PER_GRAM } from '../lib/metals';
 import { money } from '../lib/format';
 import { Card, Field, Input, LinkButton, PageHeader } from '../ui/primitives';
 import { AppStoreButton } from '../ui/AppStore';
+import { NewTabNote } from '../ui/NewTabNote';
 import { SpotNotice } from '../ui/SpotNotice';
 import COPY from '../lib/coinCopy.json';
 
@@ -221,6 +222,7 @@ export default function CoinPage() {
                   {i > 0 && ' and '}
                   <a href={s.url} target="_blank" rel="noopener" className="font-semibold text-fg-2 hover:text-fg">
                     {s.label}
+                    <NewTabNote />
                   </a>
                 </span>
               ))}
