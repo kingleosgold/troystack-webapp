@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CAMPAIGNS, appStoreUrl } from './appStore';
 import { siteCampaign } from './checkout';
@@ -30,5 +31,13 @@ describe('campaign tokens', () => {
     const token = ct(appStoreUrl(siteCampaign(longest)!, true));
     expect(token.length).toBeLessThanOrEqual(APPLE_MAX);
     expect(token).toMatch(API_SHAPE);
+  });
+
+  it("names Safari's Smart App Banner token in the list, so it's held to the same limits", () => {
+    const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+    const meta = html.match(/<meta name="apple-itunes-app" content="([^"]*)"/)?.[1] ?? '';
+    const banner = meta.replace(/&amp;/g, '&').match(/(?:^|[&,=\s])ct=([^&,\s]+)/)?.[1];
+    expect(banner).toBeDefined();
+    expect(CAMPAIGNS).toContain(banner);
   });
 });

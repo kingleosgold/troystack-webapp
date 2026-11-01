@@ -31,6 +31,8 @@ export const CAMPAIGNS = [
   'webapp-settings',
   'webapp-auth',
   'webapp-gold',
+  // Safari's Smart App Banner, set in index.html's apple-itunes-app meta.
+  'webapp-smartbanner',
 ] as const;
 
 export type Campaign = (typeof CAMPAIGNS)[number];
