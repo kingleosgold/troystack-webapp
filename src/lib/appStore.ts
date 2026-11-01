@@ -9,27 +9,31 @@
 export const APP_STORE_ID = '6757343766';
 const PROVIDER_TOKEN = '96487801';
 
-export type Campaign =
-  | 'webapp-home'
-  | 'webapp-nav'
-  | 'webapp-sidebar'
-  | 'webapp-trial'
-  | 'webapp-troy-limit'
-  | 'webapp-troy-history'
-  | 'webapp-signal'
-  | 'webapp-signal-list'
-  | 'webapp-podcast'
-  | 'webapp-prices'
-  | 'webapp-alerts'
-  | 'webapp-stack'
-  | 'webapp-tools'
-  | 'webapp-coins'
-  | 'webapp-vault'
-  | 'webapp-getapp'
-  | 'webapp-footer'
-  | 'webapp-settings'
-  | 'webapp-auth'
-  | 'webapp-gold';
+/** Every surface's own token. Each fits Apple's 40 characters with "-qr" added. */
+export const CAMPAIGNS = [
+  'webapp-home',
+  'webapp-nav',
+  'webapp-sidebar',
+  'webapp-trial',
+  'webapp-troy-limit',
+  'webapp-troy-history',
+  'webapp-signal',
+  'webapp-signal-list',
+  'webapp-podcast',
+  'webapp-prices',
+  'webapp-alerts',
+  'webapp-stack',
+  'webapp-tools',
+  'webapp-coins',
+  'webapp-vault',
+  'webapp-getapp',
+  'webapp-footer',
+  'webapp-settings',
+  'webapp-auth',
+  'webapp-gold',
+] as const;
+
+export type Campaign = (typeof CAMPAIGNS)[number];
 
 /** A token from one of troystack.com's links, at most 37 characters so "-qr" still fits in 40. */
 export type SiteCampaign = `site-${string}`;
