@@ -29,8 +29,17 @@ test("a computer's reader gets the free week beside the list, carrying the list'
   await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
   await page.goto('/signal');
   await expect(page.getByRole('heading', { name: "Troy's read on your own stack" })).toBeVisible();
-  // The App Store stays as the other door on a computer.
+  // The App Store stays as the other door on a computer, a quiet line under
+  // the free week that says who it's for, carrying the list's own token.
+  await expect(card(page).getByText('Have an iPhone?')).toBeVisible();
   await expect(card(page).getByRole('link', { name: 'Get the app' })).toBeVisible();
+  await expect(card(page).getByRole('link', { name: 'Get the app' })).toHaveAttribute('href', /[?&]ct=webapp-signal-list&/);
+  // The free week fills the card's width, and nothing sits beside it.
+  const tryBox = await card(page).getByRole('button', { name: 'Try Gold free for a week' }).boundingBox();
+  const textBox = await card(page).locator('p').first().boundingBox();
+  expect(tryBox).not.toBeNull();
+  expect(textBox).not.toBeNull();
+  expect(Math.abs(tryBox!.width - textBox!.width)).toBeLessThan(2);
   await card(page).getByRole('button', { name: 'Try Gold free for a week' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Start my free week' }).click();
   await expect(page).toHaveURL(/checkout\.stripe\.com/);

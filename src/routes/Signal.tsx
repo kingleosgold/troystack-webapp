@@ -11,6 +11,7 @@ import { excerpt, formatDate, formatTimeET } from '../lib/text';
 import { cx } from '../lib/cx';
 import { ArticleCard, ArticleRowSkeleton } from '../ui/Signal';
 import { AppStoreButton } from '../ui/AppStore';
+import { appStoreUrl } from '../lib/appStore';
 import { Button, Card, ErrorNote, PageHeader, Skeleton } from '../ui/primitives';
 
 function DigestFeature() {
@@ -69,14 +70,28 @@ function ReadOnCard() {
           ? "Gold adds a brief he writes around your stack each morning and 30 questions a day with him. The first week is free if you're new to Gold."
           : "The app can send you a push when Troy flags big news. It's capped, so it won't nag."}
       </p>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        {webGold && (
-          <Button size="sm" onClick={() => openTrial({ reason: 'Gold adds a morning brief from Troy written around your stack.', campaign: 'webapp-signal-list' })}>
+      {webGold ? (
+        <>
+          <Button
+            size="sm"
+            className="mt-3 w-full"
+            onClick={() => openTrial({ reason: 'Gold adds a morning brief from Troy written around your stack.', campaign: 'webapp-signal-list' })}
+          >
             Try Gold free for a week
           </Button>
-        )}
-        {showAppStore && <AppStoreButton campaign="webapp-signal-list" size="sm" label="Get the app" variant={webGold ? 'dark' : 'primary'} />}
-      </div>
+          {/* On a computer the App Store is the quieter second door, with a line saying who it's for. */}
+          {showAppStore && (
+            <p className="mt-2.5 text-center text-[13px] text-fg-3">
+              Have an iPhone?{' '}
+              <a href={appStoreUrl('webapp-signal-list')} target="_blank" rel="noopener" className="font-semibold text-gold underline underline-offset-2 hover:text-gold-2">
+                Get the app
+              </a>
+            </p>
+          )}
+        </>
+      ) : (
+        <AppStoreButton campaign="webapp-signal-list" size="sm" label="Get the app" className="mt-3" />
+      )}
     </Card>
   );
 }
