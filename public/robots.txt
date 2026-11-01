@@ -5,4 +5,4 @@ Disallow: /auth
 Disallow: /reset-password
 Disallow: /developers/keys
 
-Sitemap: https://troystack.ai/sitemap.xml
+Sitemap: https://troystack.com/sitemap.xml

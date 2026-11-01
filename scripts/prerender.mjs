@@ -6,12 +6,12 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { plainDashes, usableOneLiner } from '../api/_lib/signal-text.js';
+import { isRecap, plainDashes, usableOneLiner } from '../api/_lib/signal-text.js';
 import { coinBody, coinLd, junkBody, junkLd, ounces, sitemapRow, usableSnapshot } from './coin-html.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
-const SITE = 'https://troystack.ai';
+const SITE = 'https://troystack.com';
 const seo = JSON.parse(readFileSync(path.join(root, 'src/lib/seo.json'), 'utf8'));
 const coins = JSON.parse(readFileSync(path.join(root, 'src/lib/coins.json'), 'utf8'));
 const coinCopy = JSON.parse(readFileSync(path.join(root, 'src/lib/coinCopy.json'), 'utf8'));
@@ -48,6 +48,7 @@ function render(route, meta, body, ld, extra = {}) {
     html = setTag(html, /<meta property="og:image" content="[^"]*" \/>/, `<meta property="og:image" content="${image}" />`);
     html = setTag(html, /<meta name="twitter:image" content="[^"]*" \/>/, `<meta name="twitter:image" content="${image}" />`);
   }
+  if (extra.noindex) html = setTag(html, /<\/head>/, '<meta name="robots" content="noindex, follow" /></head>');
   if (extra.ogType) html = setTag(html, /<meta property="og:type" content="[^"]*" \/>/, `<meta property="og:type" content="${escape(extra.ogType)}" />`);
   // Crawlers that don't run JavaScript, which includes most AI ones, read the
   // page's facts from here. With JavaScript on, browsers ignore it.
@@ -108,24 +109,48 @@ async function loadSpot() {
   }
 }
 
+/** One page of the Signal list, tried three times, a few seconds apart, before the build gives up. */
+async function signalPage(query) {
+  let last;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((done) => setTimeout(done, 3000 * attempt));
+    try {
+      const res = await fetch(`https://api.troystack.ai/v1/stack-signal?${query}`, { signal: AbortSignal.timeout(12000) });
+      if (!res.ok) throw new Error(`list ${res.status}`);
+      const body = await res.json();
+      return Array.isArray(body.articles) ? body.articles : [];
+    } catch (err) {
+      last = err;
+    }
+  }
+  throw last;
+}
+
+// A failed read fails the build, so a deploy never ships a sitemap without
+// Troy's recaps. The deploy before it keeps serving. To ship while the API is
+// down, set PRERENDER_SIGNAL=off for that build.
 async function loadSignalArticles() {
   // The browser tests build offline, so they skip the live article list.
   if (process.env.PRERENDER_SIGNAL === 'off') return [];
-  try {
-    const articles = [];
-    for (let offset = 0; offset < 1000; offset += 50) {
-      const res = await fetch(`https://api.troystack.ai/v1/stack-signal?limit=50&offset=${offset}`, { signal: AbortSignal.timeout(12000) });
-      if (!res.ok) throw new Error(`list ${res.status}`);
-      const body = await res.json();
-      const batch = Array.isArray(body.articles) ? body.articles : [];
-      articles.push(...batch);
-      if (batch.length < 50) break;
-    }
-    return articles;
-  } catch (err) {
-    console.warn(`prerender: signal articles skipped (${err.message})`);
-    return [];
+  const articles = [];
+  for (let offset = 0; offset < 1000; offset += 50) {
+    const batch = await signalPage(`limit=50&offset=${offset}`);
+    articles.push(...batch);
+    if (batch.length < 50) break;
   }
+  return articles;
+}
+
+/** Every recap, back to the first, for the sitemap. The newest thousand articles of every kind don't reach that far. */
+async function loadAllRecaps() {
+  if (process.env.PRERENDER_SIGNAL === 'off') return [];
+  const recaps = [];
+  for (let offset = 0; offset < 5000; offset += 50) {
+    const batch = await signalPage(`type=signal&limit=50&offset=${offset}`);
+    recaps.push(...batch);
+    if (batch.length < 50) break;
+  }
+  return recaps;
 }
 
 const NEEDS_JS = '<p>TroyStack needs JavaScript to show live prices and talk to Troy.</p>';
@@ -166,8 +191,20 @@ for (const article of signalArticles) {
   const commentary = escape(plainExcerpt(plainDashes(article.troy_commentary || ''), 4000));
   bodies[route] = `<h1>${escape(title)}</h1><p>${escape(description)}</p><p>${commentary}</p><p>Troy is an AI. This is his analysis and opinion, not financial advice.</p>${NEEDS_JS}`;
   structured[route] = articleLd(article, title, description);
-  extras[route] = { ogType: 'article', image: article.image_url || undefined };
+  extras[route] = { ogType: 'article', image: article.image_url || undefined, noindex: !isRecap(article) };
   const published = String(article.published_at || article.created_at || '').slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(published)) modified[route] = published;
+}
+
+// Older recaps get a sitemap row without a prerendered file. Their pages
+// come from api/signal-html like any article's.
+const olderRecaps = [];
+for (const recap of await loadAllRecaps()) {
+  const slug = String(recap.slug || '');
+  if (!isRecap(recap) || !/^[a-z0-9-]{1,120}$/i.test(slug) || pages[`/signal/${slug}`]) continue;
+  const route = `/signal/${slug}`;
+  olderRecaps.push(route);
+  const published = String(recap.published_at || recap.created_at || '').slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(published)) modified[route] = published;
 }
 
@@ -206,7 +243,11 @@ for (const [alias, page] of Object.entries(SAME_AS)) {
 // The sitemap lists the same public pages. lastmod is the date a page's own
 // content last changed, never the build date, so search engines can trust it.
 const urls = Object.keys(pages)
-  .filter((route) => !(route in SAME_AS))
+  // News items are noindex, so the sitemap leaves them out.
+  .filter((route) => !(route in SAME_AS) && !extras[route]?.noindex)
+  .concat(olderRecaps)
+  // A recap published while the list was read can come back twice.
+  .filter((route, i, all) => all.indexOf(route) === i)
   .map((route) => sitemapRow(`${SITE}${route === '/' ? '/' : route}`, modified[route]))
   .join('\n');
 writeFileSync(path.join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);

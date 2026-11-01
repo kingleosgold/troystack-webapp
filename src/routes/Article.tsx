@@ -17,7 +17,7 @@ import { useWebGoldOffer } from '../hooks/useWebGoldOffer';
 
 function ShareButton({ title, slug }: { title: string; slug: string }) {
   const [copied, setCopied] = useState(false);
-  const url = `https://troystack.ai/signal/${slug}`;
+  const url = `https://troystack.com/signal/${slug}`;
   return (
     <button
       type="button"
@@ -95,6 +95,8 @@ export default function Article() {
     // Once loaded, the API's slug, so a differently cased link isn't made canonical.
     canonical: key ? `/signal/${key}` : '/signal',
     image: a?.imageUrl || undefined,
+    // Only Troy's recaps are indexed, as on troystack.com's Signal since April.
+    noindex: a ? !a.isDigest : undefined,
   });
 
   const episode = useMemo(() => podcast.data?.episodes.find((e) => e.slug === key), [podcast.data, key]);

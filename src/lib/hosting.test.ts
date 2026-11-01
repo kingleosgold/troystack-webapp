@@ -15,9 +15,52 @@ describe('Vercel routing', () => {
     expect(sources.filter((source) => source.startsWith('/coins'))).toEqual([]);
   });
 
-  it('sends an unknown Signal slug to the page that can answer 404', () => {
+  // troystack-marketing's alias sits behind Vercel's sign-in, and the app now
+  // serves privacy, terms and the calculator itself, so nothing goes there.
+  it('sends nothing to the marketing project', () => {
+    expect(JSON.stringify(vercel.rewrites ?? [])).not.toContain('vercel.app');
+  });
+
+  it("serves the pages troystack.com's links point at itself, /speculation included", () => {
+    const sources: string[] = (vercel.redirects ?? []).map((rule: { source: string }) => rule.source);
+    for (const path of ['/privacy', '/terms', '/calculator', '/speculation']) expect(sources).not.toContain(path);
+  });
+
+  // The iOS app opens troystack.com's reset links through this file, so it has
+  // to come from the app's own project once troystack.com is here.
+  it('serves the Apple association file as JSON for the reset link', () => {
+    const file = JSON.parse(readFileSync(new URL('../../public/.well-known/apple-app-site-association', import.meta.url), 'utf8'));
+    expect(file.applinks.details[0].appIDs).toContain('3BKELS5FG9.com.stacktrackerpro.app');
+    expect(file.applinks.details[0].paths).toContain('/auth/reset-password');
+    const header = (vercel.headers ?? []).find((item: { source: string }) => item.source === '/.well-known/apple-app-site-association');
+    expect(header?.headers).toContainEqual({ key: 'Content-Type', value: 'application/json' });
+  });
+
+  it("keeps the app's own Signal pages, which answer a new article's slug or 404", () => {
     const rule = (vercel.rewrites ?? []).find((item: { source: string }) => item.source === '/signal/:slug');
     expect(rule?.destination).toBe('/api/signal-html?slug=:slug');
+  });
+
+  // Vercel's /:path* with a host condition doesn't catch the bare root (live,
+  // www.troystack.com/ answers 200 while its subpaths 308), so / gets its own
+  // rule, the same way www.troystack.ai does.
+  it('sends www.troystack.com to troystack.com, its home page included', () => {
+    const rules = (vercel.redirects ?? []).filter((item: { has?: Array<{ value: string }> }) => item.has?.[0]?.value === 'www.troystack.com');
+    expect(rules).toEqual([
+      expect.objectContaining({ source: '/', destination: 'https://troystack.com/', permanent: true }),
+      expect.objectContaining({ source: '/:path*', destination: 'https://troystack.com/:path*', permanent: true }),
+    ]);
+    expect((vercel.redirects ?? [])[0]).toBe(rules[0]);
+  });
+
+  // The app's reset email lands on troystack.com/auth/reset-password, which the
+  // association file sends into the iOS app. Without the app the browser loads
+  // it, so it goes to the app's own reset page. The browser carries the
+  // fragment, where Supabase puts the reset session, through the redirect.
+  it("sends a reset link opened without the app to the app's reset page", () => {
+    const rule = (vercel.redirects ?? []).find((item: { source: string }) => item.source === '/auth/reset-password');
+    expect(rule).toMatchObject({ destination: '/reset-password', permanent: false });
+    expect(rule.has).toBeUndefined();
   });
 
   it('keeps signed-in app routes on the shell', () => {

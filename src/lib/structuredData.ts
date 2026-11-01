@@ -1,7 +1,7 @@
 import type { SignalArticle } from './signalApi';
 import { excerpt } from './text';
 
-const SITE = 'https://troystack.ai';
+const SITE = 'https://troystack.com';
 
 export function articleLd(article: Pick<SignalArticle, 'slug' | 'title' | 'oneLiner' | 'commentary' | 'publishedAt' | 'imageUrl'>) {
   const url = `${SITE}/signal/${article.slug}`;

@@ -2,36 +2,142 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "redirects": [
-    { "source": "/dashboard", "destination": "/", "permanent": true },
-    { "source": "/today", "destination": "/", "permanent": true },
-    { "source": "/portfolio", "destination": "/stack", "permanent": true },
-    { "source": "/analytics", "destination": "/stack", "permanent": true },
-    { "source": "/speculate", "destination": "/tools/what-if", "permanent": true },
-    { "source": "/junk-silver", "destination": "/tools/junk-silver", "permanent": true },
-    { "source": "/chat", "destination": "/troy", "permanent": true },
-    { "source": "/c/:conversationId", "destination": "/troy/c/:conversationId", "permanent": false },
     {
       "source": "/",
-      "has": [{ "type": "host", "value": "www.troystack.ai" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "www.troystack.com"
+        }
+      ],
+      "destination": "https://troystack.com/",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.troystack.com"
+        }
+      ],
+      "destination": "https://troystack.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/today",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/portfolio",
+      "destination": "/stack",
+      "permanent": true
+    },
+    {
+      "source": "/analytics",
+      "destination": "/stack",
+      "permanent": true
+    },
+    {
+      "source": "/speculate",
+      "destination": "/tools/what-if",
+      "permanent": true
+    },
+    {
+      "source": "/junk-silver",
+      "destination": "/tools/junk-silver",
+      "permanent": true
+    },
+    {
+      "source": "/chat",
+      "destination": "/troy",
+      "permanent": true
+    },
+    {
+      "source": "/c/:conversationId",
+      "destination": "/troy/c/:conversationId",
+      "permanent": false
+    },
+    {
+      "source": "/auth/reset-password",
+      "destination": "/reset-password",
+      "permanent": false
+    },
+    {
+      "source": "/auth/reset-password/:path*",
+      "destination": "/reset-password",
+      "permanent": false
+    },
+    {
+      "source": "/signal-sitemap.xml",
+      "destination": "/sitemap.xml",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.troystack.ai"
+        }
+      ],
       "destination": "https://troystack.ai/",
       "permanent": true
     },
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.troystack.ai" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "www.troystack.ai"
+        }
+      ],
       "destination": "https://troystack.ai/:path*",
       "permanent": true
     }
   ],
   "rewrites": [
-    { "source": "/troy/c/:conversationId", "destination": "/" },
-    { "source": "/settings", "destination": "/" },
-    { "source": "/auth", "destination": "/" },
-    { "source": "/reset-password", "destination": "/" },
-    { "source": "/developers/keys", "destination": "/" },
-    { "source": "/signal/:slug", "destination": "/api/signal-html?slug=:slug" }
+    {
+      "source": "/troy/c/:conversationId",
+      "destination": "/"
+    },
+    {
+      "source": "/settings",
+      "destination": "/"
+    },
+    {
+      "source": "/auth",
+      "destination": "/"
+    },
+    {
+      "source": "/reset-password",
+      "destination": "/"
+    },
+    {
+      "source": "/developers/keys",
+      "destination": "/"
+    },
+    {
+      "source": "/signal/:slug",
+      "destination": "/api/signal-html?slug=:slug"
+    }
   ],
   "headers": [
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
     {
       "source": "/assets/(.*)",
       "headers": [

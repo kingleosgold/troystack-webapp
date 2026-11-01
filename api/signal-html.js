@@ -3,9 +3,9 @@
 // and Article JSON-LD, or a real 404 when the API says the slug is unknown.
 // When the API fails it answers 503 with the app shell, so a reader still gets
 // the app and a crawler retries instead of caching the wrong page.
-import { plainDashes, usableOneLiner } from './_lib/signal-text.js';
+import { isRecap, plainDashes, usableOneLiner } from './_lib/signal-text.js';
 
-const SITE = 'https://troystack.ai';
+const SITE = 'https://troystack.com';
 
 const escapeHtml = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const scriptJson = (value) => JSON.stringify(value).replace(/</g, '\\u003c');
@@ -118,7 +118,8 @@ export default async function handler(req, res) {
     author: { '@type': 'Organization', name: 'TroyStack', url: SITE },
     publisher: { '@type': 'Organization', name: 'Mancini Tech Solutions, LLC', url: SITE },
   };
-  html = html.replace('</head>', () => `<script type="application/ld+json">${scriptJson(ld)}</script></head>`);
+  const robots = isRecap(article) ? '' : '<meta name="robots" content="noindex, follow" />';
+  html = html.replace('</head>', () => `${robots}<script type="application/ld+json">${scriptJson(ld)}</script></head>`);
 
   await send(200, html);
 }

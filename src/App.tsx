@@ -19,6 +19,8 @@ const ToolWhatIf = lazy(() => import('./routes/ToolWhatIf'));
 const ToolStackingHistory = lazy(() => import('./routes/ToolStackingHistory'));
 const ToolRatio = lazy(() => import('./routes/ToolRatio'));
 const Calculator = lazy(() => import('./routes/Calculator'));
+const Privacy = lazy(() => import('./routes/Privacy'));
+const Terms = lazy(() => import('./routes/Terms'));
 const Speculation = lazy(() => import('./routes/Speculation'));
 const Coins = lazy(() => import('./routes/Coins'));
 const Coin = lazy(() => import('./routes/Coin'));
@@ -31,8 +33,6 @@ const Auth = lazy(() => import('./routes/Auth'));
 const ResetPassword = lazy(() => import('./routes/ResetPassword'));
 const Developers = lazy(() => import('./routes/Developers'));
 const DeveloperKeys = lazy(() => import('./routes/DeveloperKeys'));
-const Privacy = lazy(() => import('./routes/Privacy'));
-const Terms = lazy(() => import('./routes/Terms'));
 const NotFound = lazy(() => import('./routes/NotFound'));
 
 /** Old chat links were /c/:id. */
