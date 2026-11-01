@@ -103,6 +103,21 @@ export function AppStoreButton({ campaign, label = 'Get the app', size = 'md', v
 }
 
 /**
+ * The quiet App Store door under a card's main button: a line saying who it's
+ * for and an underlined link with this surface's campaign token.
+ */
+export function AppStoreTextLink({ campaign, lead = 'Have an iPhone?', label = 'Get the app', className }: { campaign: CheckoutCampaign; lead?: string; label?: string; className?: string }) {
+  return (
+    <p className={cx('text-[13px] text-fg-3', className)}>
+      {lead}{' '}
+      <a href={appStoreUrl(campaign)} target="_blank" rel="noopener" className="font-semibold text-gold underline underline-offset-2 hover:text-gold-2">
+        {label}
+      </a>
+    </p>
+  );
+}
+
+/**
  * The app's install path for this device: a button on iPhone and iPad, and a
  * QR code plus the button on a computer, since installs happen on the phone.
  */

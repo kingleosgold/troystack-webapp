@@ -20,8 +20,18 @@ test("a computer's reader gets the free week under a piece, carrying the Signal'
   });
   await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
   await page.goto(PIECE);
-  // The App Store stays as the other door on a computer.
-  await expect(card(page).getByRole('link', { name: 'Get TroyStack for iPhone' })).toBeVisible();
+  // The App Store stays as the other door on a computer, a quiet line under
+  // the free week that says who it's for, carrying the piece's own token.
+  await expect(card(page).getByText('Have an iPhone?')).toBeVisible();
+  await expect(card(page).getByRole('link', { name: 'Get the app' })).toBeVisible();
+  await expect(card(page).getByRole('link', { name: 'Get the app' })).toHaveAttribute('href', /[?&]ct=webapp-signal&/);
+  // The free week is the one button, and nothing sits beside it.
+  await expect(card(page).getByRole('link', { name: 'Get TroyStack for iPhone' })).toHaveCount(0);
+  const tryBox = await card(page).getByRole('button', { name: 'Try Gold free for a week' }).boundingBox();
+  const lineBox = await card(page).getByText('Have an iPhone?').boundingBox();
+  expect(tryBox).not.toBeNull();
+  expect(lineBox).not.toBeNull();
+  expect(lineBox!.y).toBeGreaterThan(tryBox!.y + tryBox!.height - 1);
   await card(page).getByRole('button', { name: 'Try Gold free for a week' }).click();
   const sheet = page.getByRole('dialog');
   await sheet.getByRole('button', { name: 'Start my free week' }).click();

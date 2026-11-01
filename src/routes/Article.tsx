@@ -10,7 +10,7 @@ import { money } from '../lib/format';
 import { Markdown } from '../lib/markdown';
 import { ArticleCard } from '../ui/Signal';
 import { EpisodePlayer } from '../ui/Podcast';
-import { AppStoreButton } from '../ui/AppStore';
+import { AppStoreButton, AppStoreTextLink } from '../ui/AppStore';
 import { Button, Card, EmptyState, ErrorNote, Img, LinkButton, Skeleton } from '../ui/primitives';
 import { useTrial } from '../contexts/TrialContext';
 import { useWebGoldOffer } from '../hooks/useWebGoldOffer';
@@ -53,7 +53,7 @@ function ReadOnCard() {
           <Skeleton className="h-6 w-1/2" />
           <Skeleton className="mt-2.5 h-4 w-full" />
           <Skeleton className="mt-1.5 h-4 w-2/3" />
-          <Skeleton className="mt-4 h-10 w-48" />
+          <Skeleton className="mt-4 h-10 w-full sm:max-w-sm" />
         </Card>
       </div>
     );
@@ -67,16 +67,19 @@ function ReadOnCard() {
           ? "Gold adds a morning brief he writes around your stack and 30 questions a day with him. The first week is free if you're new to Gold."
           : 'In the app he knows your stack, so his read on the news comes with what it means for what you hold.'}
       </p>
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        {webGold && (
-          <Button onClick={() => openTrial({ reason: 'Gold adds a morning brief from Troy written around your stack.', campaign: 'webapp-signal' })}>
+      {webGold ? (
+        <div className="mt-4 sm:max-w-sm">
+          <Button className="w-full" onClick={() => openTrial({ reason: 'Gold adds a morning brief from Troy written around your stack.', campaign: 'webapp-signal' })}>
             Try Gold free for a week
           </Button>
-        )}
-        {showAppStore && (
-          <AppStoreButton campaign="webapp-signal" label="Get TroyStack for iPhone" variant={webGold ? 'dark' : 'primary'} size={webGold ? 'sm' : 'md'} />
-        )}
-      </div>
+          {/* On a computer the App Store is the quieter second door, with a line saying who it's for. */}
+          {showAppStore && <AppStoreTextLink campaign="webapp-signal" className="mt-2.5 text-center" />}
+        </div>
+      ) : (
+        <div className="mt-4">
+          <AppStoreButton campaign="webapp-signal" label="Get TroyStack for iPhone" />
+        </div>
+      )}
     </Card>
   );
 }
