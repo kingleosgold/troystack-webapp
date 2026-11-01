@@ -172,6 +172,16 @@ test("a guest whose session can't be read still gets the free week, not a card t
   await expect(page.getByTestId('read-on-pending')).toHaveCount(0);
 });
 
+test("a guest with another Supabase project's session left in the browser still gets the free week when the session can't be read", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store card');
+  await page.addInitScript(() => localStorage.setItem('sb-someotherproject-auth-token', '{"access_token":"x"}'));
+  await mockBackends(page);
+  await failSessionLock(page);
+  await page.goto('/signal');
+  await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
+  await expect(page.getByTestId('read-on-pending')).toHaveCount(0);
+});
+
 test("an account signing back in after its plan couldn't be read waits on the plan, and never shows the phone card", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store card');
   await signIn(page, { once: true });
