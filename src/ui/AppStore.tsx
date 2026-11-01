@@ -77,7 +77,6 @@ interface AppStoreButtonProps {
   fullWidth?: boolean;
 }
 
-export { NewTabNote };
 
 /** Opens the App Store listing with this surface's campaign token. */
 export function AppStoreButton({ campaign, label = 'Get the app', size = 'md', variant = 'primary', className, fullWidth }: AppStoreButtonProps) {
