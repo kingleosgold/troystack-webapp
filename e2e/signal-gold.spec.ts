@@ -25,6 +25,9 @@ test("a computer's reader gets the free week under a piece, carrying the Signal'
   await expect(card(page).getByText('Have an iPhone?')).toBeVisible();
   await expect(card(page).getByRole('link', { name: 'Get the app' })).toBeVisible();
   await expect(card(page).getByRole('link', { name: 'Get the app' })).toHaveAttribute('href', /[?&]ct=webapp-signal&/);
+  // A screen reader hears that the link opens a new tab.
+  await expect(card(page).getByRole('link', { name: 'Get the app (opens in a new tab)', exact: true })).toBeVisible();
+  await expect(page.locator('aside').getByRole('link', { name: 'Open the App Store (opens in a new tab)', exact: true })).toBeVisible();
   // The free week is the one button, and nothing sits beside it.
   await expect(card(page).getByRole('link', { name: 'Get TroyStack for iPhone' })).toHaveCount(0);
   const tryBox = await card(page).getByRole('button', { name: 'Try Gold free for a week' }).boundingBox();
@@ -86,7 +89,7 @@ test('an iPhone keeps the App Store button under a piece', async ({ page }, test
   test.skip(testInfo.project.name !== 'iphone', 'only the iPhone project is an iPhone');
   await mockBackends(page);
   await page.goto(PIECE);
-  await expect(card(page).getByRole('link', { name: 'Get TroyStack for iPhone' })).toBeVisible();
+  await expect(card(page).getByRole('link', { name: 'Get TroyStack for iPhone (opens in a new tab)', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toHaveCount(0);
 });
 
