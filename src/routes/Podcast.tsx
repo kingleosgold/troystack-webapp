@@ -8,6 +8,7 @@ import { PODCAST_APPLE_URL, PODCAST_RSS_URL } from '../lib/appStore';
 import { excerpt } from '../lib/text';
 import { EpisodeMeta, EpisodePlayer } from '../ui/Podcast';
 import { Button, Card, ErrorNote, Img, PageHeader, Skeleton } from '../ui/primitives';
+import { NewTabNote } from '../ui/NewTabNote';
 
 export default function Podcast() {
   usePageMeta({ ...SEO['/podcast'], canonical: '/podcast' });
@@ -53,9 +54,11 @@ export default function Podcast() {
         <div className="mt-5 flex flex-wrap gap-3 border-t border-line pt-4">
           <a href={PODCAST_APPLE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-lg bg-fg px-3.5 text-[13px] font-semibold text-bg hover:opacity-90">
             Follow on Apple Podcasts
+            <NewTabNote />
           </a>
           <a href={PODCAST_RSS_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line px-3.5 text-[13px] font-semibold text-fg-2 hover:text-fg">
             <Rss size={14} aria-hidden="true" /> RSS feed
+            <NewTabNote />
           </a>
         </div>
       </Card>

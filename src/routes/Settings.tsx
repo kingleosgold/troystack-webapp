@@ -19,6 +19,7 @@ import { formatDate, todayET } from '../lib/text';
 import { cx } from '../lib/cx';
 import { downloadText } from '../lib/download';
 import { InstallPath } from '../ui/AppStore';
+import { NewTabNote } from '../ui/NewTabNote';
 import { Button, Field, Input, PageHeader, Segmented, Sheet } from '../ui/primitives';
 
 /** What a checkout that didn't open leaves in the address for this page to say. */
@@ -49,6 +50,7 @@ function Row({ title, detail, right, onClick, href, tone }: { title: ReactNode; 
     return external ? (
       <a href={href} className={cx(cls, 'hover:bg-surface-2')} {...(href.startsWith('http') ? { target: '_blank', rel: 'noopener' } : {})}>
         {body}
+        {href.startsWith('http') && <NewTabNote />}
       </a>
     ) : (
       <Link to={href} className={cx(cls, 'hover:bg-surface-2')}>

@@ -9,6 +9,7 @@ import { coinsInGroup } from '../lib/coins';
 import { Card, Field, Input, PageHeader, Segmented } from '../ui/primitives';
 import { SpotNotice } from '../ui/SpotNotice';
 import { AppStoreButton } from '../ui/AppStore';
+import { NewTabNote } from '../ui/NewTabNote';
 import PAGE from '../lib/junkSilverPage.json';
 import COPY from '../lib/coinCopy.json';
 
@@ -160,6 +161,7 @@ export default function ToolJunkSilver() {
               {i > 0 && ' and '}
               <a href={s.url} target="_blank" rel="noopener" className="font-semibold text-fg-2 hover:text-fg">
                 {s.label}
+                <NewTabNote />
               </a>
             </span>
           ))}

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 import type { TroyPreview } from '../services/troy';
 import { money, money0, num, signedMoney } from '../lib/format';
+import { NewTabNote } from './NewTabNote';
 
 /** The data card Troy's reply can carry, matching the app's inline cards. */
 
@@ -161,6 +162,7 @@ function DealerCard({ data }: { data: Record<string, unknown> }) {
       <a href={url} target="_blank" rel="noopener sponsored" className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-btn text-btn-fg text-[13px] font-semibold hover:bg-btn-hover">
         {label}
         <ExternalLink size={13} aria-hidden="true" />
+        <NewTabNote />
       </a>
       <p className="text-[11px] text-fg-3 mt-2">We may earn a commission from these links.</p>
     </Frame>

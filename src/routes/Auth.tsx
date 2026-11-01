@@ -6,6 +6,7 @@ import { checkoutIntentCampaign, isWebPlan } from '../lib/checkout';
 import { countStep } from '../lib/funnel';
 import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { Button, Field, Input } from '../ui/primitives';
+import { NewTabNote } from '../ui/NewTabNote';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
@@ -242,8 +243,8 @@ export default function Auth() {
       {mode === 'signup' && (
         <p className="mt-4 text-center text-[12px] text-fg-3">
           By making an account you agree to the{' '}
-          <a href={TERMS_URL} target="_blank" rel="noopener" className="underline hover:text-fg-2">Terms</a> and{' '}
-          <a href={PRIVACY_URL} target="_blank" rel="noopener" className="underline hover:text-fg-2">Privacy Policy</a>.
+          <a href={TERMS_URL} target="_blank" rel="noopener" className="underline hover:text-fg-2">Terms<NewTabNote /></a> and{' '}
+          <a href={PRIVACY_URL} target="_blank" rel="noopener" className="underline hover:text-fg-2">Privacy Policy<NewTabNote /></a>.
         </p>
       )}
     </div>

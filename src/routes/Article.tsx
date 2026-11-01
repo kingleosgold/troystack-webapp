@@ -11,6 +11,7 @@ import { Markdown } from '../lib/markdown';
 import { ArticleCard } from '../ui/Signal';
 import { EpisodePlayer } from '../ui/Podcast';
 import { AppStoreButton, AppStoreTextLink } from '../ui/AppStore';
+import { NewTabNote } from '../ui/NewTabNote';
 import { Button, Card, EmptyState, ErrorNote, Img, LinkButton, Skeleton } from '../ui/primitives';
 import { useTrial } from '../contexts/TrialContext';
 import { useWebGoldOffer } from '../hooks/useWebGoldOffer';
@@ -165,7 +166,7 @@ export default function Article() {
                   <li key={i} className="text-[14px]">
                     {s.url ? (
                       <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-start gap-1.5 text-fg-2 hover:text-gold">
-                        <span>{s.title}</span>
+                        <span>{s.title}<NewTabNote /></span>
                         <ExternalLink size={13} className="mt-1 shrink-0" aria-hidden="true" />
                       </a>
                     ) : (
