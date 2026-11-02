@@ -1,6 +1,7 @@
 import { lazy } from 'react';
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { authAliasTarget, AUTH_ALIASES } from './lib/authAliases';
+import { pageAliasTarget, PAGE_ALIASES } from './lib/pageAliases';
 import AppShell from './ui/Layout';
 import Home from './routes/Home';
 import { useAfterSignIn } from './hooks/useAfterSignIn';
@@ -47,6 +48,13 @@ function OldConversation() {
 function AuthAlias({ mode }: { mode: 'signup' | 'signin' }) {
   const { search } = useLocation();
   return <Navigate to={authAliasTarget(mode, search)} replace />;
+}
+
+// /pricing, /download and the like are what people type looking for the
+// plans or the app. Send them there, keeping any campaign token.
+function PageAlias({ to }: { to: string }) {
+  const { search } = useLocation();
+  return <Navigate to={pageAliasTarget(to, search)} replace />;
 }
 
 function CheckoutOverlay({ text }: { text: string }) {
@@ -106,6 +114,9 @@ export default function App() {
           <Route path="c/:conversationId" element={<OldConversation />} />
           {AUTH_ALIASES.map(({ path, mode }) => (
             <Route key={path} path={path.slice(1)} element={<AuthAlias mode={mode} />} />
+          ))}
+          {PAGE_ALIASES.map(({ path, to }) => (
+            <Route key={path} path={path.slice(1)} element={<PageAlias to={to} />} />
           ))}
 
           <Route path="*" element={<NotFound />} />

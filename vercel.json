@@ -17,6 +17,12 @@
     { "source": "/log-in", "destination": "/auth?mode=signin", "permanent": false },
     { "source": "/signin", "destination": "/auth?mode=signin", "permanent": false },
     { "source": "/sign-in", "destination": "/auth?mode=signin", "permanent": false },
+    { "source": "/pricing", "destination": "/gold", "permanent": false },
+    { "source": "/plans", "destination": "/gold", "permanent": false },
+    { "source": "/premium", "destination": "/gold", "permanent": false },
+    { "source": "/upgrade", "destination": "/gold", "permanent": false },
+    { "source": "/subscribe", "destination": "/gold", "permanent": false },
+    { "source": "/download", "destination": "/app", "permanent": false },
     {
       "source": "/",
       "has": [{ "type": "host", "value": "www.troystack.ai" }],
