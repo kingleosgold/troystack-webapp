@@ -64,11 +64,17 @@ const DAY_MS = 24 * 3600_000;
  * it, so every price that's left still sits at its own moment. Without a time
  * for every price, they're spaced over the day before `now`, counted before
  * anything is left out, for the same reason.
+ *
+ * The feed sends its last 96 prints, which after a weekend reach back to
+ * Friday. Only the prints from the 24 hours before the newest one are kept,
+ * so the chart and its change over 24 hours don't measure from Friday.
  */
 export function pairSparklines(raw: { sparklines?: Partial<MetalMap<unknown[]>>; timestamps?: unknown[] }, now = Date.now()): Sparklines {
   const series = {} as MetalMap<number[]>;
   const times = {} as MetalMap<number[]>;
   const stamps = raw.timestamps ?? [];
+  const newest = Math.max(...stamps.map((s) => Date.parse(String(s))).filter(Number.isFinite));
+  const from = newest - DAY_MS;
   for (const m of METALS) {
     const values = raw.sparklines?.[m] ?? [];
     const timed = stamps.length === values.length;
@@ -79,6 +85,7 @@ export function pairSparklines(raw: { sparklines?: Partial<MetalMap<unknown[]>>;
       const v = Number(value);
       const t = timed ? Date.parse(String(stamps[i])) : now - (values.length - 1 - i) * step;
       if (value == null || !Number.isFinite(v) || v <= 0 || !Number.isFinite(t)) return;
+      if (timed && t < from) return;
       series[m].push(v);
       times[m].push(t);
     });
