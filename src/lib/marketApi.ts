@@ -67,7 +67,9 @@ const DAY_MS = 24 * 3600_000;
  *
  * The feed sends its last 96 prints, which after a weekend reach back to
  * Friday. Only the prints from the 24 hours before the newest one are kept,
- * so the chart and its change over 24 hours don't measure from Friday.
+ * plus the price that stood when that window opened, placed at its start.
+ * So the change over 24 hours runs from the price 24 hours ago, which after a
+ * weekend is Friday's close, and the line doesn't stretch back to Friday.
  */
 export function pairSparklines(raw: { sparklines?: Partial<MetalMap<unknown[]>>; timestamps?: unknown[] }, now = Date.now()): Sparklines {
   const series = {} as MetalMap<number[]>;
@@ -81,14 +83,22 @@ export function pairSparklines(raw: { sparklines?: Partial<MetalMap<unknown[]>>;
     const step = DAY_MS / Math.max(1, values.length - 1);
     series[m] = [];
     times[m] = [];
+    let before = null as { v: number; t: number } | null;
     values.forEach((value, i) => {
       const v = Number(value);
       const t = timed ? Date.parse(String(stamps[i])) : now - (values.length - 1 - i) * step;
       if (value == null || !Number.isFinite(v) || v <= 0 || !Number.isFinite(t)) return;
-      if (timed && t < from) return;
+      if (timed && t < from) {
+        if (!before || t >= before.t) before = { v, t };
+        return;
+      }
       series[m].push(v);
       times[m].push(t);
     });
+    if (before && series[m].length > 0 && times[m][0] > from) {
+      series[m].unshift(before.v);
+      times[m].unshift(from);
+    }
   }
   return { series, times };
 }
