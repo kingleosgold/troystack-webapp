@@ -83,6 +83,22 @@ test.describe('every page', () => {
   }
 });
 
+test.describe('typed sign-up and sign-in addresses', () => {
+  for (const [path, heading] of [['/signup', 'Make your free account'], ['/login', 'Sign in to TroyStack']] as const) {
+    test(`${path} opens the right form, not the 404 page`, async ({ page }) => {
+      const errors = watchErrors(page);
+      await mockBackends(page);
+      await page.goto(`${path}?next=/troy`);
+      await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText(heading, { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/auth\?/);
+      const url = new URL(page.url());
+      expect(url.searchParams.get('next')).toBe('/troy');
+      expect(errors).toEqual([]);
+      await shot(page, path.slice(1));
+    });
+  }
+});
+
 test('home shows live prices and Troy\'s read', async ({ page }) => {
   await mockBackends(page);
   await page.goto('/');
