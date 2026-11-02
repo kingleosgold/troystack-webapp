@@ -112,10 +112,26 @@ test.describe('typed pricing and download addresses', () => {
       const url = new URL(page.url());
       expect(url.pathname).toBe(to);
       expect(url.searchParams.get('campaign')).toBe('site-pricing');
+      if (to === '/app') {
+        // The App Store link carries the link's token, not the page's own.
+        const store = new URL(await page.locator('main').getByRole('link', { name: /App Store/ }).first().getAttribute('href') ?? '');
+        expect(store.searchParams.get('ct')).toBe('site-pricing');
+      }
       expect(errors).toEqual([]);
       await shot(page, path.slice(1));
     });
   }
+});
+
+test('/app keeps its own token without a site link, and drops a token that isn\'t a site one', async ({ page }) => {
+  const errors = watchErrors(page);
+  await mockBackends(page);
+  for (const [query, ct] of [['', 'webapp-getapp'], ['?campaign=evil', 'webapp-getapp'], ['?campaign=Site-X', 'webapp-getapp'], [`?campaign=site-${'a'.repeat(33)}`, 'webapp-getapp'], [`?campaign=site-${'a'.repeat(32)}`, `site-${'a'.repeat(32)}`], ['?campaign=site-podcast', 'site-podcast']] as const) {
+    await page.goto(`/app${query}`);
+    const store = new URL(await page.locator('main').getByRole('link', { name: /App Store/ }).first().getAttribute('href') ?? '');
+    expect(store.searchParams.get('ct')).toBe(ct);
+  }
+  expect(errors).toEqual([]);
 });
 
 test('home shows live prices and Troy\'s read', async ({ page }) => {
