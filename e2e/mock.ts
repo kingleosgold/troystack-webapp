@@ -136,7 +136,7 @@ export const BRIEF_TEXT = 'Gold held near $4,180 overnight and silver firmed. Yo
 export const DEALER_LINK_PREVIEW = {
   type: 'dealer_link',
   data: { url: 'https://www.sdbullion.com/silver', label: 'Shop silver at SD Bullion' },
-};
+} as const;
 
 /** Answers every TroyStack API and Supabase request the site makes. */
 export async function mockBackends(page: Page, opts: MockOptions = {}) {
