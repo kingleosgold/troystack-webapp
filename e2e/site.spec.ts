@@ -99,6 +99,25 @@ test.describe('typed sign-up and sign-in addresses', () => {
   }
 });
 
+test.describe('typed pricing and download addresses', () => {
+  for (const [path, heading, to] of [
+    ['/pricing', 'Troy, all day, around your stack', '/gold'],
+    ['/download', 'Your stack and Troy, wherever you are', '/app'],
+  ] as const) {
+    test(`${path} opens ${to}, not the 404 page`, async ({ page }) => {
+      const errors = watchErrors(page);
+      await mockBackends(page);
+      await page.goto(`${path}?campaign=site-pricing`);
+      await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText(heading, { timeout: 15_000 });
+      const url = new URL(page.url());
+      expect(url.pathname).toBe(to);
+      expect(url.searchParams.get('campaign')).toBe('site-pricing');
+      expect(errors).toEqual([]);
+      await shot(page, path.slice(1));
+    });
+  }
+});
+
 test('home shows live prices and Troy\'s read', async ({ page }) => {
   await mockBackends(page);
   await page.goto('/');
