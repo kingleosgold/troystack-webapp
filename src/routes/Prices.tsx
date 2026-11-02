@@ -15,6 +15,7 @@ import { ChangeBadge, MarketStatus } from '../ui/Market';
 import { AppStoreButton } from '../ui/AppStore';
 import { Card, ErrorNote, Segmented, Skeleton } from '../ui/primitives';
 import type { ChartPoint } from '../ui/PriceChart';
+import { holdThroughClose } from '../lib/sparkline';
 
 const PriceChart = lazy(() => import('../ui/PriceChart'));
 
@@ -45,7 +46,7 @@ function useChartData(metal: Metal, range: Range) {
       const values = sparks.data?.series[metal] ?? [];
       const times = sparks.data?.times[metal] ?? [];
       const points: ChartPoint[] = values.map((v, i) => ({ t: times[i], v }));
-      return { points, startsLate: false, loading: sparks.isLoading, error: sparks.isError, refetch: sparks.refetch };
+      return { points: holdThroughClose(points), startsLate: false, loading: sparks.isLoading, error: sparks.isError, refetch: sparks.refetch };
     }
     const all = history.data ?? [];
     const points: ChartPoint[] = all
