@@ -82,11 +82,11 @@ test("a signed-in iPhone's top bar App Store link tells a screen reader", async 
   await signIn(page);
   await mockBackends(page);
   await page.goto('/troy');
-  // The slot stays empty until the plan is known, so wait for the link itself.
-  await expect(page.getByTestId('nav-gold-pending')).toHaveCount(0);
+  // An iPhone never gets the web free week, so the top bar shows the App Store
+  // link at once, signed in or out. This pins it on a signed-in page.
   const topBarLink = page.getByRole('link', { name: `Get the app ${NOTE}`, exact: true });
   await expect(topBarLink).toBeVisible();
-  await expect(topBarLink).toHaveAttribute('href', /ct=webapp-nav/);
+  await expect(topBarLink).toHaveAttribute('href', /[?&]ct=webapp-nav&/);
   await everyNewTabLinkHasTheNote(page);
 });
 
