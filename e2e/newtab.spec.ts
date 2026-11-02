@@ -31,6 +31,7 @@ const PAGES = [
   { path: '/dealers', name: `Visit APMEX ${NOTE}` },
   { path: '/coins/morgan-silver-dollar', name: /\(opens in a new tab\)$/ },
   { path: '/tools/junk-silver', name: /\(opens in a new tab\)$/ },
+  // On a computer this is the Read on card's text link, on an iPhone its button.
   { path: '/signal', name: `Get the app ${NOTE}` },
   { path: '/signal/evening-signal-2026-10-08', name: /\(opens in a new tab\)$/ },
   { path: '/auth?mode=signup', name: `Privacy Policy ${NOTE}` },
