@@ -52,7 +52,7 @@ export async function fetchSpot(signal?: AbortSignal): Promise<Spot> {
 export interface Sparklines {
   /** Each metal's prices over the last 24 hours, oldest first. */
   series: MetalMap<number[]>;
-  /** When each of those prices was taken, in milliseconds, one for one with `series`. */
+  /** When each of those prices was taken, in milliseconds, one for one with `series`. A starting price from before the window sits at the window's start. */
   times: MetalMap<number[]>;
 }
 

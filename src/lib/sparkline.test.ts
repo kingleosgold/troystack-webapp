@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SPARKLINE_GAP_MS, sparklineShape } from './sparkline';
+import { SPARKLINE_GAP_MS, holdThroughClose, sparklineShape } from './sparkline';
 
 const xs = (line: string) => [...line.matchAll(/[ML](-?[\d.]+) /g)].map((m) => Number(m[1]));
 
@@ -31,5 +31,23 @@ describe('a small price line', () => {
     // The closed stretch still takes its share of the width.
     expect(xs(shape.line)[1]).toBeLessThan(20);
     expect(xs(shape.line)[2]).toBeGreaterThan(80);
+  });
+});
+
+describe('the 24-hour line across a closed market', () => {
+  it('holds the starting price flat until a minute before the open', () => {
+    const open = SPARKLINE_GAP_MS + 3_600_000;
+    expect(holdThroughClose([{ t: 0, v: 10 }, { t: open, v: 12 }, { t: open + 900_000, v: 13 }])).toEqual([
+      { t: 0, v: 10 },
+      { t: open - 60_000, v: 10 },
+      { t: open, v: 12 },
+      { t: open + 900_000, v: 13 },
+    ]);
+  });
+
+  it('leaves a line alone when the first gap is no longer than a quiet stretch', () => {
+    const pts = [{ t: 0, v: 10 }, { t: SPARKLINE_GAP_MS, v: 11 }];
+    expect(holdThroughClose(pts)).toBe(pts);
+    expect(holdThroughClose([{ t: 0, v: 10 }])).toEqual([{ t: 0, v: 10 }]);
   });
 });
