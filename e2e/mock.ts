@@ -132,6 +132,12 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** What Today's brief says in the browser checks. */
 export const BRIEF_TEXT = 'Gold held near $4,180 overnight and silver firmed. Your stack is up a little on the day.';
 
+/** The dealer card Troy's reply carries in the browser checks, shared so the specs can't drift. */
+export const DEALER_LINK_PREVIEW = {
+  type: 'dealer_link',
+  data: { url: 'https://www.sdbullion.com/silver', label: 'Shop silver at SD Bullion' },
+};
+
 /** Answers every TroyStack API and Supabase request the site makes. */
 export async function mockBackends(page: Page, opts: MockOptions = {}) {
   // The funnel skips automated browsers, and Playwright is one. These tests

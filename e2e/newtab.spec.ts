@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mockBackends, signIn } from './mock';
+import { DEALER_LINK_PREVIEW, mockBackends, signIn } from './mock';
 
 // Every link that opens a new tab says so to a screen reader. A sighted reader
 // sees the tab appear, so the note is visually hidden and nothing else moves.
@@ -77,10 +77,11 @@ test("the mobile menu's App Store button tells a screen reader", async ({ page, 
   await everyNewTabLinkHasTheNote(page);
 });
 
-test("the sponsored link in Troy's dealer card tells a screen reader", async ({ page }) => {
+test("the sponsored link in Troy's dealer card tells a screen reader", async ({ page, isMobile }) => {
+  test.skip(isMobile, 'The dealer card renders the same on both projects, so the desktop run covers it.');
   await page.addInitScript(() => localStorage.setItem('troy_ai_consent_v1', '{"version":1}'));
   await signIn(page);
-  await mockBackends(page, { replyPreview: { type: 'dealer_link', data: { url: 'https://www.sdbullion.com/silver', label: 'Shop silver at SD Bullion' } } });
+  await mockBackends(page, { replyPreview: DEALER_LINK_PREVIEW });
   await page.goto('/troy');
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('Where should I buy silver?');
   await page.getByRole('button', { name: 'Send' }).click();
