@@ -10,6 +10,13 @@
     { "source": "/junk-silver", "destination": "/tools/junk-silver", "permanent": true },
     { "source": "/chat", "destination": "/troy", "permanent": true },
     { "source": "/c/:conversationId", "destination": "/troy/c/:conversationId", "permanent": false },
+    { "source": "/signup", "destination": "/auth?mode=signup", "permanent": false },
+    { "source": "/sign-up", "destination": "/auth?mode=signup", "permanent": false },
+    { "source": "/register", "destination": "/auth?mode=signup", "permanent": false },
+    { "source": "/login", "destination": "/auth?mode=signin", "permanent": false },
+    { "source": "/log-in", "destination": "/auth?mode=signin", "permanent": false },
+    { "source": "/signin", "destination": "/auth?mode=signin", "permanent": false },
+    { "source": "/sign-in", "destination": "/auth?mode=signin", "permanent": false },
     {
       "source": "/",
       "has": [{ "type": "host", "value": "www.troystack.ai" }],

@@ -1,5 +1,6 @@
 import { lazy } from 'react';
-import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { authAliasTarget, AUTH_ALIASES } from './lib/authAliases';
 import AppShell from './ui/Layout';
 import Home from './routes/Home';
 import { useAfterSignIn } from './hooks/useAfterSignIn';
@@ -39,6 +40,13 @@ const NotFound = lazy(() => import('./routes/NotFound'));
 function OldConversation() {
   const { conversationId } = useParams();
   return <Navigate to={conversationId ? `/troy/c/${conversationId}` : '/troy'} replace />;
+}
+
+// /signup, /login and the like are what people type. Send them to the one
+// sign-in page, opened on the form they asked for, keeping any ?next=.
+function AuthAlias({ mode }: { mode: 'signup' | 'signin' }) {
+  const { search } = useLocation();
+  return <Navigate to={authAliasTarget(mode, search)} replace />;
 }
 
 function CheckoutOverlay({ text }: { text: string }) {
@@ -96,6 +104,9 @@ export default function App() {
           <Route path="junk-silver" element={<Navigate to="/tools/junk-silver" replace />} />
           <Route path="chat" element={<Navigate to="/troy" replace />} />
           <Route path="c/:conversationId" element={<OldConversation />} />
+          {AUTH_ALIASES.map(({ path, mode }) => (
+            <Route key={path} path={path.slice(1)} element={<AuthAlias mode={mode} />} />
+          ))}
 
           <Route path="*" element={<NotFound />} />
         </Route>
