@@ -77,6 +77,19 @@ test("the mobile menu's App Store button tells a screen reader", async ({ page, 
   await everyNewTabLinkHasTheNote(page);
 });
 
+test("a signed-in iPhone's top bar App Store link tells a screen reader", async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'The top bar only shows on a phone.');
+  await signIn(page);
+  await mockBackends(page);
+  await page.goto('/troy');
+  // An iPhone never gets the web free week, so the top bar shows the App Store
+  // link at once, signed in or out. This pins it on a signed-in page.
+  const topBarLink = page.getByRole('link', { name: `Get the app ${NOTE}`, exact: true });
+  await expect(topBarLink).toBeVisible();
+  await expect(topBarLink).toHaveAttribute('href', /[?&]ct=webapp-nav&/);
+  await everyNewTabLinkHasTheNote(page);
+});
+
 test("the sponsored link in Troy's dealer card tells a screen reader", async ({ page, isMobile }) => {
   test.skip(isMobile, 'The dealer card renders the same on both projects, so the desktop run covers it.');
   await page.addInitScript(() => localStorage.setItem('troy_ai_consent_v1', '{"version":1}'));
