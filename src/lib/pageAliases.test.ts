@@ -5,7 +5,7 @@ import { PAGE_ALIASES, pageAliasTarget } from './pageAliases';
 
 const vercel = JSON.parse(readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8'));
 
-describe('pricing and download addresses', () => {
+describe('pricing, download and help addresses', () => {
   it('opens the page with nothing added', () => {
     expect(pageAliasTarget('/gold', '')).toBe('/gold');
     expect(pageAliasTarget('/gold', '?')).toBe('/gold');
@@ -26,7 +26,7 @@ describe('pricing and download addresses', () => {
   });
 
   it('never redirects a page the app already serves, or an auth alias', () => {
-    const taken = new Set(['/gold', '/app', '/auth', ...AUTH_ALIASES.map((a) => a.path)]);
+    const taken = new Set(['/gold', '/app', '/auth', '/settings', ...AUTH_ALIASES.map((a) => a.path)]);
     for (const { path } of PAGE_ALIASES) expect(taken.has(path), path).toBe(false);
     expect(new Set(PAGE_ALIASES.map((a) => a.path)).size).toBe(PAGE_ALIASES.length);
   });

@@ -99,10 +99,12 @@ test.describe('typed sign-up and sign-in addresses', () => {
   }
 });
 
-test.describe('typed pricing and download addresses', () => {
+test.describe('typed pricing, download and help addresses', () => {
   for (const [path, heading, to] of [
     ['/pricing', 'Troy, all day, around your stack', '/gold'],
+    ['/lifetime', 'Troy, all day, around your stack', '/gold'],
     ['/download', 'Your stack and Troy, wherever you are', '/app'],
+    ['/support', 'Settings', '/settings'],
   ] as const) {
     test(`${path} opens ${to}, not the 404 page`, async ({ page }) => {
       const errors = watchErrors(page);
@@ -116,6 +118,10 @@ test.describe('typed pricing and download addresses', () => {
         // The App Store link carries the link's token, not the page's own.
         const store = new URL(await page.locator('main').getByRole('link', { name: /App Store/ }).first().getAttribute('href') ?? '');
         expect(store.searchParams.get('ct')).toBe('site-pricing');
+      }
+      if (to === '/settings') {
+        // A signed-out visitor still gets the support address.
+        await expect(page.getByRole('link', { name: /Email support/ })).toBeVisible();
       }
       expect(errors).toEqual([]);
       await shot(page, path.slice(1));
