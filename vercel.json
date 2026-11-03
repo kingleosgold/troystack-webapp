@@ -22,7 +22,12 @@
     { "source": "/premium", "destination": "/gold", "permanent": false },
     { "source": "/upgrade", "destination": "/gold", "permanent": false },
     { "source": "/subscribe", "destination": "/gold", "permanent": false },
+    { "source": "/lifetime", "destination": "/gold", "permanent": false },
+    { "source": "/faq", "destination": "/gold", "permanent": false },
     { "source": "/download", "destination": "/app", "permanent": false },
+    { "source": "/help", "destination": "/settings", "permanent": false },
+    { "source": "/support", "destination": "/settings", "permanent": false },
+    { "source": "/contact", "destination": "/settings", "permanent": false },
     {
       "source": "/",
       "has": [{ "type": "host", "value": "www.troystack.ai" }],
