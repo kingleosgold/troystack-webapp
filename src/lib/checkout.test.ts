@@ -255,3 +255,31 @@ describe('a plan tapped on the Gold page', () => {
     expect((JSON.parse(String(init.body)) as { cancel_url: string }).cancel_url).toBe('https://troystack.ai/gold');
   });
 });
+
+describe('what the sign-in page says on the way to checkout', () => {
+  it('leads a new account with the free week and the price after it', async () => {
+    const c = await withPrices({});
+    expect(c.checkoutAuthCopy('signup', 'yearly')).toEqual({
+      title: 'Start your free week of Gold',
+      sub: "Make your account and you'll go straight to checkout. Gold is free for 7 days, then $39.99 a year.",
+    });
+    expect(c.checkoutAuthCopy('signup', 'monthly').sub).toContain('then $4.99 a month.');
+  });
+
+  it("doesn't promise a returning account the free week", async () => {
+    const c = await withPrices({});
+    const copy = c.checkoutAuthCopy('signin', 'monthly');
+    expect(copy.title).toBe('Sign in to get Gold');
+    expect(copy.sub).not.toMatch(/free/);
+    expect(copy.sub).toContain('$4.99 a month');
+  });
+
+  it('gives Lifetime its one price and no free week', async () => {
+    const c = await withPrices({});
+    for (const mode of ['signup', 'signin'] as const) {
+      const copy = c.checkoutAuthCopy(mode, 'lifetime');
+      expect(copy.sub).toContain('$99.99 once');
+      expect(`${copy.title} ${copy.sub}`).not.toMatch(/free/);
+    }
+  });
+});
