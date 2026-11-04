@@ -15,7 +15,12 @@ export function renderLegal(route: keyof typeof PAGES): string {
   const Page = PAGES[route];
   return renderToStaticMarkup(
     <StaticRouter location={route}>
-      <Page />
+      {/* The same box Layout gives a page. #root is a flex column, and
+          without it the article shrinks to fit the privacy table and
+          runs off a phone's screen. */}
+      <main id="main" className="flex-1 min-w-0">
+        <Page />
+      </main>
     </StaticRouter>,
   );
 }

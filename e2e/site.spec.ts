@@ -1307,6 +1307,24 @@ test("the sidebar doesn't call an account Free or offer the free week while its 
   await expect(sidebar.getByText(/free week/)).toHaveCount(0);
 });
 
+test.describe('the policies without JavaScript', () => {
+  test.use({ javaScriptEnabled: false });
+  for (const [path, heading, line] of [
+    ['/privacy', 'Privacy Policy', 'on the web at troystack.com'],
+    ['/terms', 'Terms of Service', 'These terms govern your use of TroyStack'],
+  ] as const) {
+    test(`${path} carries its full text in the HTML and fits the screen`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(path);
+      await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
+      await expect(page.getByText(line).first()).toBeVisible();
+      // The privacy table is 640 pixels wide, and only its own box may scroll.
+      const right = await page.locator('article').evaluate((el) => el.getBoundingClientRect().right);
+      expect(right).toBeLessThanOrEqual(390);
+    });
+  }
+});
+
 test('the build writes privacy, terms and the calculator and lists them on troystack.com', async ({ request }) => {
   for (const file of ['privacy.html', 'terms.html', 'calculator.html']) {
     expect(existsSync(new URL(`../dist/${file}`, import.meta.url)), file).toBe(true);
