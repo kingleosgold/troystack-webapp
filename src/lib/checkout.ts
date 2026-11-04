@@ -367,3 +367,21 @@ export async function openBillingPortal(userId: string, token: string | undefine
   window.location.assign(url);
   return true;
 }
+
+/**
+ * What the sign-in page says to someone on their way to checkout, so the
+ * plan they picked is the first thing they read. Only a new account is
+ * promised the free week, since an account that's had Gold before doesn't
+ * get another one.
+ */
+export function checkoutAuthCopy(mode: 'signup' | 'signin', plan: WebPlan): { title: string; sub: string } {
+  const p = WEB_PLANS.find((x) => x.id === plan)!;
+  if (plan === 'lifetime') {
+    return mode === 'signup'
+      ? { title: 'Get Lifetime Gold', sub: `Make your account and you'll go straight to checkout. Lifetime is ${p.price} once.` }
+      : { title: 'Sign in to get Lifetime', sub: `You'll go straight to checkout. Lifetime is ${p.price} once.` };
+  }
+  return mode === 'signup'
+    ? { title: 'Start your free week of Gold', sub: `Make your account and you'll go straight to checkout. New accounts get Gold free for 7 days, then ${p.price} ${p.per}.` }
+    : { title: 'Sign in to get Gold', sub: `You'll go straight to checkout for Gold at ${p.price} ${p.per}.` };
+}

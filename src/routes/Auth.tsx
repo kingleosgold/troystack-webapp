@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageMeta } from '../hooks/usePageMeta';
-import { checkoutIntentCampaign, isWebPlan } from '../lib/checkout';
+import { checkoutAuthCopy, checkoutIntentCampaign, isWebPlan, webCheckoutReady } from '../lib/checkout';
 import { countStep } from '../lib/funnel';
 import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { Button, Field, Input } from '../ui/primitives';
@@ -52,15 +52,19 @@ export default function Auth() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const plan = params.get('plan');
+  const forCheckout = params.get('redirect') === 'checkout' && isWebPlan(plan);
+  // On the way to checkout the page leads with the plan picked, not the free
+  // account, when this site can sell that plan.
+  const planCopy = forCheckout && mode !== 'forgot' && webCheckoutReady(plan) ? checkoutAuthCopy(mode, plan) : null;
+  const head = planCopy ?? HEADINGS[mode];
+
   usePageMeta({
-    title: mode === 'signup' ? 'Make your free account' : mode === 'forgot' ? 'Reset your password' : 'Sign in',
+    title: planCopy ? planCopy.title : mode === 'signup' ? 'Make your free account' : mode === 'forgot' ? 'Reset your password' : 'Sign in',
     description: 'Sign in to TroyStack with the same account you use in the iPhone app.',
     canonical: '/auth',
     noindex: true,
   });
-
-  const plan = params.get('plan');
-  const forCheckout = params.get('redirect') === 'checkout' && isWebPlan(plan);
   const sessionId = params.get('session_id');
 
   // What the link asks for after sign-in (a plan, a campaign, a page to return
@@ -135,8 +139,6 @@ export default function Auth() {
     if (err) setError(err.message);
   };
 
-  const head = HEADINGS[mode];
-
   return (
     <div className="mx-auto w-full max-w-[26rem] px-4 py-10 sm:py-16">
       <div className="text-center">
@@ -144,14 +146,6 @@ export default function Auth() {
         <h1 className="mt-4 text-[24px] font-semibold tracking-tight text-fg">{head.title}</h1>
         <p className="mt-1.5 text-[14px] text-fg-2">{head.sub}</p>
       </div>
-
-      {forCheckout && mode !== 'forgot' && (
-        <p className="mt-6 rounded-xl border border-gold/40 bg-gold-soft px-4 py-3 text-[13px] text-fg">
-          {plan === 'lifetime'
-            ? "Sign in or make a free account, and you'll go straight to checkout for Lifetime."
-            : "Sign in or make a free account, and you'll go straight to checkout for your free week."}
-        </p>
-      )}
 
       <div className="mt-6 rounded-2xl border border-line bg-surface p-5 sm:p-6">
         {mode !== 'forgot' && (

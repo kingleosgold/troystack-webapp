@@ -267,7 +267,8 @@ test.describe('free week', () => {
       await shot(page, 'trial-desktop');
       await sheet.getByRole('button', { name: 'Start my free week' }).click();
       await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=yearly/);
-      await expect(page.getByText(/straight to checkout for your free week/)).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Start your free week of Gold');
+      await expect(page.getByText(/free for 7 days, then \$39\.99 a year/)).toBeVisible();
     }
   });
 });
