@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageMeta } from '../hooks/usePageMeta';
-import { checkoutAuthCopy, checkoutIntentCampaign, isWebPlan } from '../lib/checkout';
+import { checkoutAuthCopy, checkoutIntentCampaign, isWebPlan, webCheckoutReady } from '../lib/checkout';
 import { countStep } from '../lib/funnel';
 import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { Button, Field, Input } from '../ui/primitives';
@@ -54,11 +54,13 @@ export default function Auth() {
 
   const plan = params.get('plan');
   const forCheckout = params.get('redirect') === 'checkout' && isWebPlan(plan);
-  // On the way to checkout the page leads with the plan picked, not the free account.
-  const head = forCheckout && mode !== 'forgot' ? checkoutAuthCopy(mode, plan) : HEADINGS[mode];
+  // On the way to checkout the page leads with the plan picked, not the free
+  // account, when this site can sell that plan.
+  const planCopy = forCheckout && mode !== 'forgot' && webCheckoutReady(plan) ? checkoutAuthCopy(mode, plan) : null;
+  const head = planCopy ?? HEADINGS[mode];
 
   usePageMeta({
-    title: forCheckout && mode !== 'forgot' ? head.title : mode === 'signup' ? 'Make your free account' : mode === 'forgot' ? 'Reset your password' : 'Sign in',
+    title: planCopy ? planCopy.title : mode === 'signup' ? 'Make your free account' : mode === 'forgot' ? 'Reset your password' : 'Sign in',
     description: 'Sign in to TroyStack with the same account you use in the iPhone app.',
     canonical: '/auth',
     noindex: true,

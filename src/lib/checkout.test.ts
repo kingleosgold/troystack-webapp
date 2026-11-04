@@ -261,7 +261,7 @@ describe('what the sign-in page says on the way to checkout', () => {
     const c = await withPrices({});
     expect(c.checkoutAuthCopy('signup', 'yearly')).toEqual({
       title: 'Start your free week of Gold',
-      sub: "Make your account and you'll go straight to checkout. Gold is free for 7 days, then $39.99 a year.",
+      sub: "Make your account and you'll go straight to checkout. New accounts get Gold free for 7 days, then $39.99 a year.",
     });
     expect(c.checkoutAuthCopy('signup', 'monthly').sub).toContain('then $4.99 a month.');
   });

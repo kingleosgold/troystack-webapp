@@ -382,6 +382,6 @@ export function checkoutAuthCopy(mode: 'signup' | 'signin', plan: WebPlan): { ti
       : { title: 'Sign in to get Lifetime', sub: `You'll go straight to checkout. Lifetime is ${p.price} once.` };
   }
   return mode === 'signup'
-    ? { title: 'Start your free week of Gold', sub: `Make your account and you'll go straight to checkout. Gold is free for 7 days, then ${p.price} ${p.per}.` }
+    ? { title: 'Start your free week of Gold', sub: `Make your account and you'll go straight to checkout. New accounts get Gold free for 7 days, then ${p.price} ${p.per}.` }
     : { title: 'Sign in to get Gold', sub: `You'll go straight to checkout for Gold at ${p.price} ${p.per}.` };
 }

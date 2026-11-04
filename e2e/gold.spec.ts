@@ -348,3 +348,11 @@ test('an iPhone keeps the App Store button in the top bar', async ({ page }, tes
   await expect(bar.getByRole('link', { name: 'Get the app' })).toBeVisible();
   await expect(bar.getByRole('link', { name: 'Try Gold free' })).toHaveCount(0);
 });
+
+test('a checkout link for a plan this site can\'t sell keeps the plain sign-up copy', async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/auth?redirect=checkout&plan=bogus&mode=signup');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your free account');
+  await page.goto('/auth?redirect=checkout&plan=yearly&mode=forgot');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Reset your password');
+});
