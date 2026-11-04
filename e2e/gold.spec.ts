@@ -85,8 +85,9 @@ test('a new visitor goes from a plan on the Gold page through one sign-up form t
   await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
   await page.goto('/gold');
   await page.getByRole('button', { name: 'Get Lifetime' }).click();
-  // The sign-up form opens next, with one password field.
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your free account');
+  // The sign-up form opens next, led by the plan picked, with one password field.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Get Lifetime Gold');
+  await expect(page.getByText('Lifetime is $99.99 once.')).toBeVisible();
   await expect(page.getByLabel('Password again')).toHaveCount(0);
   await page.getByLabel('Email').fill('new@example.com');
   await page.getByLabel('Password', { exact: true }).fill('a-long-password');
@@ -126,16 +127,19 @@ test('a new visitor who picks monthly lands on sign-up with monthly kept', async
   await page.goto('/gold');
   await page.getByLabel('Plans').getByRole('button', { name: 'Start free week' }).nth(1).click();
   await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=monthly/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your free account');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Start your free week of Gold');
+  await expect(page.getByText(/free for 7 days, then \$4\.99 a month/)).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('someone with an account can still sign in from the checkout form', async ({ page }) => {
   await mockBackends(page);
   await page.goto('/auth?redirect=checkout&plan=yearly');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your free account');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Start your free week of Gold');
   await page.getByRole('button', { name: 'Have an account? Sign in' }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to TroyStack');
+  // Signing in isn't promised the free week, since an account that's had Gold doesn't get another.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to get Gold');
+  await expect(page.getByText(/free for 7 days/)).toHaveCount(0);
 });
 
 test('the Gold page counts the view, the plan tap and the sign-up, and nothing about who', async ({ page }) => {
@@ -343,4 +347,12 @@ test('an iPhone keeps the App Store button in the top bar', async ({ page }, tes
   const bar = page.locator('div.sticky').first();
   await expect(bar.getByRole('link', { name: 'Get the app' })).toBeVisible();
   await expect(bar.getByRole('link', { name: 'Try Gold free' })).toHaveCount(0);
+});
+
+test('a checkout link for a plan this site can\'t sell keeps the plain sign-up copy', async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/auth?redirect=checkout&plan=bogus&mode=signup');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your free account');
+  await page.goto('/auth?redirect=checkout&plan=yearly&mode=forgot');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Reset your password');
 });

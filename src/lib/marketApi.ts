@@ -52,7 +52,7 @@ export async function fetchSpot(signal?: AbortSignal): Promise<Spot> {
 export interface Sparklines {
   /** Each metal's prices over the last 24 hours, oldest first. */
   series: MetalMap<number[]>;
-  /** When each of those prices was taken, in milliseconds, one for one with `series`. */
+  /** When each of those prices was taken, in milliseconds, one for one with `series`. A starting price from before the window sits at the window's start. */
   times: MetalMap<number[]>;
 }
 
@@ -64,24 +64,41 @@ const DAY_MS = 24 * 3600_000;
  * it, so every price that's left still sits at its own moment. Without a time
  * for every price, they're spaced over the day before `now`, counted before
  * anything is left out, for the same reason.
+ *
+ * The feed sends its last 96 prints, which after a weekend reach back to
+ * Friday. Only the prints from the 24 hours before the newest one are kept,
+ * plus the price that stood when that window opened, placed at its start.
+ * So the change over 24 hours runs from the price 24 hours ago, which after a
+ * weekend is Friday's close, and the line doesn't stretch back to Friday.
  */
 export function pairSparklines(raw: { sparklines?: Partial<MetalMap<unknown[]>>; timestamps?: unknown[] }, now = Date.now()): Sparklines {
   const series = {} as MetalMap<number[]>;
   const times = {} as MetalMap<number[]>;
   const stamps = raw.timestamps ?? [];
+  const newest = Math.max(...stamps.map((s) => Date.parse(String(s))).filter(Number.isFinite));
+  const from = newest - DAY_MS;
   for (const m of METALS) {
     const values = raw.sparklines?.[m] ?? [];
     const timed = stamps.length === values.length;
     const step = DAY_MS / Math.max(1, values.length - 1);
     series[m] = [];
     times[m] = [];
+    let before = null as { v: number; t: number } | null;
     values.forEach((value, i) => {
       const v = Number(value);
       const t = timed ? Date.parse(String(stamps[i])) : now - (values.length - 1 - i) * step;
       if (value == null || !Number.isFinite(v) || v <= 0 || !Number.isFinite(t)) return;
+      if (timed && t < from) {
+        if (!before || t >= before.t) before = { v, t };
+        return;
+      }
       series[m].push(v);
       times[m].push(t);
     });
+    if (before && series[m].length > 0 && times[m][0] > from) {
+      series[m].unshift(before.v);
+      times[m].unshift(from);
+    }
   }
   return { series, times };
 }

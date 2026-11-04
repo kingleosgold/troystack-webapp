@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
-import { mockBackends, SAMPLE_HOLDINGS, signIn, USER_ID } from './mock';
+import { DEALER_LINK_PREVIEW, mockBackends, SAMPLE_HOLDINGS, signIn, USER_ID } from './mock';
 
 const SHOTS = process.env.E2E_SCREENS === '1';
 
@@ -82,6 +82,63 @@ test.describe('every page', () => {
       await shot(page, path === '/' ? 'home' : path.slice(1).replace(/\//g, '_'));
     });
   }
+});
+
+test.describe('typed sign-up and sign-in addresses', () => {
+  for (const [path, heading] of [['/signup', 'Make your free account'], ['/login', 'Sign in to TroyStack']] as const) {
+    test(`${path} opens the right form, not the 404 page`, async ({ page }) => {
+      const errors = watchErrors(page);
+      await mockBackends(page);
+      await page.goto(`${path}?next=/troy`);
+      await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText(heading, { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/auth\?/);
+      const url = new URL(page.url());
+      expect(url.searchParams.get('next')).toBe('/troy');
+      expect(errors).toEqual([]);
+      await shot(page, path.slice(1));
+    });
+  }
+});
+
+test.describe('typed pricing, download and help addresses', () => {
+  for (const [path, heading, to] of [
+    ['/pricing', 'Troy, all day, around your stack', '/gold'],
+    ['/lifetime', 'Troy, all day, around your stack', '/gold'],
+    ['/download', 'Your stack and Troy, wherever you are', '/app'],
+    ['/support', 'Settings', '/settings'],
+  ] as const) {
+    test(`${path} opens ${to}, not the 404 page`, async ({ page }) => {
+      const errors = watchErrors(page);
+      await mockBackends(page);
+      await page.goto(`${path}?campaign=site-pricing`);
+      await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText(heading, { timeout: 15_000 });
+      const url = new URL(page.url());
+      expect(url.pathname).toBe(to);
+      expect(url.searchParams.get('campaign')).toBe('site-pricing');
+      if (to === '/app') {
+        // The App Store link carries the link's token, not the page's own.
+        const store = new URL(await page.locator('main').getByRole('link', { name: /App Store/ }).first().getAttribute('href') ?? '');
+        expect(store.searchParams.get('ct')).toBe('site-pricing');
+      }
+      if (to === '/settings') {
+        // A signed-out visitor still gets the support address.
+        await expect(page.getByRole('link', { name: /Email support/ })).toBeVisible();
+      }
+      expect(errors).toEqual([]);
+      await shot(page, path.slice(1));
+    });
+  }
+});
+
+test('/app keeps its own token without a site link, and drops a token that isn\'t a site one', async ({ page }) => {
+  const errors = watchErrors(page);
+  await mockBackends(page);
+  for (const [query, ct] of [['', 'webapp-getapp'], ['?campaign=evil', 'webapp-getapp'], ['?campaign=Site-X', 'webapp-getapp'], [`?campaign=site-${'a'.repeat(33)}`, 'webapp-getapp'], [`?campaign=site-${'a'.repeat(32)}`, `site-${'a'.repeat(32)}`], ['?campaign=site-podcast', 'site-podcast']] as const) {
+    await page.goto(`/app${query}`);
+    const store = new URL(await page.locator('main').getByRole('link', { name: /App Store/ }).first().getAttribute('href') ?? '');
+    expect(store.searchParams.get('ct')).toBe(ct);
+  }
+  expect(errors).toEqual([]);
 });
 
 test('home shows live prices and Troy\'s read', async ({ page }) => {
@@ -182,7 +239,7 @@ test.describe('Troy for an account', () => {
   test("a dealer card carries the same disclosure line as the app's", async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('troy_ai_consent_v1', '{"version":1}'));
     await signIn(page);
-    await mockBackends(page, { replyPreview: { type: 'dealer_link', data: { url: 'https://www.sdbullion.com/silver', label: 'Shop silver at SD Bullion' } } });
+    await mockBackends(page, { replyPreview: DEALER_LINK_PREVIEW });
     await page.goto('/troy');
     await page.getByRole('textbox', { name: 'Message Troy' }).fill('Where should I buy silver?');
     await page.getByRole('button', { name: 'Send' }).click();
@@ -211,7 +268,8 @@ test.describe('free week', () => {
       await shot(page, 'trial-desktop');
       await sheet.getByRole('button', { name: 'Start my free week' }).click();
       await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=yearly/);
-      await expect(page.getByText(/straight to checkout for your free week/)).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Start your free week of Gold');
+      await expect(page.getByText(/free for 7 days, then \$39\.99 a year/)).toBeVisible();
     }
   });
 });

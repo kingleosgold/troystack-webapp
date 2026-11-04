@@ -65,6 +65,96 @@
       "permanent": false
     },
     {
+      "source": "/signup",
+      "destination": "/auth?mode=signup",
+      "permanent": false
+    },
+    {
+      "source": "/sign-up",
+      "destination": "/auth?mode=signup",
+      "permanent": false
+    },
+    {
+      "source": "/register",
+      "destination": "/auth?mode=signup",
+      "permanent": false
+    },
+    {
+      "source": "/login",
+      "destination": "/auth?mode=signin",
+      "permanent": false
+    },
+    {
+      "source": "/log-in",
+      "destination": "/auth?mode=signin",
+      "permanent": false
+    },
+    {
+      "source": "/signin",
+      "destination": "/auth?mode=signin",
+      "permanent": false
+    },
+    {
+      "source": "/sign-in",
+      "destination": "/auth?mode=signin",
+      "permanent": false
+    },
+    {
+      "source": "/pricing",
+      "destination": "/gold",
+      "permanent": false
+    },
+    {
+      "source": "/plans",
+      "destination": "/gold",
+      "permanent": false
+    },
+    {
+      "source": "/premium",
+      "destination": "/gold",
+      "permanent": false
+    },
+    {
+      "source": "/upgrade",
+      "destination": "/gold",
+      "permanent": false
+    },
+    {
+      "source": "/subscribe",
+      "destination": "/gold",
+      "permanent": false
+    },
+    {
+      "source": "/lifetime",
+      "destination": "/gold",
+      "permanent": false
+    },
+    {
+      "source": "/faq",
+      "destination": "/gold",
+      "permanent": false
+    },
+    {
+      "source": "/download",
+      "destination": "/app",
+      "permanent": false
+    },
+    {
+      "source": "/help",
+      "destination": "/settings",
+      "permanent": false
+    },
+    {
+      "source": "/support",
+      "destination": "/settings",
+      "permanent": false
+    },
+    {
+      "source": "/contact",
+      "destination": "/settings",
+      "permanent": false
+    },
+    {
       "source": "/auth/reset-password",
       "destination": "/reset-password",
       "permanent": false

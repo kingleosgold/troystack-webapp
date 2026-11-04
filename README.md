@@ -33,6 +33,7 @@ The browser checks answer every API and Supabase call from the fixtures in `e2e/
 
 - `src/routes/` has a file per page, and `src/App.tsx` maps the paths to them.
 - `src/lib/` holds the API clients, formatting, the stack math and the checkout flow. `src/ui/` holds the shared pieces, like the layout, the sheets, the trial sheet and the App Store links.
+- `src/legalSsr.tsx` is built a second time with `vite build --ssr` into `dist-ssr/`, so the prerender can write the privacy policy's and terms' full text into their HTML.
 - `scripts/prerender.mjs` runs after the build. From `src/lib/seo.json` it writes an HTML file per public page with that page's title, description, share tags and canonical link, plus `sitemap.xml`. Link previews and search engines read those, and the app takes over once it loads.
 - Prices, the Signal, the podcast, Vault Watch and Troy for signed-out visitors come from the TroyStack API. Accounts and holdings go through Supabase, and Troy's saved chats through the API with the signed-in session.
 - Every App Store link carries a campaign token for the part of the site it sits on, so App Store Connect's campaign report shows where installs came from. The tokens are in `src/lib/appStore.ts`.

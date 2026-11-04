@@ -10,6 +10,7 @@ import { GAS, OIL_TODAY, RENT, WAGE, amount, ounces } from '../lib/purchasingPow
 import { GOLD_PRESETS, SILVER_PRESETS, scenario, targetContext } from '../lib/speculation';
 import { Button, Card, Field, Input, LinkButton, PageHeader } from '../ui/primitives';
 import { SpotNotice } from '../ui/SpotNotice';
+import { NewTabNote } from '../ui/NewTabNote';
 
 type Key = 'gold' | 'silver' | 'goldTarget' | 'silverTarget';
 const KEYS: Key[] = ['gold', 'silver', 'goldTarget', 'silverTarget'];
@@ -215,6 +216,7 @@ export default function Speculation() {
                 className="inline-flex h-9 items-center rounded-lg px-3 text-[13px] font-semibold text-fg-2 hover:text-fg"
               >
                 Post on X
+                <NewTabNote />
               </a>
             </div>
           </Card>

@@ -5,7 +5,7 @@
 // for /tools/melt (cleanUrls), and the app takes over once it loads.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isRecap, plainDashes, usableOneLiner } from '../api/_lib/signal-text.js';
 import { coinBody, coinLd, junkBody, junkLd, ounces, sitemapRow, usableSnapshot } from './coin-html.mjs';
 
@@ -178,6 +178,15 @@ for (const c of coins) {
 bodies['/tools/junk-silver'] = NEEDS_JS;
 structured['/tools/junk-silver'] = junkLd(junkPage, seo['/tools/junk-silver']);
 extras['/tools/junk-silver'] = { rootBody: junkBody(junkPage, coins, usableSnapshot(spot, 'silver'), coinCopy) };
+
+// The policies' full text, rendered from the app's own components by the
+// SSR build that runs before this script, so the HTML carries the policy
+// itself and not an empty app shell.
+const { legalRoutes, renderLegal } = await import(pathToFileURL(path.join(root, 'dist-ssr/legalSsr.js')).href);
+for (const route of legalRoutes) {
+  if (!pages[route]) throw new Error(`prerender: seo.json has no entry for ${route}`);
+  extras[route] = { rootBody: renderLegal(route) };
+}
 
 const signalArticles = await loadSignalArticles();
 for (const article of signalArticles) {

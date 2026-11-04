@@ -1,12 +1,19 @@
+import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { usePageMeta } from '../hooks/usePageMeta';
 import SEO from '../lib/seo.json';
 import { GOLD } from '../lib/appStore';
+import { siteCampaign } from '../lib/checkout';
 import { FREE_FEATURES, GOLD_FEATURES } from '../lib/gold';
 import { InstallPath } from '../ui/AppStore';
 import { Card } from '../ui/primitives';
 
 export default function GetApp() {
   usePageMeta({ ...SEO['/app'], canonical: '/app' });
+  // A visitor from one of troystack.com's links keeps that page's site-* token
+  // on the App Store link, so App Store Connect shows which page sent them.
+  const [params] = useSearchParams();
+  const [campaign] = useState(() => siteCampaign(params.get('campaign')) ?? 'webapp-getapp');
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-6 sm:pt-10">
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.1fr_1fr] items-center">
@@ -17,7 +24,7 @@ export default function GetApp() {
             The app is free to download. Sign in with the same account you use here and your stack and your chats with Troy come with you.
           </p>
           <Card className="mt-6 p-5">
-            <InstallPath campaign="webapp-getapp" />
+            <InstallPath campaign={campaign} />
           </Card>
           <p className="mt-3 text-[13px] text-fg-3">
             Gold starts with {GOLD.trialDays} free days for new subscribers, then {GOLD.monthly} a month or {GOLD.yearly} a year. Cancel anytime in your iPhone's settings.

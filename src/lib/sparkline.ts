@@ -54,3 +54,14 @@ export function sparklineShape(values: number[], times: number[] | undefined, w:
   }
   return { line: lines.join(' '), area: areas.join(' ') };
 }
+
+/**
+ * A 24-hour line starts from the price that stood 24 hours ago. When the
+ * market was shut between that and the first print, hold the price flat until
+ * a minute before the open instead of drawing a slow ramp across hours
+ * nothing traded.
+ */
+export function holdThroughClose<P extends { t: number; v: number }>(points: P[]): P[] {
+  if (points.length < 2 || points[1].t - points[0].t <= SPARKLINE_GAP_MS) return points;
+  return [points[0], { ...points[0], t: points[1].t - 60_000 }, ...points.slice(1)];
+}

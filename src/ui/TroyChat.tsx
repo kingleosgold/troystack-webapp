@@ -6,6 +6,7 @@ import { Markdown } from '../lib/markdown';
 import { cx } from '../lib/cx';
 import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { TroyCard } from './TroyCards';
+import { NewTabNote } from './NewTabNote';
 import { Button, Sheet } from './primitives';
 import { saveTroyConsent } from '../lib/consent';
 import { stillSignedInAs } from '../lib/account';
@@ -231,9 +232,9 @@ export function ConsentDialog({ open, onAccept, onClose }: { open: boolean; onAc
         <p>To answer you, your messages and, once you've signed in, your stack are sent to third-party AI providers.</p>
         <p>AI can make mistakes. Don't rely on Troy as your only source.</p>
         <p className="text-[13px]">
-          <a href={PRIVACY_URL} target="_blank" rel="noopener" className="font-semibold text-gold hover:text-gold-2">Privacy Policy</a>
+          <a href={PRIVACY_URL} target="_blank" rel="noopener" className="font-semibold text-gold hover:text-gold-2">Privacy Policy<NewTabNote /></a>
           <span className="mx-2 text-fg-3">·</span>
-          <a href={TERMS_URL} target="_blank" rel="noopener" className="font-semibold text-gold hover:text-gold-2">Terms</a>
+          <a href={TERMS_URL} target="_blank" rel="noopener" className="font-semibold text-gold hover:text-gold-2">Terms<NewTabNote /></a>
         </p>
       </div>
       <Button

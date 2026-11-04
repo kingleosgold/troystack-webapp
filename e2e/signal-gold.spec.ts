@@ -20,8 +20,21 @@ test("a computer's reader gets the free week under a piece, carrying the Signal'
   });
   await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
   await page.goto(PIECE);
-  // The App Store stays as the other door on a computer.
-  await expect(card(page).getByRole('link', { name: 'Get TroyStack for iPhone' })).toBeVisible();
+  // The App Store stays as the other door on a computer, a quiet line under
+  // the free week that says who it's for, carrying the piece's own token.
+  await expect(card(page).getByText('Have an iPhone?')).toBeVisible();
+  await expect(card(page).getByRole('link', { name: 'Get the app' })).toBeVisible();
+  await expect(card(page).getByRole('link', { name: 'Get the app' })).toHaveAttribute('href', /[?&]ct=webapp-signal&/);
+  // A screen reader hears that the link opens a new tab.
+  await expect(card(page).getByRole('link', { name: 'Get the app (opens in a new tab)', exact: true })).toBeVisible();
+  await expect(page.locator('aside').getByRole('link', { name: 'Open the App Store (opens in a new tab)', exact: true })).toBeVisible();
+  // The free week is the one button, and nothing sits beside it.
+  await expect(card(page).getByRole('link', { name: 'Get TroyStack for iPhone' })).toHaveCount(0);
+  const tryBox = await card(page).getByRole('button', { name: 'Try Gold free for a week' }).boundingBox();
+  const lineBox = await card(page).getByText('Have an iPhone?').boundingBox();
+  expect(tryBox).not.toBeNull();
+  expect(lineBox).not.toBeNull();
+  expect(lineBox!.y).toBeGreaterThan(tryBox!.y + tryBox!.height - 1);
   await card(page).getByRole('button', { name: 'Try Gold free for a week' }).click();
   const sheet = page.getByRole('dialog');
   await sheet.getByRole('button', { name: 'Start my free week' }).click();
@@ -76,7 +89,7 @@ test('an iPhone keeps the App Store button under a piece', async ({ page }, test
   test.skip(testInfo.project.name !== 'iphone', 'only the iPhone project is an iPhone');
   await mockBackends(page);
   await page.goto(PIECE);
-  await expect(card(page).getByRole('link', { name: 'Get TroyStack for iPhone' })).toBeVisible();
+  await expect(card(page).getByRole('link', { name: 'Get TroyStack for iPhone (opens in a new tab)', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toHaveCount(0);
 });
 

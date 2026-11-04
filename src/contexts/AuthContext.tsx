@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, authStorageKey } from '../lib/supabase';
 import { setSignedInAs, signedInAs } from '../lib/account';
 import { clearStackCopies } from '../services/stackCopy';
 import { dropQueuedChanges } from '../services/pendingWrites';
@@ -31,10 +31,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/** Whether supabase-js has a session stored in this browser. */
+/**
+ * Whether supabase-js has a session stored in this browser for this project.
+ * Only this project's own key counts, so a key another Supabase project left
+ * behind doesn't keep a real guest waiting as if signed in.
+ */
 function hasStoredSession(): boolean {
+  const key = authStorageKey();
+  if (!key) return false;
   try {
-    return Object.keys(localStorage).some((key) => /^sb-.+-auth-token$/.test(key));
+    return localStorage.getItem(key) !== null;
   } catch {
     return false;
   }

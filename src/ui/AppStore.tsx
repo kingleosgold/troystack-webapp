@@ -3,6 +3,7 @@ import { Smartphone } from 'lucide-react';
 import { appStoreUrl, isAppleMobile } from '../lib/appStore';
 import type { CheckoutCampaign } from '../lib/checkout';
 import { cx } from '../lib/cx';
+import { NewTabNote } from './NewTabNote';
 
 type QrLib = typeof import('qrcode');
 
@@ -76,6 +77,7 @@ interface AppStoreButtonProps {
   fullWidth?: boolean;
 }
 
+
 /** Opens the App Store listing with this surface's campaign token. */
 export function AppStoreButton({ campaign, label = 'Get the app', size = 'md', variant = 'primary', className, fullWidth }: AppStoreButtonProps) {
   const sizes = { sm: 'h-8 px-3 text-[13px] rounded-lg', md: 'h-10 px-4 text-sm rounded-xl', lg: 'h-12 px-5 text-[15px] rounded-xl' };
@@ -98,7 +100,24 @@ export function AppStoreButton({ campaign, label = 'Get the app', size = 'md', v
     >
       <Smartphone size={size === 'sm' ? 14 : 16} aria-hidden="true" />
       {label}
+      <NewTabNote />
     </a>
+  );
+}
+
+/**
+ * The quiet App Store door under a card's main button: a line saying who it's
+ * for and an underlined link with this surface's campaign token.
+ */
+export function AppStoreTextLink({ campaign, lead = 'Have an iPhone?', label = 'Get the app', className }: { campaign: CheckoutCampaign; lead?: string; label?: string; className?: string }) {
+  return (
+    <p className={cx('text-[13px] text-fg-3', className)}>
+      {lead}{' '}
+      <a href={appStoreUrl(campaign)} target="_blank" rel="noopener" className="font-semibold text-gold underline underline-offset-2 hover:text-gold-2">
+        {label}
+        <NewTabNote />
+      </a>
+    </p>
   );
 }
 
