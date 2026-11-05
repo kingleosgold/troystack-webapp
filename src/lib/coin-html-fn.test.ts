@@ -16,7 +16,7 @@ type Upstream = (url: string) => Promise<Response> | Response;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const fresh = (silver: number) => json({ timestamp: new Date(NOW - 60_000).toISOString(), marketsClosed: false, prices: { silver: { price: silver }, gold: { price: 4000 } } });
 
-function run(query: Record<string, string>, prices: Upstream, site: Upstream = (url) => new Response(url.endsWith('/404.html') ? '<title>Page not found</title>' : BUILT(STALE))) {
+function run(query: Record<string, string>, prices: Upstream, site: Upstream = (url) => new Response(url.endsWith('/404') ? '<title>Page not found</title>' : BUILT(STALE))) {
   const calls: string[] = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     calls.push(url);
@@ -45,7 +45,7 @@ afterEach(() => {
 describe('coin-html', () => {
   it('puts live spot in a coin page and caches it at the edge for five minutes', async () => {
     const { res, calls } = await run({ slug: 'morgan-silver-dollar' }, () => fresh(50));
-    expect(calls).toContain('https://troystack.ai/_ssr/coins/morgan-silver-dollar.html');
+    expect(calls).toContain('https://troystack.ai/_ssr/coins/morgan-silver-dollar');
     expect(res.statusCode).toBe(200);
     expect(res.headers['Cache-Control']).toBe('public, max-age=0, s-maxage=300, stale-while-revalidate=600');
     // 0.77344 oz at $50.00
@@ -62,12 +62,12 @@ describe('coin-html', () => {
 
   it('gives the junk silver calculator both silver figures at live spot', async () => {
     const { res, calls } = await run({ page: 'junk-silver' }, () => fresh(50));
-    expect(calls).toContain('https://troystack.ai/_ssr/tools/junk-silver.html');
+    expect(calls).toContain('https://troystack.ai/_ssr/tools/junk-silver');
     expect(res.body).toContain("0.7234 troy oz of silver as struck. At silver spot of $50.00, that's $36.17");
     expect(res.body).toContain('At silver spot of $50.00, that\'s $35.75');
   });
 
-  it('serves the page as built, briefly cached, when spot fails or is stale', async () => {
+  it('leaves the build\'s number out, briefly cached, when spot fails or is stale', async () => {
     for (const prices of [
       () => new Response('down', { status: 503 }),
       () => { throw new Error('timeout'); },
@@ -76,7 +76,8 @@ describe('coin-html', () => {
     ] as Upstream[]) {
       const { res } = await run({ slug: 'morgan-silver-dollar' }, prices);
       expect(res.statusCode).toBe(200);
-      expect(res.body).toBe(BUILT(STALE));
+      expect(res.body).not.toContain('$40.00');
+      expect(res.body).toContain('A Morgan silver dollar holds 0.7734 troy oz of silver. Its melt value is that weight times live silver spot.');
       expect(res.headers['Cache-Control']).toBe('public, max-age=0, s-maxage=60');
     }
   });
@@ -91,10 +92,18 @@ describe('coin-html', () => {
     }
   });
 
-  it('answers 502 without caching when the built page cannot be read', async () => {
-    const { res } = await run({ slug: 'morgan-silver-dollar' }, () => fresh(50), () => new Response('no', { status: 500 }));
-    expect(res.statusCode).toBe(502);
-    expect(res.headers['Cache-Control']).toBe('no-store');
+  it('answers 502 without caching when the built page cannot be read or has no body to replace', async () => {
+    for (const site of [() => new Response('no', { status: 500 }), () => new Response('<html><div id="root"></div></html>')] as Upstream[]) {
+      const { res } = await run({ slug: 'morgan-silver-dollar' }, () => fresh(50), site);
+      expect(res.statusCode).toBe(502);
+      expect(res.headers['Cache-Control']).toBe('no-store');
+    }
+  });
+
+  it('keeps a coin address on its coin when ?page= is added', async () => {
+    const { res } = await run({ slug: 'morgan-silver-dollar', page: 'junk-silver' }, () => fresh(50));
+    expect(res.body).toContain('one coin melts to $38.67');
+    expect(res.body).not.toContain('Junk silver melt value calculator</h1>');
   });
 
   it('leaves a $ in the new text as written', async () => {

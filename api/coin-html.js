@@ -3,7 +3,7 @@
 // and structured data in place, but its melt figure is the build's. This
 // swaps in a melt figure from live spot, so a crawler that doesn't run
 // JavaScript reads the price a visitor sees. When spot can't be read the
-// page goes out as built, which leaves an old number out after four days.
+// line leaves the number out rather than repeat the build's.
 import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { coinBody, junkBody, usableSnapshot } from '../scripts/coin-html.mjs';
@@ -27,7 +27,8 @@ async function readBuilt(req, file) {
   try {
     return await readFile(new URL(`../dist/${file}`, import.meta.url), 'utf8');
   } catch {
-    const res = await fetch(`${originOf(req)}/${file}`, { signal: AbortSignal.timeout(5000) });
+    // Without .html, which cleanUrls would answer with a redirect first.
+    const res = await fetch(`${originOf(req)}/${file.replace(/\.html$/, '')}`, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) throw new Error(`${file} ${res.status}`);
     return res.text();
   }
@@ -60,7 +61,8 @@ export default async function handler(req, res) {
     send(404, html, 'no-store');
   };
 
-  const isJunk = req.query.page === 'junk-silver';
+  // A slug wins, so ?page= added to a coin address can't swap the page.
+  const isJunk = !req.query.slug && req.query.page === 'junk-silver';
   const coin = isJunk ? null : bySlug.get(String(req.query.slug || ''));
   if (!isJunk && !coin) {
     await notFound();
@@ -74,13 +76,14 @@ export default async function handler(req, res) {
     return;
   }
 
-  const snap = usableSnapshot(spot, isJunk ? 'silver' : coin.metal);
-  if (!snap || !ROOT_MAIN.test(built)) {
-    // The build's page, cached briefly so the next read tries spot again.
-    send(200, built, 'public, max-age=0, s-maxage=60');
+  if (!ROOT_MAIN.test(built)) {
+    send(502, '<!doctype html><title>TroyStack</title><p>TroyStack is unavailable. Try again in a minute.</p>', 'no-store');
     return;
   }
+  // No usable spot renders the line without a number. That's cached briefly,
+  // so the next read tries spot again.
+  const snap = usableSnapshot(spot, isJunk ? 'silver' : coin.metal);
   const body = isJunk ? junkBody(junkPage, coins, snap, coinCopy) : coinBody(coins, coin, snap, coinCopy);
   const html = built.replace(ROOT_MAIN, () => `<div id="root">${body}</div>`);
-  send(200, html, 'public, max-age=0, s-maxage=300, stale-while-revalidate=600');
+  send(200, html, snap ? 'public, max-age=0, s-maxage=300, stale-while-revalidate=600' : 'public, max-age=0, s-maxage=60');
 }
