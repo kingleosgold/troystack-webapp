@@ -47,9 +47,20 @@
     { "source": "/auth", "destination": "/" },
     { "source": "/reset-password", "destination": "/" },
     { "source": "/developers/keys", "destination": "/" },
-    { "source": "/signal/:slug", "destination": "/api/signal-html?slug=:slug" }
+    { "source": "/signal/:slug", "destination": "/api/signal-html?slug=:slug" },
+    { "source": "/coins/:slug", "destination": "/api/coin-html?slug=:slug" },
+    { "source": "/tools/junk-silver", "destination": "/api/coin-html?page=junk-silver" }
   ],
+  "functions": {
+    "api/coin-html.js": {
+      "includeFiles": "{dist/_ssr/**,dist/404.html,src/lib/coins.json,src/lib/coinCopy.json,src/lib/junkSilverPage.json}"
+    }
+  },
   "headers": [
+    {
+      "source": "/_ssr/(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    },
     {
       "source": "/assets/(.*)",
       "headers": [
