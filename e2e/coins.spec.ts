@@ -182,9 +182,9 @@ test.describe('coin values', () => {
   });
 
   test('the page an unknown coin falls to stays out of search', async ({ request }) => {
-    // Vercel serves 404.html with HTTP 404 for a slug with no file, since no
-    // rewrite catches /coins paths (hosting.test.ts). The preview server here
-    // doesn't, so this checks the file itself.
+    // On Vercel, api/coin-html.js answers a slug that isn't a coin with this
+    // file and HTTP 404 (coin-html-fn.test.ts). The preview server here has no
+    // functions, so this checks the file itself.
     expect(await (await request.get('/404.html')).text()).toContain('<meta name="robots" content="noindex" />');
     const sitemap = await (await request.get('/sitemap.xml')).text();
     expect(sitemap).not.toContain('not-a-coin');
