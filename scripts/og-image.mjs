@@ -1,4 +1,4 @@
-// Draws public/og-image.png, the 1200x630 picture shown when a troystack.ai
+// Draws public/og-image.png, the 1200x630 picture shown when a troystack.com
 // link is shared. Run with: node scripts/og-image.mjs
 // Set PLAYWRIGHT_CHROMIUM_PATH if Playwright's own Chromium isn't installed.
 import { chromium } from '@playwright/test';
@@ -31,8 +31,8 @@ p { margin-top: 22px; font-size: 27px; line-height: 1.35; color: #bdb8ad; max-wi
 <div class="glow"></div>
 <div class="brand"><img src="${coin}" alt="">TroyStack</div>
 <div><h1>Gold and silver, <span>live</span>, with an analyst who reads the news.</h1>
-<p>Spot prices, your stack, and Troy, the AI you can ask anything about metals.</p></div>
-<div class="foot"><div class="pill"><b>troystack.ai</b></div><div class="pill">Free on the web and iPhone</div></div>
+<p>Spot prices, your stack, and Troy, who you can ask anything about metals.</p></div>
+<div class="foot"><div class="pill"><b>troystack.com</b></div><div class="pill">Free on the web and iPhone</div></div>
 <img class="coin" src="${coin}" alt="">
 </div></body></html>`;
 

@@ -1,0 +1,26 @@
+# TroyStack
+
+> Live gold, silver, platinum and palladium prices, a tracker for the metal you own, and Troy, who reads the metals news every day and answers questions about it. On the web at troystack.com and on iPhone, with one account.
+
+TroyStack is made by Mancini Tech Solutions, LLC. Troy is an AI. His answers are analysis and opinion, not financial advice.
+
+## Pages
+
+- [Prices](https://troystack.com/prices/gold): live spot and history for each metal
+- [Ask Troy](https://troystack.com/troy): three free questions a day
+- [The Signal](https://troystack.com/signal): the day's metals news with Troy's read
+- [Podcast](https://troystack.com/podcast): The Stack Signal, a daily audio brief
+- [Coin values](https://troystack.com/coins): melt value, specs and sources for common coins and bars
+- [Tools](https://troystack.com/tools): melt, junk silver, what if, stacking history and gold/silver ratio calculators
+- [Gold plans](https://troystack.com/gold): $4.99 a month or $39.99 a year after a free week, or $99.99 lifetime
+
+## API
+
+- [TroyStack API](https://troystack.com/developers): prices, history and the Signal at https://api.troystack.ai
+- [Podcast feed](https://api.troystack.ai/v1/podcast/feed.xml)
+
+## Legal
+
+- [Privacy](https://troystack.com/privacy)
+- [Terms](https://troystack.com/terms)
+- Support: support@troystack.com

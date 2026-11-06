@@ -118,7 +118,7 @@ describe('the prerendered coin page', () => {
       const types = ld['@graph'].map((n: { '@type': string }) => n['@type']);
       expect(types, c.slug).toEqual(c.faq ? ['BreadcrumbList', 'WebPage', 'FAQPage'] : ['BreadcrumbList', 'WebPage']);
       const page = ld['@graph'][1];
-      expect(page['@id']).toBe(`https://troystack.ai/coins/${c.slug}`);
+      expect(page['@id']).toBe(`https://troystack.com/coins/${c.slug}`);
       expect(page.dateModified).toBe(c.modified);
       expect(page).not.toHaveProperty('reviewedBy');
       if (!c.faq) continue;
@@ -145,7 +145,7 @@ describe('the prerendered coin page', () => {
   });
 
   it('leaves lastmod out of a sitemap row with no date of its own', () => {
-    expect(html.sitemapRow('https://troystack.ai/coins', undefined)).toBe('  <url><loc>https://troystack.ai/coins</loc></url>');
-    expect(html.sitemapRow('https://troystack.ai/coins/mercury-dime', '2026-10-28')).toBe('  <url><loc>https://troystack.ai/coins/mercury-dime</loc><lastmod>2026-10-28</lastmod></url>');
+    expect(html.sitemapRow('https://troystack.com/coins', undefined)).toBe('  <url><loc>https://troystack.com/coins</loc></url>');
+    expect(html.sitemapRow('https://troystack.com/coins/mercury-dime', '2026-10-28')).toBe('  <url><loc>https://troystack.com/coins/mercury-dime</loc><lastmod>2026-10-28</lastmod></url>');
   });
 });

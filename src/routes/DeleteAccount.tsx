@@ -92,7 +92,7 @@ export default function DeleteAccount() {
 
         <h2 className="pt-3 text-[17px] font-semibold text-fg">What's kept</h2>
         <p>
-          If you paid on troystack.ai, Stripe keeps its record of the payments, as the law requires. A report you filed on one of Troy's replies
+          If you paid on the web, Stripe keeps its record of the payments, as the law requires. A report you filed on one of Troy's replies
           stays for review without your account on it. This browser then signs out the way it does from Settings, which clears the stack it
           kept here.
         </p>
@@ -100,7 +100,7 @@ export default function DeleteAccount() {
         <h2 className="pt-3 text-[17px] font-semibold text-fg">Subscriptions</h2>
         <p>
           Deleting your account doesn't cancel a subscription you bought through the App Store or Google Play. Cancel it in your phone's
-          subscription settings. A Gold plan bought on troystack.ai is cancelled in Settings here before the account can be deleted, so your card
+          subscription settings. A Gold plan bought on the web is cancelled in Settings here before the account can be deleted, so your card
           isn't charged again.
         </p>
       </section>

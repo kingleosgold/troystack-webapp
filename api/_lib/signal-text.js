@@ -19,3 +19,13 @@ export function usableOneLiner(raw) {
   const words = s.split(/\s+/).filter(Boolean).length;
   return words >= 5 && s.length >= 25 ? s : '';
 }
+
+// troystack-marketing's Signal rule, which troystack.com has served since
+// April, kept so the move to this project doesn't change what's indexed.
+// Troy's recaps are the pages search engines index. A news item is a short
+// take on someone else's headline, so it stays out of the index. Marketing
+// also sends a news item folded into its day's recap to its block there; the
+// app's recap page doesn't show those blocks yet, so its item keeps its own page.
+export function isRecap(article) {
+  return article?.is_stack_signal === true;
+}

@@ -78,24 +78,24 @@ test("editing a holding in this browser's own stack leaves its weight exactly as
 
 test('the gold price page has one address, in the page as served, in the app and in the sitemap', async ({ page, request }) => {
   const served = await (await request.get('/prices.html')).text();
-  expect(served).toContain('<link rel="canonical" href="https://troystack.ai/prices/gold" />');
-  expect(served).toContain('<meta property="og:url" content="https://troystack.ai/prices/gold" />');
+  expect(served).toContain('<link rel="canonical" href="https://troystack.com/prices/gold" />');
+  expect(served).toContain('<meta property="og:url" content="https://troystack.com/prices/gold" />');
   const sitemap = await (await request.get('/sitemap.xml')).text();
-  expect(sitemap).toContain('<loc>https://troystack.ai/prices/gold</loc>');
-  expect(sitemap).not.toContain('<loc>https://troystack.ai/prices</loc>');
+  expect(sitemap).toContain('<loc>https://troystack.com/prices/gold</loc>');
+  expect(sitemap).not.toContain('<loc>https://troystack.com/prices</loc>');
   const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
   expect(new Set(locs).size).toBe(locs.length);
 
   await mockBackends(page);
   await page.goto('/prices');
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://troystack.ai/prices/gold');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://troystack.com/prices/gold');
 });
 
 test("a Signal piece opened by a differently cased link takes the API's slug as its address", async ({ page }) => {
   await mockBackends(page);
   await page.goto('/signal/Evening-Signal-2026-10-08');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://troystack.ai/signal/evening-signal-2026-10-08');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://troystack.com/signal/evening-signal-2026-10-08');
 });
 
 test("the not-found page as served doesn't share as the home page or name a canonical address", async ({ request }) => {

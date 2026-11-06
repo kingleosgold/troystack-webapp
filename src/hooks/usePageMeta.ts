@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 
-const SITE = 'https://troystack.ai';
+const SITE = 'https://troystack.com';
 const DEFAULT_IMAGE = `${SITE}/og-image.png`;
 
 interface PageMeta {
   title: string;
   description?: string;
-  /** Path on troystack.ai, or a full URL when the canonical page lives elsewhere */
+  /** Path on troystack.com, or a full URL when the canonical page lives elsewhere */
   canonical?: string;
   image?: string;
   noindex?: boolean;

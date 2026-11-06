@@ -75,7 +75,7 @@ describe('what checkout says is in the way', () => {
   it('asks once more a few seconds after finding another checkout for the account opening, and only once', async () => {
     const c = await withPrices({ monthly: 'price_m' });
     const assign = vi.fn();
-    vi.stubGlobal('window', { location: { origin: 'https://troystack.ai', pathname: '/settings', assign } });
+    vi.stubGlobal('window', { location: { origin: 'https://troystack.com', pathname: '/settings', assign } });
     const answers = [
       { status: 409, body: { error: 'A checkout for this account is already opening.', reason: 'checkout_in_progress' } },
       { status: 200, body: { url: 'https://checkout.stripe.com/c/pay/e2e' } },
@@ -110,7 +110,7 @@ describe('what checkout says is in the way', () => {
   it("doesn't leave for Stripe, or ask again, once checkout is no longer wanted", async () => {
     const c = await withPrices({ monthly: 'price_m' });
     const assign = vi.fn();
-    vi.stubGlobal('window', { location: { origin: 'https://troystack.ai', pathname: '/settings', assign } });
+    vi.stubGlobal('window', { location: { origin: 'https://troystack.com', pathname: '/settings', assign } });
     const answers = [
       { status: 200, body: { url: 'https://checkout.stripe.com/c/pay/e2e' } },
       { status: 409, body: { error: 'Opening', reason: 'checkout_in_progress' } },

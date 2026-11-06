@@ -73,7 +73,7 @@
   },
   "/delete-account": {
     "title": "Delete your TroyStack account",
-    "description": "How to delete your TroyStack account and what it holds, what's kept, and what happens to an App Store, Google Play or troystack.ai subscription."
+    "description": "How to delete your TroyStack account and what it holds, what's kept, and what happens to an App Store, Google Play or web subscription."
   },
   "/privacy": {
     "title": "Privacy Policy",
