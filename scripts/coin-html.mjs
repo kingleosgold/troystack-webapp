@@ -184,6 +184,7 @@ export function junkLd(page, meta) {
         url,
         name: page.h1,
         description: meta.description,
+        dateModified: page.modified,
         publisher: { '@type': 'Organization', name: 'TroyStack', url: SITE },
         citation: page.sources.map((s) => s.url),
       },

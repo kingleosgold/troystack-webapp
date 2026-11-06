@@ -10,9 +10,18 @@ describe('Vercel routing', () => {
     expect(sources).not.toContain('/:path*');
   });
 
-  it('lets a coin page with no file fall to the 404 page', () => {
-    const sources: string[] = (vercel.rewrites ?? []).map((rule: { source: string }) => rule.source);
-    expect(sources.filter((source) => source.startsWith('/coins'))).toEqual([]);
+  it('serves coin pages and the junk silver calculator through the function that adds live spot', () => {
+    const rules: { source: string; destination: string }[] = vercel.rewrites ?? [];
+    const coinRules = rules.filter((rule) => rule.source.startsWith('/coins'));
+    // /coins itself stays the static index, and an unknown slug gets the function's 404.
+    expect(coinRules).toEqual([{ source: '/coins/:slug', destination: '/api/coin-html?slug=:slug' }]);
+    expect(rules.find((rule) => rule.source === '/tools/junk-silver')?.destination).toBe('/api/coin-html?page=junk-silver');
+    expect(vercel.functions['api/coin-html.js'].includeFiles).toContain('dist/_ssr/**');
+  });
+
+  it('keeps the built copies the function reads out of search', () => {
+    const rule = (vercel.headers ?? []).find((item: { source: string }) => item.source === '/_ssr/(.*)');
+    expect(rule?.headers).toContainEqual({ key: 'X-Robots-Tag', value: 'noindex' });
   });
 
   // troystack-marketing's alias sits behind Vercel's sign-in, and the app now

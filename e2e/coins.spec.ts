@@ -128,7 +128,7 @@ test.describe('coin values', () => {
   });
 
   test('a coin page arrives with its own title and facts before any script runs', async ({ request }) => {
-    const html = await (await request.get('/coins/mercury-dime.html')).text();
+    const html = await (await request.get('/coins/mercury-dime')).text();
     expect(html).toContain('<title>Mercury Dime Melt Value Today | TroyStack</title>');
     expect(html).toContain('<link rel="canonical" href="https://troystack.com/coins/mercury-dime" />');
     // The facts sit in the page itself, not only in a no-script fallback.
@@ -153,6 +153,18 @@ test.describe('coin values', () => {
     expect(sitemap).toContain('<url><loc>https://troystack.com/coins/war-nickel</loc><lastmod>2026-10-09</lastmod></url>');
   });
 
+  test('the junk silver calculator arrives with its facts and the date its content last changed', async ({ request }) => {
+    const html = await (await request.get('/tools/junk-silver')).text();
+    expect(html).toContain('<title>');
+    const root = html.slice(html.indexOf('<div id="root">'));
+    expect(root).toContain('held 0.7234 troy oz of silver as struck.');
+    const blocks = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)];
+    const page = JSON.parse(blocks[0][1])['@graph'].find((n: { '@type': string }) => n['@type'] === 'WebPage');
+    expect(page.dateModified).toBe('2026-10-28');
+    const sitemap = await (await request.get('/sitemap.xml')).text();
+    expect(sitemap).toContain('<url><loc>https://troystack.com/tools/junk-silver</loc><lastmod>2026-10-28</lastmod></url>');
+  });
+
   test('a coin page shows its questions and where its specs come from', async ({ page }) => {
     const errors = watchErrors(page);
     await mockBackends(page);
@@ -170,9 +182,9 @@ test.describe('coin values', () => {
   });
 
   test('the page an unknown coin falls to stays out of search', async ({ request }) => {
-    // Vercel serves 404.html with HTTP 404 for a slug with no file, since no
-    // rewrite catches /coins paths (hosting.test.ts). The preview server here
-    // doesn't, so this checks the file itself.
+    // On Vercel, api/coin-html.js answers a slug that isn't a coin with this
+    // file and HTTP 404 (coin-html-fn.test.ts). The preview server here has no
+    // functions, so this checks the file itself.
     expect(await (await request.get('/404.html')).text()).toContain('<meta name="robots" content="noindex" />');
     const sitemap = await (await request.get('/sitemap.xml')).text();
     expect(sitemap).not.toContain('not-a-coin');
@@ -241,10 +253,10 @@ test.describe('coins struck to different specs over the years', () => {
   });
 
   test('each era page arrives with its own title, and the old addresses still answer', async ({ request }) => {
-    const older = await (await request.get('/coins/chinese-silver-panda-1-oz.html')).text();
+    const older = await (await request.get('/coins/chinese-silver-panda-1-oz')).text();
     expect(older).toContain('<title>1 oz Chinese Silver Panda melt value today | TroyStack</title>');
     expect(older).toContain('tight text-fg leading-tight">Chinese Silver Panda (1 oz)</h1>');
-    const current = await (await request.get('/coins/chinese-silver-panda.html')).text();
+    const current = await (await request.get('/coins/chinese-silver-panda')).text();
     expect(current).toContain('<title>30 g Chinese Silver Panda melt value today | TroyStack</title>');
     const sitemap = await (await request.get('/sitemap.xml')).text();
     for (const slug of ['chinese-silver-panda', 'chinese-silver-panda-1-oz', 'british-gold-britannia-1987-2012', 'canadian-gold-maple-leaf-1979-1982']) {
