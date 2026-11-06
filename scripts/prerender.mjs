@@ -153,6 +153,7 @@ for (const c of coins) {
 bodies['/tools/junk-silver'] = NEEDS_JS;
 structured['/tools/junk-silver'] = junkLd(junkPage, seo['/tools/junk-silver']);
 extras['/tools/junk-silver'] = { rootBody: junkBody(junkPage, coins, usableSnapshot(spot, 'silver'), coinCopy) };
+modified['/tools/junk-silver'] = junkPage.modified;
 
 const signalArticles = await loadSignalArticles();
 for (const article of signalArticles) {
@@ -171,10 +172,16 @@ for (const article of signalArticles) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(published)) modified[route] = published;
 }
 
+// Coin pages and the junk silver calculator go under _ssr/, where no address
+// serves them as they are. api/coin-html.js serves them with today's spot in
+// the opening line, which a static file at /coins/<slug> would shadow.
+const LIVE_SPOT = (route) => route.startsWith('/coins/') || route === '/tools/junk-silver';
+
 let count = 0;
 for (const [route, meta] of Object.entries(pages)) {
   const html = render(route, meta, bodies[route], structured[route], extras[route]);
-  const file = route === '/' ? path.join(dist, 'index.html') : path.join(dist, `${route.slice(1)}.html`);
+  const name = LIVE_SPOT(route) ? `_ssr/${route.slice(1)}.html` : `${route.slice(1)}.html`;
+  const file = route === '/' ? path.join(dist, 'index.html') : path.join(dist, name);
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, html);
   count += 1;
