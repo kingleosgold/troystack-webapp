@@ -104,8 +104,15 @@
   html {
     background-color: var(--bg);
     -webkit-text-size-adjust: 100%;
-    /* A jump to a #section clears the sticky top bar. */
-    scroll-padding-top: 4.5rem;
+    /* A jump to a #section clears the sticky top bar. On a phone the bar
+       carries the price ticker too, so it stands taller. */
+    scroll-padding-top: 6.5rem;
+  }
+
+  @media (min-width: 1024px) {
+    html {
+      scroll-padding-top: 4.5rem;
+    }
   }
 
   body {
