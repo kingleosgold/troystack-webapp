@@ -11,8 +11,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-IM=convert
-command -v magick >/dev/null && IM=magick
+if command -v magick >/dev/null; then IM=magick
+elif command -v convert >/dev/null; then IM=convert
+else echo 'gen-icons.sh needs ImageMagick (magick or convert)' >&2; exit 1; fi
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
 
 SRC=public/troy-avatar.png
 BG_IN='#0E0C07'
@@ -33,10 +37,8 @@ coin_on_bg() {
 
 coin 16 public/favicon-16x16.png
 coin 32 public/favicon-32x32.png
-ICO48=$(mktemp --suffix=.png)
-coin 48 "$ICO48"
-$IM public/favicon-16x16.png public/favicon-32x32.png "$ICO48" public/favicon.ico
-rm -f "$ICO48"
+coin 48 "$TMP/favicon-48.png"
+$IM public/favicon-16x16.png public/favicon-32x32.png "$TMP/favicon-48.png" public/favicon.ico
 
 # The brand mark in the app's bar, Troy's chat and the sign-in pages.
 coin 96 public/troy-96.png
@@ -49,7 +51,7 @@ coin_on_bg 512 76 public/icon-maskable-512.png
 # iOS fills a transparent touch icon with black, so it gets the warm fill.
 coin_on_bg 180 88 public/apple-touch-icon.png
 
-# The app icon on /get-app, from ICON v2.
+# The app icon on /app, from ICON v2.
 $IM public/icon.png -filter Lanczos -resize 384x384 -strip -quality 88 public/app-icon.jpg
 
 echo 'icons drawn'
