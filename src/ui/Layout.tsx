@@ -496,9 +496,14 @@ export default function AppShell() {
 
   const menuOpen = menuPath === pathname;
 
+  // A new page starts at the top. A hash-only change, like Back after an
+  // in-page jump, leaves the scroll where the browser put it.
+  const lastPathRef = useRef<string | null>(null);
   useEffect(() => {
+    const pageChanged = lastPathRef.current !== pathname;
+    lastPathRef.current = pathname;
     if (pathname.startsWith('/troy')) return;
-    window.scrollTo({ top: 0 });
+    if (pageChanged) window.scrollTo({ top: 0 });
     if (hash) return scrollToHash(hash);
   }, [pathname, hash]);
 

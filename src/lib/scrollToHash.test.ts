@@ -7,12 +7,15 @@ describe('scrollToHash', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'Date'] });
     scrolled = [];
-    Element.prototype.scrollIntoView = function (this: Element) {
+    vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (this: Element) {
       scrolled.push(this.id);
-    };
+    });
     document.body.innerHTML = '';
   });
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it('scrolls to a section that is already on the page', () => {
     document.body.innerHTML = '<h2 id="your-rights">5</h2>';

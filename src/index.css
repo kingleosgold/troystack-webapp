@@ -104,6 +104,8 @@
   html {
     background-color: var(--bg);
     -webkit-text-size-adjust: 100%;
+    /* A jump to a #section clears the sticky top bar. */
+    scroll-padding-top: 4.5rem;
   }
 
   body {
