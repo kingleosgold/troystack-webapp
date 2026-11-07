@@ -1360,6 +1360,27 @@ test('the privacy policy keeps the old section anchors', async ({ page }) => {
   }
 });
 
+// A link inside the app to /privacy#section lands on the section, not the top.
+test('an in-app move to a privacy section scrolls to it', async ({ page }) => {
+  await page.goto('/terms');
+  await expect(page.getByRole('link', { name: 'Privacy Policy' }).first()).toBeVisible();
+  await page.evaluate(() => {
+    history.pushState({}, '', '/privacy#contact');
+    dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect(page.locator('#contact')).toBeInViewport();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  // The heading clears the sticky top bar instead of hiding under it.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const bar = [...document.querySelectorAll('div.sticky')].find((d) => getComputedStyle(d).display !== 'none')!;
+        return document.getElementById('contact')!.getBoundingClientRect().top - bar.getBoundingClientRect().bottom;
+      }),
+    )
+    .toBeGreaterThanOrEqual(0);
+});
+
 test('the build writes privacy, terms and the calculator and lists them on troystack.com', async ({ request }) => {
   for (const file of ['privacy.html', 'terms.html', 'calculator.html']) {
     expect(existsSync(new URL(`../dist/${file}`, import.meta.url)), file).toBe(true);

@@ -28,6 +28,7 @@ import { useTheme } from '../hooks/useTheme';
 import { METALS, METAL_LABEL, METAL_VAR } from '../lib/metals';
 import { money, signedPercent, changeTone } from '../lib/format';
 import { cx } from '../lib/cx';
+import { scrollToHash } from '../lib/scrollToHash';
 import { appStoreUrl, PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL } from '../lib/appStore';
 import { buttonClass } from '../lib/cx';
 import { AppStoreButton, QrCode } from './AppStore';
@@ -481,7 +482,7 @@ export default function AppShell() {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   // The menu belongs to the page it was opened on, so moving to another page closes it.
   const [menuPath, setMenuPath] = useState<string | null>(null);
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   const mainRef = useRef<HTMLDivElement>(null);
   const fullBleed = isFullBleed(pathname);
 
@@ -495,9 +496,16 @@ export default function AppShell() {
 
   const menuOpen = menuPath === pathname;
 
+  // A new page starts at the top. A hash-only change, like Back after an
+  // in-page jump, leaves the scroll where the browser put it.
+  const lastPathRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!pathname.startsWith('/troy')) window.scrollTo({ top: 0 });
-  }, [pathname]);
+    const pageChanged = lastPathRef.current !== pathname;
+    lastPathRef.current = pathname;
+    if (pathname.startsWith('/troy')) return;
+    if (pageChanged) window.scrollTo({ top: 0 });
+    if (hash) return scrollToHash(hash);
+  }, [pathname, hash]);
 
   return (
     <div className="min-h-screen bg-bg text-fg">
