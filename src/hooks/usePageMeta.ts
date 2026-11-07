@@ -9,7 +9,8 @@ interface PageMeta {
   /** Path on troystack.com, or a full URL when the canonical page lives elsewhere */
   canonical?: string;
   image?: string;
-  noindex?: boolean;
+  /** true writes noindex, false or unset writes index. null leaves the tag as it is, for a page still loading. */
+  noindex?: boolean | null;
 }
 
 function setMeta(attr: 'name' | 'property', key: string, value: string) {
@@ -54,6 +55,6 @@ export function usePageMeta({ title, description, canonical, image, noindex }: P
       setMeta('property', 'og:description', description);
       setMeta('name', 'twitter:description', description);
     }
-    setMeta('name', 'robots', noindex ? 'noindex' : 'index, follow');
+    if (noindex !== null) setMeta('name', 'robots', noindex ? 'noindex' : 'index, follow');
   }, [title, description, canonical, image, noindex]);
 }

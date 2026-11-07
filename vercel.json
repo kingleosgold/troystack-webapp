@@ -25,6 +25,28 @@
       "permanent": true
     },
     {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.troystack.ai"
+        }
+      ],
+      "destination": "https://troystack.com/",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.troystack.ai"
+        }
+      ],
+      "destination": "https://troystack.com/:path*",
+      "permanent": true
+    },
+    {
       "source": "/dashboard",
       "destination": "/",
       "permanent": true
@@ -168,28 +190,6 @@
       "source": "/signal-sitemap.xml",
       "destination": "/sitemap.xml",
       "permanent": false
-    },
-    {
-      "source": "/",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.troystack.ai"
-        }
-      ],
-      "destination": "https://troystack.com/",
-      "permanent": true
-    },
-    {
-      "source": "/:path*",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.troystack.ai"
-        }
-      ],
-      "destination": "https://troystack.com/:path*",
-      "permanent": true
     }
   ],
   "rewrites": [

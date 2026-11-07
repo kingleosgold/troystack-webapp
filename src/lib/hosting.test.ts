@@ -68,6 +68,8 @@ describe('Vercel routing', () => {
       expect.objectContaining({ source: '/', destination: 'https://troystack.com/', permanent: true }),
       expect.objectContaining({ source: '/:path*', destination: 'https://troystack.com/:path*', permanent: true }),
     ]);
+    // Ahead of the path rules, so www.troystack.ai/pricing isn't two hops.
+    expect((vercel.redirects ?? []).indexOf(rules[0])).toBe(2);
   });
 
   // Links and emails from the old marketing site point at these files.
