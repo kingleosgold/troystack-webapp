@@ -1348,7 +1348,7 @@ test('a Signal item leaves robots alone while it loads and writes noindex if it 
     history.pushState({}, '', '/signal/missing-item');
     dispatchEvent(new PopStateEvent('popstate'));
   });
-  await expect(robots).toHaveAttribute('content', 'noindex', { timeout: 15_000 });
+  await expect(robots).toHaveAttribute('content', 'noindex, follow', { timeout: 15_000 });
 });
 
 // Links from the old troystack.com, like /privacy#third-party-services, land on their section.
