@@ -20,7 +20,12 @@ function run(slug: string, upstream: Upstream) {
     setHeader(k: string, v: string) { this.headers[k] = v; },
     end(b: string) { this.body = b; },
   };
-  const req = { query: { slug }, headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' } };
+  // req.query is Vercel's url.parse() getter, so the handler must read req.url instead.
+  const req = {
+    url: `/api/signal-html?${new URLSearchParams({ slug })}`,
+    get query(): never { throw new Error('req.query read'); },
+    headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' },
+  };
   return (handler(req, res) as Promise<void>).then(() => res);
 }
 
@@ -75,11 +80,30 @@ describe('signal-html', () => {
       setHeader(k: string, v: string) { this.headers[k] = v; },
       end(b: string) { this.body = b; },
     };
-    await (handler({ query: { slug: 'nope' }, headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' } }, res) as Promise<void>);
+    await (handler({ url: '/api/signal-html?slug=nope', headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' } }, res) as Promise<void>);
     expect(res.statusCode).toBe(404);
     expect(res.body).toContain("That page isn't here");
     expect(res.body).toContain('<meta name="robots" content="noindex, follow" />');
     expect(res.headers['Cache-Control']).toBe('no-store');
+  });
+
+  it("answers 404 without asking the API when a visitor's own ?slug= repeats the address's", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      calls.push(url);
+      return url.startsWith('https://troystack.com/') ? new Response(SHELL) : json({ error: 'not found' }, 404);
+    }));
+    const res = {
+      statusCode: 0,
+      headers: {} as Record<string, string>,
+      body: '',
+      setHeader(k: string, v: string) { this.headers[k] = v; },
+      end(b: string) { this.body = b; },
+    };
+    await (handler({ url: '/api/signal-html?slug=fed-2026-10-08&slug=other-2026-10-08', headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' } }, res) as Promise<void>);
+    expect(res.statusCode).toBe(404);
+    expect(res.headers['Cache-Control']).toBe('no-store');
+    expect(calls.some((u) => u.includes('fed-2026-10-08') || u.includes('other-2026-10-08'))).toBe(false);
   });
 
   it('answers a retryable 503 that is never cached when the API fails', async () => {

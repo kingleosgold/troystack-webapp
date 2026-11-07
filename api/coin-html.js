@@ -7,6 +7,7 @@
 import { readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { coinBody, junkBody, usableSnapshot } from '../scripts/coin-html.mjs';
+import { queryParam } from './_lib/query.js';
 
 const readJson = (rel) => JSON.parse(readFileSync(new URL(rel, import.meta.url), 'utf8'));
 const coins = readJson('../src/lib/coins.json');
@@ -62,8 +63,10 @@ export default async function handler(req, res) {
   };
 
   // A slug wins, so ?page= added to a coin address can't swap the page.
-  const isJunk = !req.query.slug && req.query.page === 'junk-silver';
-  const coin = isJunk ? null : bySlug.get(String(req.query.slug || ''));
+  const slug = queryParam(req, 'slug');
+  // A repeated slug is null, so it can't fall through to the junk silver page.
+  const isJunk = slug === '' && queryParam(req, 'page') === 'junk-silver';
+  const coin = isJunk ? null : bySlug.get(slug ?? '');
   if (!isJunk && !coin) {
     await notFound();
     return;

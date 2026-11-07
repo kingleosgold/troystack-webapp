@@ -16,7 +16,7 @@ type Upstream = (url: string) => Promise<Response> | Response;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const fresh = (silver: number) => json({ timestamp: new Date(NOW - 60_000).toISOString(), marketsClosed: false, prices: { silver: { price: silver }, gold: { price: 4000 } } });
 
-function run(query: Record<string, string>, prices: Upstream, site: Upstream = (url) => new Response(url.endsWith('/404') ? '<title>Page not found</title>' : BUILT(STALE))) {
+function run(query: Record<string, string> | string, prices: Upstream, site: Upstream = (url) => new Response(url.endsWith('/404') ? '<title>Page not found</title>' : BUILT(STALE))) {
   const calls: string[] = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     calls.push(url);
@@ -29,7 +29,12 @@ function run(query: Record<string, string>, prices: Upstream, site: Upstream = (
     setHeader(k: string, v: string) { this.headers[k] = v; },
     end(b: string) { this.body = b; },
   };
-  const req = { query, headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' } };
+  // req.query is Vercel's url.parse() getter, so the handler must read req.url instead.
+  const req = {
+    url: `/api/coin-html?${new URLSearchParams(query)}`,
+    get query(): never { throw new Error('req.query read'); },
+    headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' },
+  };
   return (handler(req, res) as Promise<void>).then(() => ({ res, calls }));
 }
 
@@ -112,6 +117,35 @@ describe('coin-html', () => {
     const { res } = await run({ slug: 'morgan-silver-dollar', page: 'junk-silver' }, () => fresh(50));
     expect(res.body).toContain('one coin melts to $38.67');
     expect(res.body).not.toContain('Junk silver melt value calculator</h1>');
+  });
+
+  it("answers 404 when a visitor's own ?slug= rides along with the address's", async () => {
+    const { res } = await run('slug=morgan-silver-dollar&slug=peace-dollar', () => fresh(50));
+    expect(res.statusCode).toBe(404);
+    expect(res.headers['Cache-Control']).toBe('no-store');
+  });
+
+  it("answers 404, not the junk silver page, when a repeated ?slug= comes with ?page=junk-silver", async () => {
+    const { res } = await run('slug=morgan-silver-dollar&slug=peace-dollar&page=junk-silver', () => fresh(50));
+    expect(res.statusCode).toBe(404);
+    expect(res.headers['Cache-Control']).toBe('no-store');
+    expect(res.body).not.toContain('Junk silver melt value calculator</h1>');
+  });
+
+  it('answers 404 when two empty slugs come with ?page=junk-silver', async () => {
+    const { res } = await run('slug=&slug=&page=junk-silver', () => fresh(50));
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('still serves junk silver when the visitor adds an empty ?slug=', async () => {
+    const { res } = await run('page=junk-silver&slug=', () => fresh(50));
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('Junk silver melt value calculator</h1>');
+  });
+
+  it('answers 404 for a repeated ?page=junk-silver with no slug', async () => {
+    const { res } = await run('page=junk-silver&page=junk-silver', () => fresh(50));
+    expect(res.statusCode).toBe(404);
   });
 
   it('leaves a $ in the new text as written', async () => {

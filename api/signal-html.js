@@ -4,6 +4,7 @@
 // When the API fails it answers 503 with the app shell, so a reader still gets
 // the app and a crawler retries instead of caching the wrong page.
 import { isRecap, plainDashes, usableOneLiner } from './_lib/signal-text.js';
+import { queryParam } from './_lib/query.js';
 
 const SITE = 'https://troystack.com';
 
@@ -42,7 +43,7 @@ function apply(html, { title, description, url, image }) {
 }
 
 export default async function handler(req, res) {
-  const slug = String(req.query.slug || '');
+  const slug = queryParam(req, 'slug') ?? '';
   const send = async (status, html) => {
     res.statusCode = status;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
