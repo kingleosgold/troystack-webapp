@@ -82,7 +82,7 @@ function articleLd(article, title, description) {
     description,
     datePublished: article.published_at || article.created_at || undefined,
     mainEntityOfPage: url,
-    image: article.image_url || `${SITE}/og-image.png`,
+    image: article.image_url || `${SITE}/og-image.png?v=2`,
     author: { '@type': 'Organization', name: 'TroyStack', url: SITE },
     publisher: { '@type': 'Organization', name: 'Mancini Tech Solutions, LLC', url: SITE },
   };

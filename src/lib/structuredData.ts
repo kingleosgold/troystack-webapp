@@ -13,7 +13,7 @@ export function articleLd(article: Pick<SignalArticle, 'slug' | 'title' | 'oneLi
     description,
     datePublished: article.publishedAt || undefined,
     mainEntityOfPage: url,
-    image: article.imageUrl || `${SITE}/og-image.png`,
+    image: article.imageUrl || `${SITE}/og-image.png?v=2`,
     author: { '@type': 'Organization', name: 'TroyStack', url: SITE },
     publisher: {
       '@type': 'Organization',

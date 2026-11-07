@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 const SITE = 'https://troystack.com';
-const DEFAULT_IMAGE = `${SITE}/og-image.png`;
+const DEFAULT_IMAGE = `${SITE}/og-image.png?v=2`;
 
 interface PageMeta {
   title: string;
