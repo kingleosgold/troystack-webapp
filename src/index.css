@@ -109,7 +109,7 @@
     scroll-padding-top: 6.5rem;
   }
 
-  @media (min-width: 1024px) {
+  @media (min-width: 64rem) {
     html {
       scroll-padding-top: 4.5rem;
     }
