@@ -245,7 +245,7 @@ notFound = setTag(notFound, /<meta name="twitter:title" content="[^"]*" \/>/, '<
 notFound = setTag(notFound, /<meta name="twitter:description" content="[^"]*" \/>/, '<meta name="twitter:description" content="That page is not on TroyStack." />');
 notFound = setTag(notFound, /\s*<link rel="canonical" href="[^"]*" \/>/, '');
 notFound = setTag(notFound, /\s*<meta property="og:url" content="[^"]*" \/>/, '');
-notFound = notFound.includes('name="robots"') ? notFound : notFound.replace('</head>', '<meta name="robots" content="noindex" /></head>');
+notFound = notFound.includes('name="robots"') ? notFound : notFound.replace('</head>', '<meta name="robots" content="noindex, follow" /></head>');
 writeFileSync(path.join(dist, '404.html'), notFound);
 
 // /prices shows the gold page, so it is the gold page under a shorter

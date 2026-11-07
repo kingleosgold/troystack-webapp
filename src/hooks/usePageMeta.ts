@@ -9,7 +9,7 @@ interface PageMeta {
   /** Path on troystack.com, or a full URL when the canonical page lives elsewhere */
   canonical?: string;
   image?: string;
-  /** true writes noindex, false or unset writes index. null leaves the tag as it is, for a page still loading. */
+  /** true writes "noindex, follow", false or unset writes index. null leaves the tag as it is, for a page still loading. */
   noindex?: boolean | null;
 }
 
