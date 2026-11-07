@@ -125,6 +125,18 @@ describe('coin-html', () => {
     expect(res.headers['Cache-Control']).toBe('no-store');
   });
 
+  it("answers 404, not the junk silver page, when a repeated ?slug= comes with ?page=junk-silver", async () => {
+    const { res } = await run('slug=morgan-silver-dollar&slug=peace-dollar&page=junk-silver', () => fresh(50));
+    expect(res.statusCode).toBe(404);
+    expect(res.headers['Cache-Control']).toBe('no-store');
+    expect(res.body).not.toContain('Junk silver melt value calculator</h1>');
+  });
+
+  it('answers 404 for a repeated ?page=junk-silver with no slug', async () => {
+    const { res } = await run('page=junk-silver&page=junk-silver', () => fresh(50));
+    expect(res.statusCode).toBe(404);
+  });
+
   it('leaves a $ in the new text as written', async () => {
     const { res } = await run({ slug: 'morgan-silver-dollar' }, () => fresh(50), () => new Response(BUILT('$&')));
     expect(res.body).toContain('$38.67');

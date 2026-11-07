@@ -43,7 +43,7 @@ function apply(html, { title, description, url, image }) {
 }
 
 export default async function handler(req, res) {
-  const slug = queryParam(req, 'slug');
+  const slug = queryParam(req, 'slug') ?? '';
   const send = async (status, html) => {
     res.statusCode = status;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
