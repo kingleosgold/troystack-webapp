@@ -9,8 +9,8 @@ describe('queryParam', () => {
   it('decodes percent and plus encoding the way req.query did', () => {
     expect(queryParam({ url: '/api/signal-html?slug=a%20b+c' }, 'slug')).toBe('a b c');
   });
-  it('gives the first value of a repeated key', () => {
-    expect(queryParam({ url: '/x?slug=one&slug=two' }, 'slug')).toBe('one');
+  it("gives '' for a repeated key, so a visitor's extra ?slug= can't pick the page", () => {
+    expect(queryParam({ url: '/x?slug=one&slug=two' }, 'slug')).toBe('');
   });
   it("gives '' for a missing, empty or unparseable url", () => {
     expect(queryParam({ url: '/x' }, 'slug')).toBe('');
