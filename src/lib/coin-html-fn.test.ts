@@ -29,7 +29,7 @@ function run(query: Record<string, string>, prices: Upstream, site: Upstream = (
     setHeader(k: string, v: string) { this.headers[k] = v; },
     end(b: string) { this.body = b; },
   };
-  const req = { query, headers: { host: 'troystack.ai', 'x-forwarded-proto': 'https' } };
+  const req = { query, headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' } };
   return (handler(req, res) as Promise<void>).then(() => ({ res, calls }));
 }
 
@@ -45,7 +45,7 @@ afterEach(() => {
 describe('coin-html', () => {
   it('puts live spot in a coin page and caches it at the edge for five minutes', async () => {
     const { res, calls } = await run({ slug: 'morgan-silver-dollar' }, () => fresh(50));
-    expect(calls).toContain('https://troystack.ai/_ssr/coins/morgan-silver-dollar');
+    expect(calls).toContain('https://troystack.com/_ssr/coins/morgan-silver-dollar');
     expect(res.statusCode).toBe(200);
     expect(res.headers['Cache-Control']).toBe('public, max-age=0, s-maxage=300, stale-while-revalidate=600');
     // 0.77344 oz at $50.00
@@ -62,7 +62,7 @@ describe('coin-html', () => {
 
   it('gives the junk silver calculator both silver figures at live spot', async () => {
     const { res, calls } = await run({ page: 'junk-silver' }, () => fresh(50));
-    expect(calls).toContain('https://troystack.ai/_ssr/tools/junk-silver');
+    expect(calls).toContain('https://troystack.com/_ssr/tools/junk-silver');
     expect(res.body).toContain("0.7234 troy oz of silver as struck. At silver spot of $50.00, that's $36.17");
     expect(res.body).toContain('At silver spot of $50.00, that\'s $35.75');
   });
@@ -90,6 +90,14 @@ describe('coin-html', () => {
       expect(res.headers['Cache-Control']).toBe('no-store');
       expect(calls.some((url) => url.startsWith('https://api.troystack.ai/'))).toBe(false);
     }
+  });
+
+  it('keeps crawlers off the plain 404 page used when the site 404 cannot be read', async () => {
+    const { res } = await run({ slug: 'not-a-coin' }, () => fresh(50), () => new Response('no', { status: 500 }));
+    expect(res.statusCode).toBe(404);
+    expect(res.body).toContain("That page isn't here");
+    expect(res.body).toContain('<meta name="robots" content="noindex, follow" />');
+    expect(res.headers['Cache-Control']).toBe('no-store');
   });
 
   it('answers 502 without caching when the built page cannot be read or has no body to replace', async () => {

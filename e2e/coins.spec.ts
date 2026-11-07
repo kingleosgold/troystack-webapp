@@ -185,7 +185,7 @@ test.describe('coin values', () => {
     // On Vercel, api/coin-html.js answers a slug that isn't a coin with this
     // file and HTTP 404 (coin-html-fn.test.ts). The preview server here has no
     // functions, so this checks the file itself.
-    expect(await (await request.get('/404.html')).text()).toContain('<meta name="robots" content="noindex, follow" />');
+    expect(await (await request.get('/404.html')).text()).toMatch(/<meta\s+name="robots"\s+content="noindex,\s*follow"\s*\/?>/);
     const sitemap = await (await request.get('/sitemap.xml')).text();
     expect(sitemap).not.toContain('not-a-coin');
   });
