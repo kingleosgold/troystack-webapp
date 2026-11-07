@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const vercel = JSON.parse(readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8'));
@@ -60,6 +60,23 @@ describe('Vercel routing', () => {
       expect.objectContaining({ source: '/:path*', destination: 'https://troystack.com/:path*', permanent: true }),
     ]);
     expect((vercel.redirects ?? [])[0]).toBe(rules[0]);
+  });
+
+  it('sends www.troystack.ai straight to troystack.com in one hop', () => {
+    const rules = (vercel.redirects ?? []).filter((item: { has?: Array<{ value: string }> }) => item.has?.[0]?.value === 'www.troystack.ai');
+    expect(rules).toEqual([
+      expect.objectContaining({ source: '/', destination: 'https://troystack.com/', permanent: true }),
+      expect.objectContaining({ source: '/:path*', destination: 'https://troystack.com/:path*', permanent: true }),
+    ]);
+    // Ahead of the path rules, so www.troystack.ai/pricing isn't two hops.
+    expect((vercel.redirects ?? []).indexOf(rules[0])).toBe(2);
+  });
+
+  // Links and emails from the old marketing site point at these files.
+  it('serves the images the old troystack.com linked to', () => {
+    for (const f of ['icon.png', 'og-calculator.png', 'og-speculation.png', 'og-junk-silver.png', 'screenshot.png']) {
+      expect(existsSync(new URL(`../../public/${f}`, import.meta.url))).toBe(true);
+    }
   });
 
   // The app's reset email lands on troystack.com/auth/reset-password, which the

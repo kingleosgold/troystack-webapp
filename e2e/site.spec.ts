@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
-import { DEALER_LINK_PREVIEW, mockBackends, SAMPLE_HOLDINGS, signIn, USER_ID } from './mock';
+import { DEALER_LINK_PREVIEW, holdRequests, mockBackends, SAMPLE_HOLDINGS, signIn, USER_ID } from './mock';
 
 const SHOTS = process.env.E2E_SCREENS === '1';
 
@@ -1322,6 +1322,41 @@ test.describe('the policies without JavaScript', () => {
       const right = await page.locator('article').evaluate((el) => el.getBoundingClientRect().right);
       expect(right).toBeLessThanOrEqual(390);
     });
+  }
+});
+
+// The server's robots tag stands while a Signal item loads. A failed load is noindex.
+test('a Signal item leaves robots alone while it loads and writes noindex if it fails', async ({ page }) => {
+  await mockBackends(page);
+  const robots = page.locator('meta[name="robots"]');
+  // An indexable page first, so the tag holds index, follow before the item opens.
+  await page.goto('/prices/gold');
+  await expect(robots).toHaveAttribute('content', 'index, follow');
+  const held = await holdRequests(page, (u) => u.pathname.startsWith('/v1/stack-signal/evening'));
+  // Stands in for the tag the server wrote, which nothing may touch while the item loads.
+  await page.evaluate(() => document.querySelector('meta[name="robots"]')?.setAttribute('content', 'server'));
+  await page.evaluate(() => {
+    history.pushState({}, '', '/signal/evening-signal-2026-10-08');
+    dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect.poll(() => held.seen.length).toBeGreaterThan(0);
+  await expect(robots).toHaveAttribute('content', 'server');
+  held.release();
+
+  await page.route((u) => u.pathname.startsWith('/v1/stack-signal/missing'), (route) => route.fulfill({ status: 500, body: '{}' }));
+  await page.evaluate(() => {
+    history.pushState({}, '', '/signal/missing-item');
+    dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect(robots).toHaveAttribute('content', 'noindex', { timeout: 15_000 });
+});
+
+// Links from the old troystack.com, like /privacy#third-party-services, land on their section.
+test('the privacy policy keeps the old section anchors', async ({ page }) => {
+  await page.goto('/privacy#third-party-services');
+  await expect(page.locator('#third-party-services')).toHaveText('3. Third-party services we use');
+  for (const id of ['information-we-collect', 'your-rights', 'contact']) {
+    await expect(page.locator(`#${id}`)).toHaveCount(1);
   }
 });
 
