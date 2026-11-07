@@ -164,7 +164,7 @@ describe('where a checkout backs out to', () => {
   async function cancelUrlFor(pathname: string, campaign?: string, tappedOnGold = true) {
     const c = await withPrices({ monthly: 'price_m' });
     if (tappedOnGold && campaign) c.rememberGoldTap('monthly', campaign as never);
-    vi.stubGlobal('window', { location: { origin: 'https://troystack.ai', pathname, assign: vi.fn() } });
+    vi.stubGlobal('window', { location: { origin: 'https://troystack.com', pathname, assign: vi.fn() } });
     const fetch = vi.fn(async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/e2e' }), { status: 200, headers: { 'content-type': 'application/json' } }));
     vi.stubGlobal('fetch', fetch);
     await c.startCheckout('7b1c6c1e-1111-4a2b-9c3d-000000000001', 'token', 'monthly', campaign as never);
@@ -173,25 +173,25 @@ describe('where a checkout backs out to', () => {
   }
 
   it('is the plans with the token for a troystack.com link, wherever checkout opened', async () => {
-    expect(await cancelUrlFor('/auth', 'site-pricing')).toBe('https://troystack.ai/gold?campaign=site-pricing&back=1');
+    expect(await cancelUrlFor('/auth', 'site-pricing')).toBe('https://troystack.com/gold?campaign=site-pricing&back=1');
   });
 
   it('is the plans for a Gold-page pick, even when checkout opened on /auth after sign-up', async () => {
-    expect(await cancelUrlFor('/auth', 'webapp-gold')).toBe('https://troystack.ai/gold?back=1');
-    expect(await cancelUrlFor('/', 'webapp-gold')).toBe('https://troystack.ai/gold?back=1');
+    expect(await cancelUrlFor('/auth', 'webapp-gold')).toBe('https://troystack.com/gold?back=1');
+    expect(await cancelUrlFor('/', 'webapp-gold')).toBe('https://troystack.com/gold?back=1');
   });
 
   it("doesn't say the counts happened when this tab never tapped a plan on the Gold page under that campaign", async () => {
-    expect(await cancelUrlFor('/auth', 'site-pricing', false)).toBe('https://troystack.ai/gold?campaign=site-pricing');
-    expect(await cancelUrlFor('/auth', 'webapp-gold', false)).toBe('https://troystack.ai/gold');
+    expect(await cancelUrlFor('/auth', 'site-pricing', false)).toBe('https://troystack.com/gold?campaign=site-pricing');
+    expect(await cancelUrlFor('/auth', 'webapp-gold', false)).toBe('https://troystack.com/gold');
     const c = await withPrices({ monthly: 'price_m' });
     c.rememberGoldTap('monthly', 'site-signal' as never);
-    expect(await cancelUrlFor('/auth', 'site-pricing', false)).toBe('https://troystack.ai/gold?campaign=site-pricing');
+    expect(await cancelUrlFor('/auth', 'site-pricing', false)).toBe('https://troystack.com/gold?campaign=site-pricing');
   });
 
   it('is the page checkout opened on for anything else', async () => {
-    expect(await cancelUrlFor('/settings', 'webapp-settings')).toBe('https://troystack.ai/settings');
-    expect(await cancelUrlFor('/troy')).toBe('https://troystack.ai/troy');
+    expect(await cancelUrlFor('/settings', 'webapp-settings')).toBe('https://troystack.com/settings');
+    expect(await cancelUrlFor('/troy')).toBe('https://troystack.com/troy');
   });
 });
 
@@ -247,12 +247,12 @@ describe('a plan tapped on the Gold page', () => {
   it("keeps a back-out to the Gold page from saying the counts happened once the tap is stale", async () => {
     const c = await withPrices({ monthly: 'price_m' });
     c.rememberGoldTap('monthly', 'webapp-gold', Date.now() - 31 * 60 * 1000);
-    vi.stubGlobal('window', { location: { origin: 'https://troystack.ai', pathname: '/auth', assign: vi.fn() } });
+    vi.stubGlobal('window', { location: { origin: 'https://troystack.com', pathname: '/auth', assign: vi.fn() } });
     const fetch = vi.fn(async () => new Response(JSON.stringify({ url: 'https://checkout.stripe.com/c/pay/e2e' }), { status: 200, headers: { 'content-type': 'application/json' } }));
     vi.stubGlobal('fetch', fetch);
     await c.startCheckout('7b1c6c1e-1111-4a2b-9c3d-000000000001', 'token', 'monthly', 'webapp-gold');
     const init = (fetch.mock.calls[0] as unknown as [string, RequestInit])[1];
-    expect((JSON.parse(String(init.body)) as { cancel_url: string }).cancel_url).toBe('https://troystack.ai/gold');
+    expect((JSON.parse(String(init.body)) as { cancel_url: string }).cancel_url).toBe('https://troystack.com/gold');
   });
 });
 

@@ -55,6 +55,6 @@ export function usePageMeta({ title, description, canonical, image, noindex }: P
       setMeta('property', 'og:description', description);
       setMeta('name', 'twitter:description', description);
     }
-    if (noindex !== null) setMeta('name', 'robots', noindex ? 'noindex' : 'index, follow');
+    if (noindex !== null) setMeta('name', 'robots', noindex ? 'noindex, follow' : 'index, follow');
   }, [title, description, canonical, image, noindex]);
 }
