@@ -1333,12 +1333,14 @@ test('a Signal item leaves robots alone while it loads and writes noindex if it 
   await page.goto('/prices/gold');
   await expect(robots).toHaveAttribute('content', 'index, follow');
   const held = await holdRequests(page, (u) => u.pathname.startsWith('/v1/stack-signal/evening'));
+  // Stands in for the tag the server wrote, which nothing may touch while the item loads.
+  await page.evaluate(() => document.querySelector('meta[name="robots"]')?.setAttribute('content', 'server'));
   await page.evaluate(() => {
     history.pushState({}, '', '/signal/evening-signal-2026-10-08');
     dispatchEvent(new PopStateEvent('popstate'));
   });
   await expect.poll(() => held.seen.length).toBeGreaterThan(0);
-  await expect(robots).toHaveAttribute('content', 'index, follow');
+  await expect(robots).toHaveAttribute('content', 'server');
   held.release();
 
   await page.route((u) => u.pathname.startsWith('/v1/stack-signal/missing'), (route) => route.fulfill({ status: 500, body: '{}' }));
