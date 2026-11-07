@@ -52,7 +52,7 @@ export default async function handler(req, res) {
     res.end(html);
   };
   const notFound = async () => {
-    let html = '<!doctype html><title>Page not found</title><h1>That page isn\'t here</h1>';
+    let html = '<!doctype html><meta name="robots" content="noindex, follow" /><title>Page not found</title><h1>That page isn\'t here</h1>';
     try {
       html = await readBuilt(req, '404.html');
     } catch {

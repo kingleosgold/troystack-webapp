@@ -64,6 +64,23 @@ describe('signal-html', () => {
     expect(res.headers['Cache-Control']).toBe('no-store');
   });
 
+  it('keeps crawlers off the plain 404 page used when the site 404 cannot be read', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => (url.startsWith('https://troystack.ai/')
+      ? new Response('no', { status: 500 })
+      : json({ error: 'not found' }, 404))));
+    const res = {
+      statusCode: 0,
+      headers: {} as Record<string, string>,
+      body: '',
+      setHeader(k: string, v: string) { this.headers[k] = v; },
+      end(b: string) { this.body = b; },
+    };
+    await (handler({ query: { slug: 'nope' }, headers: { host: 'troystack.ai', 'x-forwarded-proto': 'https' } }, res) as Promise<void>);
+    expect(res.statusCode).toBe(404);
+    expect(res.body).toContain("That page isn't here");
+    expect(res.body).toContain('<meta name="robots" content="noindex, follow" />');
+  });
+
   it('answers a retryable 503 that is never cached when the API fails', async () => {
     const failures: Upstream[] = [
       () => json({ error: 'boom' }, 500),

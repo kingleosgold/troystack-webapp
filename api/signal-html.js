@@ -54,7 +54,7 @@ export default async function handler(req, res) {
     try {
       await send(404, await readStatic(req, '/404.html'));
     } catch {
-      await send(404, '<!doctype html><title>Page not found</title><h1>That page isn\'t here</h1>');
+      await send(404, '<!doctype html><meta name="robots" content="noindex, follow" /><title>Page not found</title><h1>That page isn\'t here</h1>');
     }
   };
 

@@ -2,7 +2,7 @@
 
 The web side of TroyStack. Live spot for gold, silver, platinum and palladium, Troy's read on what moved them, the Stack Signal and its podcast, calculators, Vault Watch, where to buy and your stack. It's the same account as the iPhone app, so your holdings and your chats with Troy are on both.
 
-Vite, React 19, TypeScript, Tailwind 4 and TanStack Query. Vercel builds it, and `main` is what troystack.com serves once its domain moves here (troystack.ai until then).
+Vite, React 19, TypeScript, Tailwind 4 and TanStack Query. Vercel builds it, and `main` is what troystack.com serves. troystack.ai redirects there.
 
 ## Running it
 

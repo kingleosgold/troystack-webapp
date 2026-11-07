@@ -32,14 +32,14 @@ test('a signed-in account is deleted only after DELETE is typed, then signed out
 test('an account on a Stripe plan is told to cancel first and stays signed in', async ({ page }) => {
   await signIn(page);
   const api = await mockBackends(page, {
-    deleteAccount: { status: 409, body: { error: 'stripe_plan_active', message: 'Cancel your Gold plan in Settings on troystack.ai first.' } },
+    deleteAccount: { status: 409, body: { error: 'stripe_plan_active', message: 'Cancel your Gold plan in Settings on troystack.com first.' } },
   });
   await page.goto('/delete-account');
   await page.getByRole('button', { name: 'Delete my account' }).click();
   const sheet = page.getByRole('dialog', { name: 'Delete your account?' });
   await sheet.getByLabel('Type DELETE').fill('DELETE');
   await sheet.getByRole('button', { name: 'Delete my account' }).click();
-  await expect(sheet.getByText('Cancel your Gold plan in Settings on troystack.ai first.')).toBeVisible();
+  await expect(sheet.getByText('Cancel your Gold plan in Settings on troystack.com first.')).toBeVisible();
   expect(api.accountDeletes).toHaveLength(1);
   expect(await page.evaluate(() => localStorage.getItem('sb-e2e-auth-token'))).not.toBeNull();
 });
