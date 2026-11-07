@@ -445,11 +445,12 @@ export default function Troy() {
   }, [conversationId]);
 
   // An empty chat stays at the top, so a phone shows Troy's coin and the
-  // heading first instead of opening scrolled past them.
+  // heading first instead of opening scrolled past them. A note under the
+  // chips, like a first question that failed, still scrolls into view.
   useEffect(() => {
-    if (messages.length === 0 && !busy && !quotaHit) return;
+    if (messages.length === 0 && !busy && !quotaHit && !unsent && !error) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, busy, quotaHit]);
+  }, [messages, busy, quotaHit, unsent, error]);
 
   const sendSignedIn = useCallback(
     async (text: string) => {

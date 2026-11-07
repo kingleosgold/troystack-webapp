@@ -57,7 +57,10 @@ describe('brand icons', () => {
     for (const f of ['apple-touch-icon.png', 'icon-maskable-512.png']) {
       const b = readFileSync(pub(f));
       expect([2, 3]).toContain(b[25]);
-      expect(b.includes(Buffer.from('tRNS'))).toBe(false);
+      const chunks: string[] = [];
+      for (let at = 8; at < b.length; at += 12 + b.readUInt32BE(at)) chunks.push(b.toString('latin1', at + 4, at + 8));
+      expect(chunks).toContain('IEND');
+      expect(chunks).not.toContain('tRNS');
     }
   });
 
