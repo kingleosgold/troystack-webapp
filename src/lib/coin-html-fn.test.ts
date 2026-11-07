@@ -29,7 +29,12 @@ function run(query: Record<string, string>, prices: Upstream, site: Upstream = (
     setHeader(k: string, v: string) { this.headers[k] = v; },
     end(b: string) { this.body = b; },
   };
-  const req = { query, headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' } };
+  // req.query is Vercel's url.parse() getter, so the handler must read req.url instead.
+  const req = {
+    url: `/api/coin-html?${new URLSearchParams(query)}`,
+    get query(): never { throw new Error('req.query read'); },
+    headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' },
+  };
   return (handler(req, res) as Promise<void>).then(() => ({ res, calls }));
 }
 

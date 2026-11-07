@@ -20,7 +20,12 @@ function run(slug: string, upstream: Upstream) {
     setHeader(k: string, v: string) { this.headers[k] = v; },
     end(b: string) { this.body = b; },
   };
-  const req = { query: { slug }, headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' } };
+  // req.query is Vercel's url.parse() getter, so the handler must read req.url instead.
+  const req = {
+    url: `/api/signal-html?${new URLSearchParams({ slug })}`,
+    get query(): never { throw new Error('req.query read'); },
+    headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' },
+  };
   return (handler(req, res) as Promise<void>).then(() => res);
 }
 
@@ -75,7 +80,7 @@ describe('signal-html', () => {
       setHeader(k: string, v: string) { this.headers[k] = v; },
       end(b: string) { this.body = b; },
     };
-    await (handler({ query: { slug: 'nope' }, headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' } }, res) as Promise<void>);
+    await (handler({ url: '/api/signal-html?slug=nope', headers: { host: 'troystack.com', 'x-forwarded-proto': 'https' } }, res) as Promise<void>);
     expect(res.statusCode).toBe(404);
     expect(res.body).toContain("That page isn't here");
     expect(res.body).toContain('<meta name="robots" content="noindex, follow" />');
