@@ -1325,6 +1325,15 @@ test.describe('the policies without JavaScript', () => {
   }
 });
 
+// Links from the old troystack.com, like /privacy#third-party-services, land on their section.
+test('the privacy policy keeps the old section anchors', async ({ page }) => {
+  await page.goto('/privacy#third-party-services');
+  await expect(page.locator('#third-party-services')).toHaveText('3. Third-party services we use');
+  for (const id of ['information-we-collect', 'your-rights', 'contact']) {
+    await expect(page.locator(`#${id}`)).toHaveCount(1);
+  }
+});
+
 test('the build writes privacy, terms and the calculator and lists them on troystack.com', async ({ request }) => {
   for (const file of ['privacy.html', 'terms.html', 'calculator.html']) {
     expect(existsSync(new URL(`../dist/${file}`, import.meta.url)), file).toBe(true);

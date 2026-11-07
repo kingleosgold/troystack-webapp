@@ -100,7 +100,8 @@ export default function Article() {
     canonical: key ? `/signal/${key}` : '/signal',
     image: a?.imageUrl || undefined,
     // Only Troy's recaps are indexed, as on troystack.com's Signal since April.
-    noindex: a ? !a.isDigest : undefined,
+    // Until the item loads, or if it fails, it stays noindex.
+    noindex: a ? !a.isDigest : true,
   });
 
   const episode = useMemo(() => podcast.data?.episodes.find((e) => e.slug === key), [podcast.data, key]);

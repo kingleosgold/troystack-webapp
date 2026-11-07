@@ -177,7 +177,7 @@
           "value": "www.troystack.ai"
         }
       ],
-      "destination": "https://troystack.ai/",
+      "destination": "https://troystack.com/",
       "permanent": true
     },
     {
@@ -188,7 +188,7 @@
           "value": "www.troystack.ai"
         }
       ],
-      "destination": "https://troystack.ai/:path*",
+      "destination": "https://troystack.com/:path*",
       "permanent": true
     }
   ],

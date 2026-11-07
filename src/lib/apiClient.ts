@@ -1,7 +1,7 @@
 /**
  * Calls to the TroyStack API (api.troystack.ai). The browser calls it
- * directly, the way the iPhone app does; the API allows troystack.ai and the
- * web app's Vercel previews.
+ * directly, the way the iPhone app does; the API allows troystack.com,
+ * troystack.ai and the web app's Vercel previews.
  */
 
 export const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'https://api.troystack.ai';

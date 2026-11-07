@@ -13,7 +13,7 @@ export default function Privacy() {
         TroyStack is a precious metals portfolio tracking service operated by Mancini Tech Solutions LLC, available as an app for iPhone and Android and on the web at troystack.com. This policy covers all three. We track what you tell us about your holdings, we use AI to help you understand markets and process receipts, and we use third-party services to deliver that experience. This document tells you what data we collect, who we share it with, and what your rights are. We've tried to write it in plain English.
       </p>
 
-      <h2 className="mt-10 text-[20px] font-semibold text-fg">1. Information we collect</h2>
+      <h2 id="information-we-collect" className="mt-10 text-[20px] font-semibold text-fg">1. Information we collect</h2>
       <h3 className="mt-6 text-[16px] font-semibold text-fg">Account information</h3>
       <ul className="mt-2 list-disc space-y-1 pl-5">
         <li>Email address (required for account creation)</li>
@@ -41,7 +41,7 @@ export default function Privacy() {
         <li>App version and operating system version (iOS or Android)</li>
       </ul>
 
-      <h2 className="mt-10 text-[20px] font-semibold text-fg">2. How we use the information</h2>
+      <h2 id="how-we-use-the-information" className="mt-10 text-[20px] font-semibold text-fg">2. How we use the information</h2>
       <ul className="mt-2 list-disc space-y-1 pl-5">
         <li>Provide the core service: track your portfolio, calculate value against live spot prices, generate intelligence summaries, send alerts you've opted into</li>
         <li>Operate the Troy AI assistant: route your messages through third-party AI providers to generate responses</li>
@@ -52,7 +52,7 @@ export default function Privacy() {
       </ul>
       <p className="mt-3">Receipt images you upload are processed in memory and are not written to our servers' disk storage. They are forwarded to Google Gemini for OCR processing and are not retained by us afterward.</p>
 
-      <h2 className="mt-10 text-[20px] font-semibold text-fg">3. Third-party services we use</h2>
+      <h2 id="third-party-services" className="mt-10 text-[20px] font-semibold text-fg">3. Third-party services we use</h2>
       <p className="mt-2">TroyStack uses the following third-party services to operate. Each service has its own privacy policy governing how they handle data they receive. We do not control those policies.</p>
       <div className="mt-4 max-w-full overflow-x-auto">
         <table className="w-full min-w-[640px] border-collapse text-left text-[13px]">
@@ -91,7 +91,7 @@ export default function Privacy() {
         </table>
       </div>
 
-      <h2 className="mt-10 text-[20px] font-semibold text-fg">4. What we don't do</h2>
+      <h2 id="what-we-dont-do" className="mt-10 text-[20px] font-semibold text-fg">4. What we don't do</h2>
       <ul className="mt-2 list-disc space-y-1 pl-5">
         <li>We do not sell your personal information to third parties.</li>
         <li>We do not show advertising in the app.</li>
@@ -100,7 +100,7 @@ export default function Privacy() {
         <li>We do not access your portfolio data for marketing or sales targeting. Production data access is logged and limited to debugging and support purposes.</li>
       </ul>
 
-      <h2 className="mt-10 text-[20px] font-semibold text-fg">5. Your rights</h2>
+      <h2 id="your-rights" className="mt-10 text-[20px] font-semibold text-fg">5. Your rights</h2>
       <ul className="mt-2 list-disc space-y-2 pl-5">
         <li><strong className="text-fg">Access your data:</strong> export available in app settings.</li>
         <li>
@@ -110,16 +110,16 @@ export default function Privacy() {
         <li><strong className="text-fg">Contact us:</strong> <a href={`mailto:${SUPPORT_EMAIL}`} className="font-semibold text-gold hover:text-gold-2">{SUPPORT_EMAIL}</a></li>
       </ul>
 
-      <h2 className="mt-10 text-[20px] font-semibold text-fg">6. Children's privacy</h2>
+      <h2 id="childrens-privacy" className="mt-10 text-[20px] font-semibold text-fg">6. Children's privacy</h2>
       <p className="mt-2">TroyStack is not directed at children under 13 and we do not knowingly collect data from children under 13.</p>
 
-      <h2 className="mt-10 text-[20px] font-semibold text-fg">7. International users</h2>
+      <h2 id="international-users" className="mt-10 text-[20px] font-semibold text-fg">7. International users</h2>
       <p className="mt-2">We are based in the United States. By using TroyStack you consent to processing in the United States.</p>
 
-      <h2 className="mt-10 text-[20px] font-semibold text-fg">8. Changes to this policy</h2>
+      <h2 id="changes-to-this-policy" className="mt-10 text-[20px] font-semibold text-fg">8. Changes to this policy</h2>
       <p className="mt-2">We will update the effective date when we make material changes. Significant changes will be communicated in the app.</p>
 
-      <h2 className="mt-10 text-[20px] font-semibold text-fg">9. Contact</h2>
+      <h2 id="contact" className="mt-10 text-[20px] font-semibold text-fg">9. Contact</h2>
       <p className="mt-2">
         Mancini Tech Solutions LLC<br />
         Connecticut, United States<br />
