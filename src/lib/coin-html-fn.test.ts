@@ -132,6 +132,17 @@ describe('coin-html', () => {
     expect(res.body).not.toContain('Junk silver melt value calculator</h1>');
   });
 
+  it('answers 404 when two empty slugs come with ?page=junk-silver', async () => {
+    const { res } = await run('slug=&slug=&page=junk-silver', () => fresh(50));
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('still serves junk silver when the visitor adds an empty ?slug=', async () => {
+    const { res } = await run('page=junk-silver&slug=', () => fresh(50));
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('Junk silver melt value calculator</h1>');
+  });
+
   it('answers 404 for a repeated ?page=junk-silver with no slug', async () => {
     const { res } = await run('page=junk-silver&page=junk-silver', () => fresh(50));
     expect(res.statusCode).toBe(404);
