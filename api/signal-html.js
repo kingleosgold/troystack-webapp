@@ -106,7 +106,7 @@ export default async function handler(req, res) {
   // The canonical takes the API's slug, so /signal/Gold-x and /signal/gold-x agree.
   const canonicalSlug = /^[a-z0-9-]{1,120}$/.test(String(article.slug || '')) ? article.slug : slug.toLowerCase();
   const url = `${SITE}/signal/${canonicalSlug}`;
-  const image = article.image_url || `${SITE}/og-image.png`;
+  const image = article.image_url || `${SITE}/og-image.png?v=2`;
   html = apply(html, { title, description, url, image });
   const ld = {
     '@context': 'https://schema.org',

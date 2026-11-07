@@ -444,9 +444,13 @@ export default function Troy() {
     openChat.current = conversationId;
   }, [conversationId]);
 
+  // An empty chat stays at the top, so a phone shows Troy's coin and the
+  // heading first instead of opening scrolled past them. A note under the
+  // chips, like a first question that failed, still scrolls into view.
   useEffect(() => {
+    if (messages.length === 0 && !busy && !quotaHit && !unsent && !error) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, busy, quotaHit]);
+  }, [messages, busy, quotaHit, unsent, error]);
 
   const sendSignedIn = useCallback(
     async (text: string) => {
@@ -803,7 +807,7 @@ export default function Troy() {
             {brief && brief.userId === user?.id && <BriefCard brief={brief} onRetry={() => void todaysBrief()} onHide={hideBrief} />}
             {isEmpty && !limit && !chatFailed && (
               <div className="flex flex-col items-center text-center pt-6 sm:pt-12">
-                <img src="/troy-96.png" alt="Troy" className="h-20 w-20 rounded-full shadow-card" width={80} height={80} />
+                <img src="/troy-96.png" srcSet="/troy-96.png 1x, /troy-192.png 2x" alt="Troy" className="h-20 w-20 rounded-full shadow-card" width={80} height={80} />
                 <h1 className="mt-4 text-[24px] sm:text-[28px] font-semibold tracking-tight text-fg">Ask Troy anything</h1>
                 <p className="mt-1.5 max-w-md text-[15px] text-fg-2">
                   {signedIn
