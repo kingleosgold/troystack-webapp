@@ -102,9 +102,10 @@ test("New chat clears an old note and opens at the top", async ({ page }) => {
   await expect.poll(() => scroller(page).evaluate((el) => el.scrollTop)).toBe(0);
 });
 
-test('a note on an empty chat goes, and New chat brings the coin back into view', async ({ page }, testInfo) => {
-  // A desktop window fits the empty chat and its note without scrolling.
-  test.skip(testInfo.project.name === 'desktop', 'only a phone scrolls an empty chat');
+test('a note on an empty chat goes, and New chat brings the coin back into view', async ({ page }) => {
+  // At the md breakpoint and up the chat list moves to a sidebar and the
+  // window fits the empty chat and its note without scrolling.
+  test.skip((page.viewportSize()?.width ?? 0) >= 768, 'only a phone-width chat scrolls when empty');
   await signIn(page);
   await mockBackends(page, { tier: 'gold', conversations: 2, failDeletes: true });
   await page.goto('/troy');
@@ -152,11 +153,23 @@ test('New chat tapped while the chat is still gliding to a note lands exactly at
   if (await toggle.isVisible()) await toggle.click();
   await page.getByRole('button', { name: 'Delete Silver ratio' }).filter({ visible: true }).click();
   await expect(page.getByText("That chat couldn't be deleted.")).toBeAttached();
-  // No wait for the glide to finish. On main this left the chat about 23px
-  // down in the iPhone project. Chromium can't show WebKit's own overshoot.
+  // No wait for the glide to finish. Before the fix in #80 this left the
+  // chat about 23px down in the iPhone project. Chromium can't show WebKit's own overshoot.
   await page.getByRole('button', { name: 'New chat' }).filter({ visible: true }).click();
 
   await expect(page).toHaveURL(/\/troy$/);
-  await page.waitForTimeout(800);
+  // Settled means two reads at 0 a few frames apart, so a glide still
+  // passing through the top can't count and a slow runner isn't cut off.
+  await expect
+    .poll(() =>
+      scroller(page).evaluate(async (el) => {
+        const first = el.scrollTop;
+        for (let i = 0; i < 6; i++) await new Promise((r) => requestAnimationFrame(r));
+        return [first, el.scrollTop];
+      }),
+    )
+    .toEqual([0, 0]);
+  // And nothing late, like a refetch or a layout shift, moves it after that.
+  await page.waitForTimeout(500);
   expect(await scroller(page).evaluate((el) => el.scrollTop)).toBe(0);
 });
