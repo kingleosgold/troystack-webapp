@@ -460,17 +460,23 @@ export default function Troy() {
   const hasLimit = Boolean(limit);
   const hadContent = useRef(false);
   const settleTop = useRef(0);
-  const lastSeen = useRef({ messages, busy, hasLimit, unsent, error });
+  // What the chat showed last time, so a change that only took the limit card
+  // away can be told apart. Null until the first run, so no snapshot is built
+  // on every render just to be thrown away.
+  type Seen = { messages: typeof messages; busy: typeof busy; unsent: typeof unsent; error: typeof error; hasLimit: boolean };
+  const lastSeen = useRef<Seen | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
     const had = hadContent.current;
-    const prev = lastSeen.current;
-    lastSeen.current = { messages, busy, hasLimit, unsent, error };
+    const now = { messages, busy, unsent, error, hasLimit };
+    const prev = lastSeen.current ?? now;
+    lastSeen.current = now;
     const empty = messages.length === 0 && !busy && !hasLimit && !unsent && !error;
     hadContent.current = !empty;
     if (!el) return;
-    const limitCleared =
-      prev.hasLimit && !hasLimit && prev.messages === messages && prev.busy === busy && prev.unsent === unsent && prev.error === error;
+    const chatUnchanged =
+      prev.messages === messages && prev.busy === busy && prev.unsent === unsent && prev.error === error;
+    const limitCleared = chatUnchanged && prev.hasLimit && !hasLimit;
     if (empty) {
       if (!had) return;
       el.scrollTo({ top: 0 });
