@@ -264,6 +264,8 @@ test("a visitor's question refused at the limit brings the card into view under 
   // when the card shows up gets all the way down.
   await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport({ ratio: 1 });
   await expect.poll(() => atBottom(page)).toBeLessThan(2);
+  // Still exactly one question sent by the time the last check passed.
+  expect(answer.seen).toHaveLength(1);
 });
 
 test("a free account's question refused at the limit brings the card into view under a long chat", async ({ page }) => {
@@ -300,6 +302,8 @@ test("a free account's question refused at the limit brings the card into view u
   await expect(page).toHaveURL(/\/troy\/c\/conv-1$/);
   await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toBeInViewport({ ratio: 1 });
   await expect.poll(() => atBottom(page)).toBeLessThan(2);
+  // Still exactly one question sent by the time the last check passed.
+  expect(answer.seen).toHaveLength(1);
 });
 
 test("a free account's first question in a new chat, refused at the limit, leaves the card fully in view", async ({ page }) => {
@@ -324,6 +328,8 @@ test("a free account's first question in a new chat, refused at the limit, leave
   await expect.poll(() => api.calls.filter((c) => c === 'DELETE /v1/troy/conversations/conv-new').length).toBe(1);
   await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toBeInViewport({ ratio: 1 });
   await expect.poll(() => atBottom(page)).toBeLessThan(2);
+  // Still exactly one question sent by the time the last check passed.
+  expect(answer.seen).toHaveLength(1);
 });
 
 test("a visitor's question that doesn't get through brings its note into view under a long chat", async ({ page }) => {

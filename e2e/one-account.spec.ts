@@ -104,6 +104,8 @@ test.describe('a receipt scan', () => {
     answer.release();
     await expect(page.getByText(/Your stack is worth/)).toBeVisible();
     await expect(importSheet(page)).toHaveCount(0);
+    // Still exactly one question sent by the time the last check passed.
+    expect(answer.seen).toHaveLength(1);
   });
 });
 
