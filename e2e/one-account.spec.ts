@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { expect, test, type Page } from '@playwright/test';
-import { holdRequests, mockBackends, SAMPLE_HOLDINGS, signIn, signInElsewhere, signInExpired, signOutElsewhere } from './mock';
+import { holdRequests, MESSAGES_PATH, mockBackends, SAMPLE_HOLDINGS, signIn, signInElsewhere, signInExpired, signOutElsewhere } from './mock';
 
 // Whatever is started for one account stays with it. When another account
 // signs in, here or in another tab, or this one signs out, an answer still on
@@ -93,7 +93,7 @@ test.describe('a receipt scan', () => {
     const box = page.getByRole('textbox', { name: 'Message Troy' });
     await box.fill('How is my stack doing?');
     await expect(page.getByRole('button', { name: 'Send' })).toBeVisible();
-    const answer = await holdRequests(page, (u) => /^\/v1\/troy\/conversations\/[^/]+\/messages$/.test(u.pathname), 'POST');
+    const answer = await holdRequests(page, (u) => MESSAGES_PATH.test(u.pathname), 'POST');
     await page.getByRole('button', { name: 'Send' }).click();
     await expect.poll(() => answer.seen.length).toBe(1);
 
