@@ -183,16 +183,17 @@ async function reconnect(page: Page) {
 }
 
 for (const [name, next] of [
-  ['a refetch that changes the count', { questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' }],
+  // Still at the limit, with a new count, so the reply is a new object and the card's words change.
+  ['a refetch that changes the count', { questionsUsed: 5, questionsLimit: 5, resetsAt: '2026-10-10T04:00:00Z' }],
   ["the day's rollover clearing the limit", { questionsUsed: 0, questionsLimit: 3, resetsAt: '2026-10-11T04:00:00Z' }],
 ] as const) {
   test(`a visitor at the limit reading back up stays put on ${name}`, async ({ page }) => {
     await page.clock.install({ time: new Date('2026-10-09T14:00:00Z') });
     const chat = longChat('r');
     await page.addInitScript((saved) => sessionStorage.setItem('troy_visitor_chat_v1', JSON.stringify(saved)), chat);
-    await mockBackends(page, { visitorQuota: { questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-09T04:00:00Z' } });
+    await mockBackends(page, { visitorQuota: { questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' } });
     let reads = 0;
-    let body: object = { questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-09T04:00:00Z' };
+    let body: object = { questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' };
     await page.route(
       (url) => url.pathname === '/v1/troy/ask/status',
       (route) => {
@@ -215,9 +216,14 @@ for (const [name, next] of [
     await page.clock.fastForward('02:00');
     await reconnect(page);
     await expect.poll(() => reads).toBeGreaterThan(before);
+    // The new reply reached the page, not just the route.
     if (next.questionsUsed === 0) await expect(page.getByRole('link', { name: 'Create a free account' })).toHaveCount(0);
+    else await expect(page.getByText("That's today's 5 free questions.")).toBeAttached();
     // Give a glide time to start and run.
     await page.waitForTimeout(800);
-    expect(await scroller(page).evaluate((el) => el.scrollTop)).toBe(300);
+    // The card leaving can shift the layout a pixel on a phone. Being pulled
+    // down would move it thousands.
+    const top = await scroller(page).evaluate((el) => el.scrollTop);
+    expect(Math.abs(top - 300)).toBeLessThan(5);
   });
 }
