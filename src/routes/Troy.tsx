@@ -463,7 +463,8 @@ export default function Troy() {
   // What the chat showed last time, so a change that only took the limit card
   // away can be told apart. Null until the first run, so no snapshot is built
   // on every render just to be thrown away.
-  const lastSeen = useRef<{ messages: typeof messages; busy: typeof busy; unsent: typeof unsent; error: typeof error; hasLimit: boolean } | null>(null);
+  type Seen = { messages: typeof messages; busy: typeof busy; unsent: typeof unsent; error: typeof error; hasLimit: boolean };
+  const lastSeen = useRef<Seen | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
     const had = hadContent.current;
