@@ -66,7 +66,7 @@ test("a visitor's limit card scrolls into view when the count lands after their 
   );
   await page.goto('/troy');
   await expect(page.getByText('Answer 24.')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport();
+  await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport({ ratio: 1 });
 });
 
 test("New chat clears an old note and opens at the top", async ({ page }) => {
@@ -177,6 +177,18 @@ test('New chat tapped while the chat is still gliding to a note lands exactly at
   expect(await scroller(page).evaluate((el) => el.scrollTop)).toBe(0);
 });
 
+/** Holds the answer to a question for a moment, so the page can be checked while it's asked. */
+async function holdAnswer(page: Page, path: string | RegExp) {
+  await page.route(
+    (url) => (typeof path === 'string' ? url.pathname === path : path.test(url.pathname)),
+    async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      await new Promise((r) => setTimeout(r, 600));
+      return route.fallback();
+    },
+  );
+}
+
 /** Drops the connection and brings it back, which refetches stale queries. */
 async function reconnect(page: Page) {
   await page.evaluate(() => {
@@ -205,7 +217,7 @@ for (const [name, next] of [
       },
     );
     await page.goto('/troy');
-    await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport();
+    await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport({ ratio: 1 });
     await expect
       .poll(() => atBottom(page))
       .toBeLessThan(2);
@@ -248,8 +260,11 @@ test("a visitor's question refused at the limit brings the card into view under 
   await scroller(page).evaluate((el) => {
     el.scrollTop = 300;
   });
+  await holdAnswer(page, '/v1/troy/ask');
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
+  // The question shows while it's asked.
+  await expect(page.getByText('What moved silver today?')).toBeVisible();
 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
   // The refused question comes off the chat, so only the card is new.
@@ -257,7 +272,7 @@ test("a visitor's question refused at the limit brings the card into view under 
   // The card is taller than the question and the typing dots it replaces, so
   // the scroll from sending stops short of the new bottom. Only the scroll
   // when the card shows up gets all the way down.
-  await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport();
+  await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport({ ratio: 1 });
   await expect.poll(() => atBottom(page)).toBeLessThan(2);
 });
 
@@ -282,13 +297,57 @@ test("a free account's question refused at the limit brings the card into view u
   await scroller(page).evaluate((el) => {
     el.scrollTop = 300;
   });
+  await holdAnswer(page, /^\/v1\/troy\/conversations\/[^/]+\/messages$/);
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
+  await expect(page.getByText('What moved silver today?')).toBeVisible();
 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
   await expect(page.getByText('What moved silver today?')).toHaveCount(0);
   // The chat already had messages, so it stays open and isn't deleted.
   await expect(page).toHaveURL(/\/troy\/c\/conv-1$/);
-  await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toBeInViewport({ ratio: 1 });
+  await expect.poll(() => atBottom(page)).toBeLessThan(2);
+});
+
+test("a free account's first question in a new chat, refused at the limit, leaves the card fully in view", async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { conversations: 2, chatLimitReached: true });
+  await page.goto('/troy');
+  await expect(page.getByRole('heading', { name: 'Ask Troy anything' })).toBeVisible();
+
+  await holdAnswer(page, /^\/v1\/troy\/conversations\/[^/]+\/messages$/);
+  await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(page.getByText('What moved silver today?')).toBeVisible();
+
+  await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
+  await expect(page.getByText('What moved silver today?')).toHaveCount(0);
+  // The chat made for the question was empty, so it goes and the page is back on /troy.
+  await expect(page).toHaveURL(/\/troy$/);
+  await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toBeInViewport({ ratio: 1 });
+  await expect.poll(() => atBottom(page)).toBeLessThan(2);
+});
+
+test("a visitor's question that doesn't get through brings its note into view under a long chat", async ({ page }) => {
+  const chat = longChat('f');
+  await page.addInitScript((saved) => {
+    sessionStorage.setItem('troy_visitor_chat_v1', JSON.stringify(saved));
+    localStorage.setItem('troy_ai_consent_v1', '{"version":1}');
+  }, chat);
+  await mockBackends(page, { failAsks: 1 });
+  await page.goto('/troy');
+  await expect(page.getByText('Answer 24.')).toBeVisible();
+
+  // The visitor reads back up, then asks, and the answer comes back a 502.
+  await scroller(page).evaluate((el) => {
+    el.scrollTop = 300;
+  });
+  await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
+  await page.getByRole('button', { name: 'Send' }).click();
+
+  const card = page.getByRole('alert').filter({ hasText: "Troy couldn't answer that just now." });
+  await expect(card).toBeInViewport({ ratio: 1 });
+  await expect(card.getByRole('button', { name: 'Ask again' })).toBeInViewport({ ratio: 1 });
   await expect.poll(() => atBottom(page)).toBeLessThan(2);
 });
