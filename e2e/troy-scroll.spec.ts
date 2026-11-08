@@ -65,3 +65,39 @@ test("a visitor's limit card scrolls into view when the count lands after their 
   await expect(page.getByText('Answer 24.')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport();
 });
+
+test("New chat clears an old note and opens at the top", async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { tier: 'gold', conversations: 2, failDeletes: true });
+  await page.route(
+    (url) => url.pathname === '/v1/troy/conversations/conv-1',
+    (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      return route.fulfill({
+        headers: { 'access-control-allow-origin': '*' },
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'conv-1', title: 'Junk silver value', created_at: '', updated_at: '', messages: longChat('m-note') }),
+      });
+    },
+  );
+  await page.goto('/troy/c/conv-1');
+  await expect(page.getByText('Answer 24.')).toBeInViewport();
+
+  const toggle = page.getByRole('button', { name: 'Your chats' });
+  if (await toggle.isVisible()) await toggle.click();
+  await page.getByRole('button', { name: 'Delete Silver ratio' }).filter({ visible: true }).click();
+  const note = page.getByText("That chat couldn't be deleted.");
+  await expect(note).toBeAttached();
+  // The chat scrolls down to the note. Let that finish, as it would before anyone taps again.
+  await expect
+    .poll(() => scroller(page).evaluate((el) => Math.round(el.scrollHeight - el.clientHeight - el.scrollTop)))
+    .toBeLessThan(2);
+
+  // On a phone the list stays open after the failed delete, so New chat is right there.
+  await page.getByRole('button', { name: 'New chat' }).filter({ visible: true }).click();
+
+  await expect(page).toHaveURL(/\/troy$/);
+  await expect(note).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Ask Troy anything' })).toBeInViewport();
+  await expect.poll(() => scroller(page).evaluate((el) => el.scrollTop)).toBe(0);
+});

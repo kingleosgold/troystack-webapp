@@ -754,6 +754,9 @@ export default function Troy() {
       onNew={() => {
         setListOpen(false);
         setQuotaHit(null);
+        // A note about the last chat, like a delete that failed, doesn't
+        // follow into the new one, so the empty chat opens at the top.
+        setError(null);
         setMessages([]);
         navigate('/troy');
       }}
