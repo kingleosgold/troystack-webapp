@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { holdRequests, mockBackends, signIn } from './mock';
+import { holdRequests, MESSAGES_PATH, mockBackends, signIn } from './mock';
 
 // /troy keeps Troy's coin and heading on screen when a chat is empty, and
 // scrolls whatever comes under the chat into view.
@@ -253,6 +253,7 @@ test("a visitor's question refused at the limit brings the card into view under 
   await page.getByRole('button', { name: 'Send' }).click();
   // The question shows while it's asked.
   await expect(page.getByText('What moved silver today?')).toBeVisible();
+  await expect.poll(() => answer.seen.length).toBe(1);
   answer.release();
 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
@@ -286,10 +287,11 @@ test("a free account's question refused at the limit brings the card into view u
   await scroller(page).evaluate((el) => {
     el.scrollTop = 300;
   });
-  const answer = await holdRequests(page, (u) => /^\/v1\/troy\/conversations\/[^/]+\/messages$/.test(u.pathname), 'POST');
+  const answer = await holdRequests(page, (u) => MESSAGES_PATH.test(u.pathname), 'POST');
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByText('What moved silver today?')).toBeVisible();
+  await expect.poll(() => answer.seen.length).toBe(1);
   answer.release();
 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
@@ -306,12 +308,13 @@ test("a free account's first question in a new chat, refused at the limit, leave
   await page.goto('/troy');
   await expect(page.getByRole('heading', { name: 'Ask Troy anything' })).toBeVisible();
 
-  const answer = await holdRequests(page, (u) => /^\/v1\/troy\/conversations\/[^/]+\/messages$/.test(u.pathname), 'POST');
+  const answer = await holdRequests(page, (u) => MESSAGES_PATH.test(u.pathname), 'POST');
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByText('What moved silver today?')).toBeVisible();
   // A chat was made for the question.
   await expect(page).toHaveURL(/\/troy\/c\/conv-new$/);
+  await expect.poll(() => answer.seen.length).toBe(1);
   answer.release();
 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();

@@ -276,7 +276,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       started.push(conv);
       return fulfillJson(route, conv);
     }
-    if (/^\/v1\/troy\/conversations\/[^/]+\/messages$/.test(p)) {
+    if (MESSAGES_PATH.test(p)) {
       if (opts.chatLimitReached) {
         const limit = (opts.tier ?? 'free') === 'free' ? 3 : 30;
         return fulfillJson(route, { error: 'Daily question limit reached', questionsUsed: limit, questionsLimit: limit, resetsAt: '2026-10-10T04:00:00Z' }, 403);
@@ -497,6 +497,9 @@ export function sessionFor(user = sessionUser()) {
     user,
   };
 }
+
+/** The path a signed-in question posts to, in any chat. */
+export const MESSAGES_PATH = /^\/v1\/troy\/conversations\/[^/]+\/messages$/;
 
 /**
  * Holds the requests `match` picks, with `method`, until `release`, as a slow
