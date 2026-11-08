@@ -177,16 +177,24 @@ test('New chat tapped while the chat is still gliding to a note lands exactly at
   expect(await scroller(page).evaluate((el) => el.scrollTop)).toBe(0);
 });
 
-/** Holds the answer to a question for a moment, so the page can be checked while it's asked. */
+/**
+ * Holds the answer to a question until the test lets it go, so the page can
+ * be checked while it's asked. A timer would race a slow runner.
+ */
 async function holdAnswer(page: Page, path: string | RegExp) {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
   await page.route(
     (url) => (typeof path === 'string' ? url.pathname === path : path.test(url.pathname)),
     async (route) => {
       if (route.request().method() !== 'POST') return route.fallback();
-      await new Promise((r) => setTimeout(r, 600));
+      await gate;
       return route.fallback();
     },
   );
+  return release;
 }
 
 /** Drops the connection and brings it back, which refetches stale queries. */
@@ -260,11 +268,12 @@ test("a visitor's question refused at the limit brings the card into view under 
   await scroller(page).evaluate((el) => {
     el.scrollTop = 300;
   });
-  await holdAnswer(page, '/v1/troy/ask');
+  const answer = await holdAnswer(page, '/v1/troy/ask');
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
   // The question shows while it's asked.
   await expect(page.getByText('What moved silver today?')).toBeVisible();
+  answer();
 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
   // The refused question comes off the chat, so only the card is new.
@@ -297,10 +306,11 @@ test("a free account's question refused at the limit brings the card into view u
   await scroller(page).evaluate((el) => {
     el.scrollTop = 300;
   });
-  await holdAnswer(page, /^\/v1\/troy\/conversations\/[^/]+\/messages$/);
+  const answer = await holdAnswer(page, /^\/v1\/troy\/conversations\/[^/]+\/messages$/);
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByText('What moved silver today?')).toBeVisible();
+  answer();
 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
   await expect(page.getByText('What moved silver today?')).toHaveCount(0);
@@ -312,19 +322,23 @@ test("a free account's question refused at the limit brings the card into view u
 
 test("a free account's first question in a new chat, refused at the limit, leaves the card fully in view", async ({ page }) => {
   await signIn(page);
-  await mockBackends(page, { conversations: 2, chatLimitReached: true });
+  const api = await mockBackends(page, { conversations: 2, chatLimitReached: true });
   await page.goto('/troy');
   await expect(page.getByRole('heading', { name: 'Ask Troy anything' })).toBeVisible();
 
-  await holdAnswer(page, /^\/v1\/troy\/conversations\/[^/]+\/messages$/);
+  const answer = await holdAnswer(page, /^\/v1\/troy\/conversations\/[^/]+\/messages$/);
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByText('What moved silver today?')).toBeVisible();
+  // A chat was made for the question.
+  await expect(page).toHaveURL(/\/troy\/c\/conv-new$/);
+  answer();
 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
   await expect(page.getByText('What moved silver today?')).toHaveCount(0);
-  // The chat made for the question was empty, so it goes and the page is back on /troy.
+  // It was empty, so it goes and the page is back on /troy.
   await expect(page).toHaveURL(/\/troy$/);
+  await expect.poll(() => api.calls.filter((c) => c === 'DELETE /v1/troy/conversations/conv-new').length).toBe(1);
   await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toBeInViewport({ ratio: 1 });
   await expect.poll(() => atBottom(page)).toBeLessThan(2);
 });
@@ -349,5 +363,7 @@ test("a visitor's question that doesn't get through brings its note into view un
   const card = page.getByRole('alert').filter({ hasText: "Troy couldn't answer that just now." });
   await expect(card).toBeInViewport({ ratio: 1 });
   await expect(card.getByRole('button', { name: 'Ask again' })).toBeInViewport({ ratio: 1 });
+  // The question comes off the chat and waits on the note to be asked again.
+  await expect(page.getByText('What moved silver today?')).toHaveCount(1);
   await expect.poll(() => atBottom(page)).toBeLessThan(2);
 });
