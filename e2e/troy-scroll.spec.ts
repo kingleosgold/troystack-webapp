@@ -16,7 +16,10 @@ function longChat(prefix: string) {
 }
 
 const scroller = (page: Page) => page.locator('section div.overflow-y-auto').first();
-
+/** Pixels left between the bottom of the chat and the bottom of what's on screen. */
+const atBottom = (page: Page) =>
+  scroller(page).evaluate((el) => Math.round(el.scrollHeight - el.clientHeight - el.scrollTop));
+/** Pixels left between the bottom of the chat and the bottom of what's on screen. */
 test('New chat from far down a long chat opens at the top with the coin showing', async ({ page }) => {
   await signIn(page);
   await mockBackends(page, { tier: 'gold', conversations: 2 });
@@ -90,7 +93,7 @@ test("New chat clears an old note and opens at the top", async ({ page }) => {
   await expect(note).toBeAttached();
   // The chat scrolls down to the note. Let that finish, as it would before anyone taps again.
   await expect
-    .poll(() => scroller(page).evaluate((el) => Math.round(el.scrollHeight - el.clientHeight - el.scrollTop)))
+    .poll(() => atBottom(page))
     .toBeLessThan(2);
 
   // On a phone the list stays open after the failed delete, so New chat is right there.
@@ -118,7 +121,7 @@ test('a note on an empty chat goes, and New chat brings the coin back into view'
   await expect(note).toBeAttached();
   expect(await scroller(page).evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
   await expect
-    .poll(() => scroller(page).evaluate((el) => Math.round(el.scrollHeight - el.clientHeight - el.scrollTop)))
+    .poll(() => atBottom(page))
     .toBeLessThan(2);
 
   await page.getByRole('button', { name: 'New chat' }).filter({ visible: true }).click();
@@ -204,7 +207,7 @@ for (const [name, next] of [
     await page.goto('/troy');
     await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport();
     await expect
-      .poll(() => scroller(page).evaluate((el) => Math.round(el.scrollHeight - el.clientHeight - el.scrollTop)))
+      .poll(() => atBottom(page))
       .toBeLessThan(2);
 
     // The visitor reads back up to an earlier answer.
@@ -228,9 +231,6 @@ for (const [name, next] of [
   });
 }
 
-const atBottom = (page: Page) =>
-  scroller(page).evaluate((el) => Math.round(el.scrollHeight - el.clientHeight - el.scrollTop));
-
 test("a visitor's question refused at the limit brings the card into view under a long chat", async ({ page }) => {
   const chat = longChat('q');
   await page.addInitScript((saved) => {
@@ -241,6 +241,7 @@ test("a visitor's question refused at the limit brings the card into view under 
   await mockBackends(page, { visitorQuota: { questionsUsed: 2, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' }, visitorUsedElsewhere: true });
   await page.goto('/troy');
   await expect(page.getByText('Answer 24.')).toBeVisible();
+  await expect(page.getByText('1 of 3 free questions left today')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Create a free account' })).toHaveCount(0);
 
   // The visitor reads back up, then asks.
@@ -253,6 +254,9 @@ test("a visitor's question refused at the limit brings the card into view under 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
   // The refused question comes off the chat, so only the card is new.
   await expect(page.getByText('What moved silver today?')).toHaveCount(0);
+  // The card is taller than the question and the typing dots it replaces, so
+  // the scroll from sending stops short of the new bottom. Only the scroll
+  // when the card shows up gets all the way down.
   await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport();
   await expect.poll(() => atBottom(page)).toBeLessThan(2);
 });
