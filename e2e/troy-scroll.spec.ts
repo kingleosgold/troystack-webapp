@@ -227,3 +227,64 @@ for (const [name, next] of [
     expect(Math.abs(top - 300)).toBeLessThan(5);
   });
 }
+
+const atBottom = (page: Page) =>
+  scroller(page).evaluate((el) => Math.round(el.scrollHeight - el.clientHeight - el.scrollTop));
+
+test("a visitor's question refused at the limit brings the card into view under a long chat", async ({ page }) => {
+  const chat = longChat('q');
+  await page.addInitScript((saved) => {
+    sessionStorage.setItem('troy_visitor_chat_v1', JSON.stringify(saved));
+    localStorage.setItem('troy_ai_consent_v1', '{"version":1}');
+  }, chat);
+  // The count says a question is left, but someone else on the connection used it.
+  await mockBackends(page, { visitorQuota: { questionsUsed: 2, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' }, visitorUsedElsewhere: true });
+  await page.goto('/troy');
+  await expect(page.getByText('Answer 24.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Create a free account' })).toHaveCount(0);
+
+  // The visitor reads back up, then asks.
+  await scroller(page).evaluate((el) => {
+    el.scrollTop = 300;
+  });
+  await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
+  await page.getByRole('button', { name: 'Send' }).click();
+
+  await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
+  // The refused question comes off the chat, so only the card is new.
+  await expect(page.getByText('What moved silver today?')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport();
+  await expect.poll(() => atBottom(page)).toBeLessThan(2);
+});
+
+test("a free account's question refused at the limit brings the card into view under a long chat", async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { conversations: 2, chatLimitReached: true });
+  await page.route(
+    (url) => url.pathname === '/v1/troy/conversations/conv-1',
+    (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      return route.fulfill({
+        headers: { 'access-control-allow-origin': '*' },
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'conv-1', title: 'Junk silver value', created_at: '', updated_at: '', messages: longChat('m-limit') }),
+      });
+    },
+  );
+  await page.goto('/troy/c/conv-1');
+  await expect(page.getByText('Answer 24.')).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toHaveCount(0);
+
+  await scroller(page).evaluate((el) => {
+    el.scrollTop = 300;
+  });
+  await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
+  await page.getByRole('button', { name: 'Send' }).click();
+
+  await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
+  await expect(page.getByText('What moved silver today?')).toHaveCount(0);
+  // The chat already had messages, so it stays open and isn't deleted.
+  await expect(page).toHaveURL(/\/troy\/c\/conv-1$/);
+  await expect(page.getByRole('button', { name: 'Try Gold free for a week' })).toBeInViewport();
+  await expect.poll(() => atBottom(page)).toBeLessThan(2);
+});
