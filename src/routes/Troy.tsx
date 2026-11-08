@@ -444,13 +444,20 @@ export default function Troy() {
     openChat.current = conversationId;
   }, [conversationId]);
 
-  // An empty chat stays at the top, so a phone shows Troy's coin and the
-  // heading first instead of opening scrolled past them. A note under the
-  // chips, like a first question that failed, still scrolls into view.
+  // An empty chat sits at the top, so a phone shows Troy's coin and the
+  // heading first, even after New chat from far down a long one. Anything
+  // under the chips, like a first question that failed or the day's limit,
+  // scrolls into view, and so does the limit card once a visitor's count
+  // comes back after their saved chat is already on screen.
   useEffect(() => {
-    if (messages.length === 0 && !busy && !quotaHit && !unsent && !error) return;
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, busy, quotaHit, unsent, error]);
+    const el = scrollRef.current;
+    if (!el) return;
+    if (messages.length === 0 && !busy && !limit && !unsent && !error) {
+      el.scrollTo({ top: 0 });
+      return;
+    }
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [messages, busy, limit, unsent, error]);
 
   const sendSignedIn = useCallback(
     async (text: string) => {
