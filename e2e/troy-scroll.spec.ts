@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mockBackends, signIn } from './mock';
+import { holdRequests, mockBackends, signIn } from './mock';
 
 // /troy keeps Troy's coin and heading on screen when a chat is empty, and
 // scrolls whatever comes under the chat into view.
@@ -177,26 +177,6 @@ test('New chat tapped while the chat is still gliding to a note lands exactly at
   expect(await scroller(page).evaluate((el) => el.scrollTop)).toBe(0);
 });
 
-/**
- * Holds the answer to a question until the test lets it go, so the page can
- * be checked while it's asked. A timer would race a slow runner.
- */
-async function holdAnswer(page: Page, path: string | RegExp) {
-  let release: () => void = () => undefined;
-  const gate = new Promise<void>((r) => {
-    release = r;
-  });
-  await page.route(
-    (url) => (typeof path === 'string' ? url.pathname === path : path.test(url.pathname)),
-    async (route) => {
-      if (route.request().method() !== 'POST') return route.fallback();
-      await gate;
-      return route.fallback();
-    },
-  );
-  return release;
-}
-
 /** Drops the connection and brings it back, which refetches stale queries. */
 async function reconnect(page: Page) {
   await page.evaluate(() => {
@@ -268,12 +248,12 @@ test("a visitor's question refused at the limit brings the card into view under 
   await scroller(page).evaluate((el) => {
     el.scrollTop = 300;
   });
-  const answer = await holdAnswer(page, '/v1/troy/ask');
+  const answer = await holdRequests(page, (u) => u.pathname === '/v1/troy/ask', 'POST');
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
   // The question shows while it's asked.
   await expect(page.getByText('What moved silver today?')).toBeVisible();
-  answer();
+  answer.release();
 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
   // The refused question comes off the chat, so only the card is new.
@@ -306,11 +286,11 @@ test("a free account's question refused at the limit brings the card into view u
   await scroller(page).evaluate((el) => {
     el.scrollTop = 300;
   });
-  const answer = await holdAnswer(page, /^\/v1\/troy\/conversations\/[^/]+\/messages$/);
+  const answer = await holdRequests(page, (u) => /^\/v1\/troy\/conversations\/[^/]+\/messages$/.test(u.pathname), 'POST');
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByText('What moved silver today?')).toBeVisible();
-  answer();
+  answer.release();
 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
   await expect(page.getByText('What moved silver today?')).toHaveCount(0);
@@ -326,13 +306,13 @@ test("a free account's first question in a new chat, refused at the limit, leave
   await page.goto('/troy');
   await expect(page.getByRole('heading', { name: 'Ask Troy anything' })).toBeVisible();
 
-  const answer = await holdAnswer(page, /^\/v1\/troy\/conversations\/[^/]+\/messages$/);
+  const answer = await holdRequests(page, (u) => /^\/v1\/troy\/conversations\/[^/]+\/messages$/.test(u.pathname), 'POST');
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
   await expect(page.getByText('What moved silver today?')).toBeVisible();
   // A chat was made for the question.
   await expect(page).toHaveURL(/\/troy\/c\/conv-new$/);
-  answer();
+  answer.release();
 
   await expect(page.getByText("That's today's 3 free questions.")).toBeAttached();
   await expect(page.getByText('What moved silver today?')).toHaveCount(0);
