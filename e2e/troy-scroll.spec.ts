@@ -102,9 +102,9 @@ test("New chat clears an old note and opens at the top", async ({ page }) => {
   await expect.poll(() => scroller(page).evaluate((el) => el.scrollTop)).toBe(0);
 });
 
-test('a note on an empty chat goes, and New chat brings the coin back into view', async ({ page }, testInfo) => {
-  // A desktop window fits the empty chat and its note without scrolling.
-  test.skip(testInfo.project.name === 'desktop', 'only a phone scrolls an empty chat');
+test('a note on an empty chat goes, and New chat brings the coin back into view', async ({ page, isMobile }) => {
+  // A computer window fits the empty chat and its note without scrolling.
+  test.skip(!isMobile, 'only a phone scrolls an empty chat');
   await signIn(page);
   await mockBackends(page, { tier: 'gold', conversations: 2, failDeletes: true });
   await page.goto('/troy');
@@ -157,6 +157,15 @@ test('New chat tapped while the chat is still gliding to a note lands exactly at
   await page.getByRole('button', { name: 'New chat' }).filter({ visible: true }).click();
 
   await expect(page).toHaveURL(/\/troy$/);
-  await page.waitForTimeout(800);
-  expect(await scroller(page).evaluate((el) => el.scrollTop)).toBe(0);
+  // Settled means two reads at 0 a few frames apart, so a glide still
+  // passing through the top can't count and a slow runner isn't cut off.
+  await expect
+    .poll(() =>
+      scroller(page).evaluate(async (el) => {
+        const first = el.scrollTop;
+        for (let i = 0; i < 6; i++) await new Promise((r) => requestAnimationFrame(r));
+        return [first, el.scrollTop];
+      }),
+    )
+    .toEqual([0, 0]);
 });
