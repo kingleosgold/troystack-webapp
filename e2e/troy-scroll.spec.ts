@@ -346,13 +346,24 @@ test("a visitor's question that doesn't get through brings its note into view un
   await scroller(page).evaluate((el) => {
     el.scrollTop = 300;
   });
+  const answer = await holdRequests(page, (u) => u.pathname === '/v1/troy/ask', 'POST');
   await page.getByRole('textbox', { name: 'Message Troy' }).fill('What moved silver today?');
   await page.getByRole('button', { name: 'Send' }).click();
+  // The question shows while it's asked.
+  await expect(page.getByText('What moved silver today?')).toBeVisible();
+  await expect.poll(() => answer.seen.length).toBe(1);
+  answer.release();
 
   const card = page.getByRole('alert').filter({ hasText: "Troy couldn't answer that just now." });
   await expect(card).toBeInViewport({ ratio: 1 });
-  await expect(card.getByRole('button', { name: 'Ask again' })).toBeInViewport({ ratio: 1 });
   // The question comes off the chat and waits on the note to be asked again.
+  await expect(card.getByText('What moved silver today?')).toHaveCount(1);
   await expect(page.getByText('What moved silver today?')).toHaveCount(1);
   await expect.poll(() => atBottom(page)).toBeLessThan(2);
+  // Nothing is drawn over Ask again, so a tap lands on it. A trial click runs
+  // every check a real one does without asking again. It comes after the
+  // glide ends, since its own scroll into view would cut a glide short.
+  await card.getByRole('button', { name: 'Ask again' }).click({ trial: true });
+  // Still exactly one question sent by the time the last check passed.
+  expect(answer.seen).toHaveLength(1);
 });
