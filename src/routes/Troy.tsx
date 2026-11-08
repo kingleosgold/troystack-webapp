@@ -449,11 +449,17 @@ export default function Troy() {
   // under the chips, like a first question that failed or the day's limit,
   // scrolls into view, and so does the limit card once a visitor's count
   // comes back after their saved chat is already on screen.
+  // Only a chat that just emptied goes back to the top. A token refresh that
+  // sets the same empty chat again leaves someone reading the brief where
+  // they are.
+  const hadMessages = useRef(false);
   useEffect(() => {
     const el = scrollRef.current;
+    const had = hadMessages.current;
+    hadMessages.current = messages.length > 0;
     if (!el) return;
     if (messages.length === 0 && !busy && !limit && !unsent && !error) {
-      el.scrollTo({ top: 0 });
+      if (had) el.scrollTo({ top: 0 });
       return;
     }
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
