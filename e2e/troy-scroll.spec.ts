@@ -19,7 +19,7 @@ const scroller = (page: Page) => page.locator('section div.overflow-y-auto').fir
 /** Pixels left between the bottom of the chat and the bottom of what's on screen. */
 const atBottom = (page: Page) =>
   scroller(page).evaluate((el) => Math.round(el.scrollHeight - el.clientHeight - el.scrollTop));
-/** Pixels left between the bottom of the chat and the bottom of what's on screen. */
+
 test('New chat from far down a long chat opens at the top with the coin showing', async ({ page }) => {
   await signIn(page);
   await mockBackends(page, { tier: 'gold', conversations: 2 });
