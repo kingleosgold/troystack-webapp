@@ -452,7 +452,10 @@ export default function Troy() {
   // Only a chat that just emptied goes back to the top, whether it held
   // messages or only a note under the chips. A token refresh that sets the
   // same empty chat again leaves someone reading the brief where they are.
+  // A scan or a question that ends without a message counts as content too,
+  // since the coin comes back once it's done.
   const hadContent = useRef(false);
+  const settleTop = useRef(0);
   useEffect(() => {
     const el = scrollRef.current;
     const had = hadContent.current;
@@ -464,13 +467,14 @@ export default function Troy() {
       el.scrollTo({ top: 0 });
       // A smooth scroll toward the last note can still be running, and on a
       // phone it can carry the chat a few pixels past the top. Once more on
-      // the next frame settles it. It isn't cancelled when the effect runs
-      // again, since New chat sets the empty chat a second time right after.
-      requestAnimationFrame(() => {
+      // the next frame settles it. Only new content cancels it, since New
+      // chat sets the empty chat a second time right after.
+      settleTop.current = requestAnimationFrame(() => {
         el.scrollTop = 0;
       });
       return;
     }
+    cancelAnimationFrame(settleTop.current);
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [messages, busy, limit, unsent, error]);
 

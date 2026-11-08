@@ -102,7 +102,9 @@ test("New chat clears an old note and opens at the top", async ({ page }) => {
   await expect.poll(() => scroller(page).evaluate((el) => el.scrollTop)).toBe(0);
 });
 
-test('a note on an empty chat goes, and New chat brings the coin back into view', async ({ page }) => {
+test('a note on an empty chat goes, and New chat brings the coin back into view', async ({ page }, testInfo) => {
+  // A desktop window fits the empty chat and its note without scrolling.
+  test.skip(testInfo.project.name === 'desktop', 'only a phone scrolls an empty chat');
   await signIn(page);
   await mockBackends(page, { tier: 'gold', conversations: 2, failDeletes: true });
   await page.goto('/troy');
@@ -113,6 +115,7 @@ test('a note on an empty chat goes, and New chat brings the coin back into view'
   await page.getByRole('button', { name: 'Delete Silver ratio' }).filter({ visible: true }).click();
   const note = page.getByText("That chat couldn't be deleted.");
   await expect(note).toBeAttached();
+  expect(await scroller(page).evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
   await expect
     .poll(() => scroller(page).evaluate((el) => Math.round(el.scrollHeight - el.clientHeight - el.scrollTop)))
     .toBeLessThan(2);
@@ -149,7 +152,8 @@ test('New chat tapped while the chat is still gliding to a note lands exactly at
   if (await toggle.isVisible()) await toggle.click();
   await page.getByRole('button', { name: 'Delete Silver ratio' }).filter({ visible: true }).click();
   await expect(page.getByText("That chat couldn't be deleted.")).toBeAttached();
-  // No wait for the glide to finish.
+  // No wait for the glide to finish. On main this left the chat about 23px
+  // down in the iPhone project. Chromium can't show WebKit's own overshoot.
   await page.getByRole('button', { name: 'New chat' }).filter({ visible: true }).click();
 
   await expect(page).toHaveURL(/\/troy$/);
