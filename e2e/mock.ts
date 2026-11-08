@@ -10,6 +10,9 @@ export const USER_ID = '7b1c6c1e-1111-4a2b-9c3d-000000000001';
 /** A second account, on the Free plan, for checks where the account changes. */
 export const FREE_USER_ID = '7b1c6c1e-2222-4a2b-9c3d-000000000002';
 
+/** The path a signed-in question posts to, in any chat. */
+export const MESSAGES_PATH = /^\/v1\/troy\/conversations\/[^/]+\/messages$/;
+
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-headers': '*',
@@ -497,9 +500,6 @@ export function sessionFor(user = sessionUser()) {
     user,
   };
 }
-
-/** The path a signed-in question posts to, in any chat. */
-export const MESSAGES_PATH = /^\/v1\/troy\/conversations\/[^/]+\/messages$/;
 
 /**
  * Holds the requests `match` picks, with `method`, until `release`, as a slow
