@@ -173,3 +173,51 @@ test('New chat tapped while the chat is still gliding to a note lands exactly at
   await page.waitForTimeout(500);
   expect(await scroller(page).evaluate((el) => el.scrollTop)).toBe(0);
 });
+
+/** Drops the connection and brings it back, which refetches stale queries. */
+async function reconnect(page: Page) {
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('offline'));
+    window.dispatchEvent(new Event('online'));
+  });
+}
+
+for (const [name, next] of [
+  ['a refetch that changes the count', { questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-10T04:00:00Z' }],
+  ["the day's rollover clearing the limit", { questionsUsed: 0, questionsLimit: 3, resetsAt: '2026-10-11T04:00:00Z' }],
+] as const) {
+  test(`a visitor at the limit reading back up stays put on ${name}`, async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-10-09T14:00:00Z') });
+    const chat = longChat('r');
+    await page.addInitScript((saved) => sessionStorage.setItem('troy_visitor_chat_v1', JSON.stringify(saved)), chat);
+    await mockBackends(page, { visitorQuota: { questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-09T04:00:00Z' } });
+    let reads = 0;
+    let body: object = { questionsUsed: 3, questionsLimit: 3, resetsAt: '2026-10-09T04:00:00Z' };
+    await page.route(
+      (url) => url.pathname === '/v1/troy/ask/status',
+      (route) => {
+        reads += 1;
+        return route.fulfill({ headers: { 'access-control-allow-origin': '*' }, contentType: 'application/json', body: JSON.stringify(body) });
+      },
+    );
+    await page.goto('/troy');
+    await expect(page.getByRole('link', { name: 'Create a free account' })).toBeInViewport();
+    await expect
+      .poll(() => scroller(page).evaluate((el) => Math.round(el.scrollHeight - el.clientHeight - el.scrollTop)))
+      .toBeLessThan(2);
+
+    // The visitor reads back up to an earlier answer.
+    await scroller(page).evaluate((el) => {
+      el.scrollTop = 300;
+    });
+    const before = reads;
+    body = next;
+    await page.clock.fastForward('02:00');
+    await reconnect(page);
+    await expect.poll(() => reads).toBeGreaterThan(before);
+    if (next.questionsUsed === 0) await expect(page.getByRole('link', { name: 'Create a free account' })).toHaveCount(0);
+    // Give a glide time to start and run.
+    await page.waitForTimeout(800);
+    expect(await scroller(page).evaluate((el) => el.scrollTop)).toBe(300);
+  });
+}

@@ -454,14 +454,23 @@ export default function Troy() {
   // same empty chat again leaves someone reading the brief where they are.
   // A scan or a question that ends without a message counts as content too,
   // since the coin comes back once it's done.
+  // Only the limit card showing up scrolls. A count that changes while it's
+  // already up, or clears at the day's rollover, adds nothing under the chat,
+  // so a visitor reading back up stays where they are.
+  const hasLimit = Boolean(limit);
   const hadContent = useRef(false);
   const settleTop = useRef(0);
+  const lastSeen = useRef({ messages, busy, hasLimit, unsent, error });
   useEffect(() => {
     const el = scrollRef.current;
     const had = hadContent.current;
-    const empty = messages.length === 0 && !busy && !limit && !unsent && !error;
+    const prev = lastSeen.current;
+    lastSeen.current = { messages, busy, hasLimit, unsent, error };
+    const empty = messages.length === 0 && !busy && !hasLimit && !unsent && !error;
     hadContent.current = !empty;
     if (!el) return;
+    const limitCleared =
+      prev.hasLimit && !hasLimit && prev.messages === messages && prev.busy === busy && prev.unsent === unsent && prev.error === error;
     if (empty) {
       if (!had) return;
       el.scrollTo({ top: 0 });
@@ -474,9 +483,10 @@ export default function Troy() {
       });
       return;
     }
+    if (limitCleared) return;
     cancelAnimationFrame(settleTop.current);
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [messages, busy, limit, unsent, error]);
+  }, [messages, busy, hasLimit, unsent, error]);
 
   const sendSignedIn = useCallback(
     async (text: string) => {
