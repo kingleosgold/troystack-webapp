@@ -124,6 +124,8 @@ export interface MockOptions {
    * 'outage' answers the sign-in with a 503.
    */
   existingAccount?: 'same-password' | 'other' | 'rate-limited' | 'outage';
+  /** How the plain sign-in, sign-up and reset calls fail, each on its own. */
+  authFails?: Partial<Record<'signIn' | 'signUp' | 'recover', AuthFailure>>;
 }
 
 /** The API's words for each reason checkout gives on a 409. */
@@ -136,6 +138,19 @@ const CHECKOUT_REFUSALS: Record<string, string> = {
 
 function fulfillJson(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, headers: { ...CORS, 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
+}
+
+type AuthFailure = 'wrong-password' | 'rate-limited' | 'rate-limited-bare' | 'outage' | 'unconfirmed' | 'email-rate-limited';
+
+/** Answers an auth call the way Supabase does when it fails for this reason. */
+function fulfillAuthFailure(route: Route, why: AuthFailure) {
+  if (why === 'wrong-password') return fulfillAuthError(route, 400, 'invalid_credentials', 'Invalid login credentials');
+  if (why === 'rate-limited') return fulfillAuthError(route, 429, 'over_request_rate_limit', 'Request rate limit reached');
+  if (why === 'email-rate-limited') return fulfillAuthError(route, 429, 'over_email_send_rate_limit', 'email rate limit exceeded');
+  if (why === 'unconfirmed') return fulfillAuthError(route, 400, 'email_not_confirmed', 'Email not confirmed');
+  // A rate limit from a proxy in front of Supabase, with no JSON and no CORS headers, so the browser hides it.
+  if (why === 'rate-limited-bare') return route.fulfill({ status: 429, body: 'Too Many Requests' });
+  return route.fulfill({ status: 503, headers: CORS, body: '' });
 }
 
 /**
@@ -449,6 +464,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (url.pathname.startsWith('/auth/v1/user')) return fulfillJson(route, sessionUser());
     // Email and password sign-in on the page itself, with no reload.
     if (url.pathname === '/auth/v1/token' && req.method() === 'POST') {
+      if (opts.authFails?.signIn) return fulfillAuthFailure(route, opts.authFails.signIn);
       if (opts.existingAccount === 'other') return fulfillAuthError(route, 400, 'invalid_credentials', 'Invalid login credentials');
       if (opts.existingAccount === 'rate-limited') return fulfillAuthError(route, 429, 'over_request_rate_limit', 'Request rate limit reached');
       if (opts.existingAccount === 'outage') return route.fulfill({ status: 503, headers: CORS, body: '' });
@@ -456,8 +472,13 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     }
     // A new email account gets its session at once, as production confirms email sign-ups.
     if (url.pathname === '/auth/v1/signup' && req.method() === 'POST') {
+      if (opts.authFails?.signUp) return fulfillAuthFailure(route, opts.authFails.signUp);
       if (opts.existingAccount) return fulfillAuthError(route, 422, 'user_already_exists', 'User already registered');
       return fulfillJson(route, sessionFor());
+    }
+    if (url.pathname === '/auth/v1/recover' && req.method() === 'POST') {
+      if (opts.authFails?.recover) return fulfillAuthFailure(route, opts.authFails.recover);
+      return fulfillJson(route, {});
     }
     if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204, headers: CORS });
     return fulfillJson(route, {});

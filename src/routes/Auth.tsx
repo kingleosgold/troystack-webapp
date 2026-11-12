@@ -39,22 +39,29 @@ const EXISTING_ACCOUNT =
   "There's already an account for that email. Enter its password to sign in, or use Apple or Google if that's how you made it.";
 
 /** Supabase refuses a sign-up for an email that already has an account. */
-function isExistingAccount(err: { code?: string; message: string }): boolean {
+function isExistingAccount(err: AuthErr): boolean {
   return err.code === 'user_already_exists' || /already registered/i.test(err.message);
 }
 
+type AuthErr = { code?: string; message: string; status?: number };
+
 /**
- * Plain words for a sign-in that failed for a reason other than the password.
- * supabase-js reports an outage as "{}" and a dropped connection as "Failed to fetch".
+ * Plain words for an auth call that failed for a reason other than the
+ * password. supabase-js reports an outage as "{}" and a dropped connection as
+ * "Failed to fetch", both with no status. A 429 that comes back without CORS
+ * headers looks the same, so that line holds for a rate limit too.
  */
-function signInTrouble(err: { code?: string; message: string; status?: number }): string {
-  if (err.status === 429 || err.code === 'over_request_rate_limit') return 'Too many tries just now. Wait a minute, then sign in.';
-  if (!err.status || err.status >= 500) return "Couldn't reach TroyStack. Check your connection and try again.";
+function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string {
+  // Checked before the status, since Supabase sends this one as a 429 too.
+  if (err.code === 'over_email_send_rate_limit') return "We've just sent that address a few emails. Wait a few minutes, then try again.";
+  if (err.code === 'email_not_confirmed') return 'Confirm your email first. Tap the link we sent you, then sign in.';
+  if (err.status === 429 || err.code === 'over_request_rate_limit') return `Too many tries just now. Wait a minute, then ${then}.`;
+  if (!err.status || err.status >= 500) return "Couldn't reach TroyStack. Check your connection and try again in a minute.";
   return err.message;
 }
 
 /** The password typed doesn't match, as against a rate limit or a dropped connection. */
-function isWrongPassword(err: { code?: string; message: string }): boolean {
+function isWrongPassword(err: AuthErr): boolean {
   return err.code === 'invalid_credentials' || err.message === 'Invalid login credentials';
 }
 
@@ -129,7 +136,7 @@ export default function Auth() {
     try {
       if (mode === 'forgot') {
         const { error: err } = await resetPasswordForEmail(email.trim());
-        if (err) setError(err.message);
+        if (err) setError(authTrouble(err, 'try again'));
         else setNotice('Check your email for a link to reset your password.');
       } else if (mode === 'signup') {
         // Read before signing up, since signing in uses the waiting plan up.
@@ -151,10 +158,10 @@ export default function Auth() {
             } else {
               // A rate limit or a dropped connection says nothing about the
               // password, so keep it and say what actually went wrong.
-              setError(signInTrouble(inErr));
+              setError(authTrouble(inErr, 'sign in'));
             }
           }
-        } else if (err) setError(err.message);
+        } else if (err) setError(authTrouble(err, 'try again'));
         else if (needsConfirmation) {
           setNotice(
             forCheckout
@@ -165,7 +172,7 @@ export default function Auth() {
         }
       } else {
         const { error: err } = await signIn(email.trim(), password);
-        if (err) setError(isWrongPassword(err) ? "That email and password don't match an account." : signInTrouble(err));
+        if (err) setError(isWrongPassword(err) ? "That email and password don't match an account." : authTrouble(err, 'sign in'));
       }
     } catch {
       setError('Something went wrong. Try again in a moment.');
