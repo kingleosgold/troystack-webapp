@@ -39,9 +39,17 @@ const HEADINGS: Record<Mode, { title: string; sub: string }> = {
 const EXISTING_ACCOUNT =
   "There's already an account for that email. Enter its password to sign in, or use Apple or Google if that's how you made it.";
 
-/** Supabase refuses a sign-up for an email that already has an account. */
+/**
+ * Supabase refuses a sign-up for an email that already has an account. GoTrue
+ * sends user_already_exists today, and email_exists with "has already been
+ * registered" on some versions, so both count.
+ */
 function isExistingAccount(err: AuthErr): boolean {
-  return err.code === 'user_already_exists' || /already registered/i.test(err.message);
+  return (
+    err.code === 'user_already_exists' ||
+    err.code === 'email_exists' ||
+    /already (been )?registered/i.test(err.message ?? '')
+  );
 }
 
 /** The password typed doesn't match, as against a rate limit or a dropped connection. */

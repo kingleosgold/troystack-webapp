@@ -1,10 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSignOut } from '../contexts/SignOutContext';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { stillSignedInAs } from '../lib/account';
 import { Button, Field, Input } from '../ui/primitives';
 import { authThrew, authTrouble } from '../lib/authErrors';
+
+const RESET_TOO_OLD = 'This reset link is too old to change your password now. Get a new link, then try again.';
 
 export default function ResetPassword() {
   usePageMeta({ title: 'Set a new password', canonical: '/reset-password', noindex: true });
@@ -30,6 +33,19 @@ export default function ResetPassword() {
     return () => clearTimeout(t);
   }, [done, navigate]);
 
+  // The old reset link still holds a session, and the sign-in page sends anyone signed in
+  // home, so sign it out first or the forgot form never shows. It goes through the same
+  // sign-out as everywhere else, so changes still waiting to reach the account get their
+  // chance and an ask before they're dropped. Only this browser signs out, so the app on
+  // their phone stays signed in, and a sign-out that can't reach the server still lands
+  // on the forgot form.
+  const { requestSignOutWith } = useSignOut();
+  const [leaving, setLeaving] = useState(false);
+  const newLink = () => {
+    setLeaving(true);
+    requestSignOutWith({ scope: 'local', then: '/auth?mode=forgot' });
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -41,7 +57,9 @@ export default function ResetPassword() {
     try {
       const { error: err } = await updateEmailPassword('', password);
       if (!stillSignedInAs(owner)) return;
-      if (err) setError(authTrouble(err, 'try again'));
+      // Signing out and back in doesn't help here, since the reset link is what signed them in.
+      if (err?.code === 'reauthentication_needed') setError(RESET_TOO_OLD);
+      else if (err) setError(authTrouble(err, 'try again'));
       else setDone(true);
     } catch (e) {
       if (stillSignedInAs(owner)) setError(authThrew(e));
@@ -57,7 +75,9 @@ export default function ResetPassword() {
         <h1 className="mt-4 text-[24px] font-semibold tracking-tight text-fg">Set a new password</h1>
       </div>
       <div className="mt-6 rounded-2xl border border-line bg-surface p-5 sm:p-6">
-        {loading || resetFor === undefined ? (
+        {leaving && !user ? (
+          <p className="text-center text-[14px] text-fg-3">Taking you to a new link</p>
+        ) : loading || resetFor === undefined ? (
           <p className="text-center text-[14px] text-fg-3">Checking your reset link</p>
         ) : done ? (
           <p className="text-center text-[14px] text-up" role="status">Your password is updated. Taking you home.</p>
@@ -86,6 +106,11 @@ export default function ResetPassword() {
               <p className="text-[13px] text-down" role="alert">
                 {error}
               </p>
+            )}
+            {error === RESET_TOO_OLD && (
+              <button type="button" onClick={newLink} className="inline-flex text-[13px] font-semibold text-fg underline underline-offset-2">
+                Get a new link
+              </button>
             )}
             <Button type="submit" size="lg" className="w-full" disabled={busy || !password}>
               {busy ? 'Saving' : 'Save my new password'}
