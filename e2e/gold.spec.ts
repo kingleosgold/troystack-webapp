@@ -212,7 +212,7 @@ test('an outage on the existing-account sign-in says so in plain words and keeps
   await page.getByLabel('Email').fill('app-user@example.com');
   await page.getByLabel('Password', { exact: true }).fill('their-app-password');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByRole('alert')).toHaveText("Couldn't reach TroyStack. Check your connection and try again.");
+  await expect(page.getByRole('alert')).toHaveText("Couldn't reach TroyStack. Check your connection and try again in a minute.");
   await expect(page.getByLabel('Password', { exact: true })).toHaveValue('their-app-password');
 });
 
