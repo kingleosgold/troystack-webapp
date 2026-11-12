@@ -6,6 +6,8 @@ import { stillSignedInAs } from '../lib/account';
 import { Button, Field, Input } from '../ui/primitives';
 import { authThrew, authTrouble } from '../lib/authErrors';
 
+const RESET_TOO_OLD = 'This reset link is too old to change your password now. Get a new link, then try again.';
+
 export default function ResetPassword() {
   usePageMeta({ title: 'Set a new password', canonical: '/reset-password', noindex: true });
   const navigate = useNavigate();
@@ -41,7 +43,9 @@ export default function ResetPassword() {
     try {
       const { error: err } = await updateEmailPassword('', password);
       if (!stillSignedInAs(owner)) return;
-      if (err) setError(authTrouble(err, 'try again'));
+      // Signing out and back in doesn't help here, since the reset link is what signed them in.
+      if (err?.code === 'reauthentication_needed') setError(RESET_TOO_OLD);
+      else if (err) setError(authTrouble(err, 'try again'));
       else setDone(true);
     } catch (e) {
       if (stillSignedInAs(owner)) setError(authThrew(e));
@@ -86,6 +90,11 @@ export default function ResetPassword() {
               <p className="text-[13px] text-down" role="alert">
                 {error}
               </p>
+            )}
+            {error === RESET_TOO_OLD && (
+              <Link to="/auth?mode=forgot" className="inline-flex text-[13px] font-semibold text-fg underline underline-offset-2">
+                Get a new link
+              </Link>
             )}
             <Button type="submit" size="lg" className="w-full" disabled={busy || !password}>
               {busy ? 'Saving' : 'Save my new password'}

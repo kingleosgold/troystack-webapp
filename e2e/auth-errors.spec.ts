@@ -234,3 +234,49 @@ test('a password change that needs a fresh sign-in says so in Settings', async (
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet.getByText('Sign out and back in, then change your password.')).toBeVisible();
 });
+
+test('a password change from an old reset link says to get a new link, not to sign out', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { authFails: { updateUser: 'reauth-needed' } });
+  await page.goto('/reset-password');
+  await page.getByLabel('New password', { exact: true }).fill('a longer password');
+  await page.getByLabel('New password again').fill('a longer password');
+  await page.getByRole('button', { name: /save|set|update/i }).click();
+  await expect(page.getByRole('alert')).toHaveText('This reset link is too old to change your password now. Get a new link, then try again.');
+  await expect(page.getByText('Sign out and back in')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Get a new link' })).toHaveAttribute('href', '/auth?mode=forgot');
+});
+
+test('a sign-up refused with email_exists still tries the password and lands on sign-in', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'other', authFails: { signUp: 'email-exists' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText(
+    "There's already an account for that email. Enter its password to sign in, or use Apple or Google if that's how you made it.",
+  );
+  await expect(page.getByText('Another account already uses that email.')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+});
+
+test('a sign-up refused with email_exists signs in when the password matches', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'email-exists' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page).not.toHaveURL(/mode=signup/);
+});
+
+test('a bad API key on sign-up reads as our fault and logs it', async ({ page }) => {
+  const logged: string[] = [];
+  page.on('console', (m) => { if (m.type() === 'error') logged.push(m.text()); });
+  await mockBackends(page, { authFails: { signUp: 'bad-api-key' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText(OURS);
+  await expect(page.getByText('Invalid API key')).toHaveCount(0);
+  await expect.poll(() => logged.some((t) => t.includes('Auth failed on the server') && t.includes('401'))).toBe(true);
+});
+
+test('a bad API key on the forgot form reads as our fault', async ({ page }) => {
+  await mockBackends(page, { authFails: { recover: 'bad-api-key' } });
+  await forgotWith(page);
+  await expect(page.getByRole('alert')).toHaveText(OURS);
+  await expect(page.getByText('Invalid API key')).toHaveCount(0);
+});
