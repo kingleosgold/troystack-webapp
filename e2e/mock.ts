@@ -140,10 +140,12 @@ function fulfillJson(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, headers: { ...CORS, 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 }
 
-type AuthFailure = 'wrong-password' | 'rate-limited' | 'rate-limited-bare' | 'outage' | 'unconfirmed' | 'email-rate-limited';
+type AuthFailure = 'server-fault' | 'weak-password' | 'wrong-password' | 'rate-limited' | 'rate-limited-bare' | 'outage' | 'unconfirmed' | 'email-rate-limited';
 
 /** Answers an auth call the way Supabase does when it fails for this reason. */
 function fulfillAuthFailure(route: Route, why: AuthFailure) {
+  if (why === 'server-fault') return fulfillAuthError(route, 500, 'unexpected_failure', 'Database error saving new user');
+  if (why === 'weak-password') return fulfillAuthError(route, 422, 'weak_password', 'Password should be at least 8 characters.');
   if (why === 'wrong-password') return fulfillAuthError(route, 400, 'invalid_credentials', 'Invalid login credentials');
   if (why === 'rate-limited') return fulfillAuthError(route, 429, 'over_request_rate_limit', 'Request rate limit reached');
   if (why === 'email-rate-limited') return fulfillAuthError(route, 429, 'over_email_send_rate_limit', 'email rate limit exceeded');

@@ -40,7 +40,7 @@ test('an outage on the sign-in form says so in plain words', async ({ page }) =>
   await expect(page.getByText('{}')).toHaveCount(0);
 });
 
-test('a rate limit the browser hides reads as a short wait, not a broken site', async ({ page }) => {
+test('a rate limit the browser hides reads as a connection problem, since the page can\'t tell them apart', async ({ page }) => {
   await mockBackends(page, { authFails: { signIn: 'rate-limited-bare' } });
   await signInWith(page);
   await expect(page.getByRole('alert')).toHaveText(OUTAGE);
@@ -56,7 +56,7 @@ test('an unconfirmed email on the sign-in form points to the link', async ({ pag
 test('too many sign-up emails says to wait, not the raw code', async ({ page }) => {
   await mockBackends(page, { authFails: { signUp: 'email-rate-limited' } });
   await signUpWith(page);
-  await expect(page.getByRole('alert')).toHaveText("We've just sent that address a few emails. Wait a few minutes, then try again.");
+  await expect(page.getByRole('alert')).toHaveText("We've sent a lot of emails just now. Wait a few minutes, then try again.");
   await expect(page.getByText(/rate limit/i)).toHaveCount(0);
 });
 
@@ -78,7 +78,7 @@ test('too many reset emails says to wait', async ({ page }) => {
   await page.goto('/auth?mode=forgot');
   await page.getByLabel('Email').fill('someone@example.com');
   await page.getByRole('button', { name: 'Send the link' }).click();
-  await expect(page.getByRole('alert')).toHaveText("We've just sent that address a few emails. Wait a few minutes, then try again.");
+  await expect(page.getByRole('alert')).toHaveText("We've sent a lot of emails just now. Wait a few minutes, then try again.");
 });
 
 test('a reset link that goes out says to check email', async ({ page }) => {
@@ -87,4 +87,16 @@ test('a reset link that goes out says to check email', async ({ page }) => {
   await page.getByLabel('Email').fill('someone@example.com');
   await page.getByRole('button', { name: 'Send the link' }).click();
   await expect(page.getByRole('status')).toHaveText('Check your email for a link to reset your password.');
+});
+
+test('a fault on our side says so instead of blaming the connection', async ({ page }) => {
+  await mockBackends(page, { authFails: { signUp: 'server-fault' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText('Something went wrong on our side. Try again later.');
+});
+
+test("Supabase's own words still show for a password that's too weak", async ({ page }) => {
+  await mockBackends(page, { authFails: { signUp: 'weak-password' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText('Password should be at least 8 characters.');
 });

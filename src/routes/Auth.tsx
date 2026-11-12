@@ -53,10 +53,19 @@ type AuthErr = { code?: string; message: string; status?: number };
  */
 function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string {
   // Checked before the status, since Supabase sends this one as a 429 too.
-  if (err.code === 'over_email_send_rate_limit') return "We've just sent that address a few emails. Wait a few minutes, then try again.";
+  // GoTrue also sends this for its project-wide email cap and its resend guard,
+  // so the words don't promise anything about this one address.
+  if (err.code === 'over_email_send_rate_limit') return "We've sent a lot of emails just now. Wait a few minutes, then try again.";
   if (err.code === 'email_not_confirmed') return 'Confirm your email first. Tap the link we sent you, then sign in.';
   if (err.status === 429 || err.code === 'over_request_rate_limit') return `Too many tries just now. Wait a minute, then ${then}.`;
-  if (!err.status || err.status >= 500) return "Couldn't reach TroyStack. Check your connection and try again in a minute.";
+  if (!err.status || err.status === 502 || err.status === 503 || err.status === 504) {
+    return "Couldn't reach TroyStack. Check your connection and try again in a minute.";
+  }
+  if (err.status >= 500) {
+    // A fault that won't clear on a retry, so keep the real reason where we can find it.
+    console.error('Auth failed on the server', err.status, err.code, err.message);
+    return 'Something went wrong on our side. Try again later.';
+  }
   return err.message;
 }
 
