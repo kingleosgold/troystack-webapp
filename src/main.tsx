@@ -1,3 +1,5 @@
+// First, so it reads the server's robots tag before any page writes one.
+import './hooks/usePageMeta';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';

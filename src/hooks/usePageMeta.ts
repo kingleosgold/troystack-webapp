@@ -9,8 +9,30 @@ interface PageMeta {
   /** Path on troystack.com, or a full URL when the canonical page lives elsewhere */
   canonical?: string;
   image?: string;
-  /** true writes "noindex, follow", false or unset writes index. null leaves the tag as it is, for a page still loading. */
+  /**
+   * true writes "noindex, follow", false or unset writes index. null puts back
+   * the tag the server sent with this page, for a page still loading or one
+   * whose load failed for a reason that may pass.
+   */
   noindex?: boolean | null;
+}
+
+// The robots tag the server sent with the first page, read once before any
+// page writes its own. main.tsx imports this file first so the read comes
+// before the first render. Only that path came from the server, so any other
+// path gets the plain page's tag, which is none.
+const firstLoad =
+  typeof document === 'undefined'
+    ? null
+    : {
+        path: window.location.pathname,
+        robots: document.head.querySelector('meta[name="robots"]')?.getAttribute('content') ?? null,
+      };
+
+function restoreServerRobots() {
+  const robots = firstLoad && window.location.pathname === firstLoad.path ? firstLoad.robots : null;
+  if (robots === null) document.head.querySelector('meta[name="robots"]')?.remove();
+  else setMeta('name', 'robots', robots);
 }
 
 function setMeta(attr: 'name' | 'property', key: string, value: string) {
@@ -55,6 +77,7 @@ export function usePageMeta({ title, description, canonical, image, noindex }: P
       setMeta('property', 'og:description', description);
       setMeta('name', 'twitter:description', description);
     }
-    if (noindex !== null) setMeta('name', 'robots', noindex ? 'noindex, follow' : 'index, follow');
+    if (noindex === null) restoreServerRobots();
+    else setMeta('name', 'robots', noindex ? 'noindex, follow' : 'index, follow');
   }, [title, description, canonical, image, noindex]);
 }

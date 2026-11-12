@@ -1326,46 +1326,85 @@ test.describe('the policies without JavaScript', () => {
 });
 
 // The server's robots tag stands while a Signal item loads and when a load
-// fails for a reason that may pass. Only a 404 is noindex.
-test('a Signal item leaves robots alone while it loads or fails and writes noindex on a 404', async ({ page }) => {
+// fails for a reason that may pass. Only a 404 is noindex. An in-app move gets
+// the tag the server sent with the first page, never the last page's.
+test('a Signal item keeps the server\'s robots tag while it loads or fails and writes noindex on a 404', async ({ page }) => {
   await mockBackends(page);
   const robots = page.locator('meta[name="robots"]');
-  // An indexable page first, so the tag holds index, follow before the item opens.
-  await page.goto('/prices/gold');
-  await expect(robots).toHaveAttribute('content', 'index, follow');
+  // Stands in for the tag the server writes into a Signal item's page, which
+  // the preview build doesn't do.
+  await page.route(
+    (u) => u.pathname.startsWith('/signal/'),
+    async (route) => {
+      if (route.request().resourceType() !== 'document') return route.fallback();
+      const response = await route.fetch();
+      const body = (await response.text()).replace('</head>', '<meta name="robots" content="server" /></head>');
+      await route.fulfill({ response, body });
+    },
+  );
+
+  // Nothing touches the server's tag while the item loads. Once it loads, the
+  // item writes its own.
   const held = await holdRequests(page, (u) => u.pathname.startsWith('/v1/stack-signal/evening'));
-  // Stands in for the tag the server wrote, which nothing may touch while the item loads.
-  await page.evaluate(() => document.querySelector('meta[name="robots"]')?.setAttribute('content', 'server'));
-  await page.evaluate(() => {
-    history.pushState({}, '', '/signal/evening-signal-2026-10-08');
-    dispatchEvent(new PopStateEvent('popstate'));
-  });
+  await page.goto('/signal/evening-signal-2026-10-08');
   await expect.poll(() => held.seen.length).toBeGreaterThan(0);
   await expect(robots).toHaveAttribute('content', 'server');
   held.release();
-  // Once it loads, the item writes its own tag.
   await expect(robots).not.toHaveAttribute('content', 'server');
 
   // A 429 or 500 is a bad moment, not a missing page, so a crawler that hits
-  // one doesn't drop a recap from the index.
+  // one doesn't drop a recap from the index. The page asks twice before it
+  // gives up, so the check waits for both asks.
   for (const status of [429, 500]) {
-    await page.evaluate(() => document.querySelector('meta[name="robots"]')?.setAttribute('content', 'server'));
-    await page.route((u) => u.pathname === `/v1/stack-signal/flaky-${status}`, (route) => route.fulfill({ status, contentType: 'application/json', body: '{}' }));
-    await page.evaluate((s) => {
-      history.pushState({}, '', `/signal/flaky-${s}`);
-      dispatchEvent(new PopStateEvent('popstate'));
-    }, status);
-    await expect(page.getByText("This piece didn't load.")).toBeVisible({ timeout: 15_000 });
+    const asks: string[] = [];
+    await page.route(
+      (u) => u.pathname === `/v1/stack-signal/flaky-${status}`,
+      (route) => {
+        asks.push(route.request().url());
+        return route.fulfill({ status, contentType: 'application/json', body: '{}' });
+      },
+    );
+    await page.goto(`/signal/flaky-${status}`);
+    await expect.poll(() => asks.length, { timeout: 15_000 }).toBe(2);
+    await expect(page.getByText("This piece didn't load.")).toBeVisible();
     await expect(robots).toHaveAttribute('content', 'server');
   }
 
-  await page.route((u) => u.pathname.startsWith('/v1/stack-signal/missing'), (route) => route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"Not found"}' }));
+  await page.route(
+    (u) => u.pathname.startsWith('/v1/stack-signal/missing'),
+    (route) => route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"Not found"}' }),
+  );
   await page.evaluate(() => {
     history.pushState({}, '', '/signal/missing-item');
     dispatchEvent(new PopStateEvent('popstate'));
   });
   await expect(page.getByText("That piece isn't here anymore")).toBeVisible({ timeout: 15_000 });
   await expect(robots).toHaveAttribute('content', 'noindex, follow');
+
+  // Moving in the app from that 404 to a failed item drops the 404's noindex.
+  // The server only sent a tag for the first page, so this page gets none.
+  const asks: string[] = [];
+  await page.route(
+    (u) => u.pathname === '/v1/stack-signal/flaky-moved',
+    (route) => {
+      asks.push(route.request().url());
+      return route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
+    },
+  );
+  await page.evaluate(() => {
+    history.pushState({}, '', '/signal/flaky-moved');
+    dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect.poll(() => asks.length, { timeout: 15_000 }).toBe(2);
+  await expect(page.getByText("This piece didn't load.")).toBeVisible();
+  await expect(robots).toHaveCount(0);
+
+  // Back on the first page's path, the server's tag comes back.
+  await page.goBack();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/signal\/flaky-500$/);
+  await expect(page.getByText("This piece didn't load.")).toBeVisible({ timeout: 15_000 });
+  await expect(robots).toHaveAttribute('content', 'server');
 });
 
 // Links from the old troystack.com, like /privacy#third-party-services, land on their section.
