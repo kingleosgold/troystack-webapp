@@ -20,7 +20,11 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signInWithApple: () => Promise<{ error: AuthError | null }>;
-  signOut: () => Promise<{ error: AuthError | null }>;
+  /**
+   * scope 'local' ends only this browser's session, and fallback is where the page
+   * starts over if the server can't be reached. The defaults are every device and home.
+   */
+  signOut: (opts?: { scope?: 'global' | 'local'; fallback?: string }) => Promise<{ error: AuthError | null }>;
   linkWithGoogle: () => Promise<{ error: AuthError | null }>;
   linkWithApple: () => Promise<{ error: AuthError | null }>;
   updateEmailPassword: (email: string, password: string) => Promise<{ error: AuthError | null }>;
@@ -139,9 +143,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Signing out goes through useSignOut, which first gives the account's
   // waiting changes a few seconds to go and asks before any are dropped.
-  const signOut = async () => {
+  const signOut = async (opts?: { scope?: 'global' | 'local'; fallback?: string }) => {
     const userId = user?.id;
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: opts?.scope ?? 'global' });
     try {
       // Clear app data on sign out (keep theme preference)
       localStorage.removeItem('stacktracker_holdings');
@@ -169,7 +173,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         for (const key of Object.keys(localStorage)) {
           if (/^sb-.+-auth-token/.test(key)) localStorage.removeItem(key);
         }
-        window.location.assign('/');
+        window.location.assign(opts?.fallback ?? '/');
       }
     } catch {
       // storage blocked, nothing kept here to clear

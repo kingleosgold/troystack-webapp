@@ -244,7 +244,10 @@ test('a password change from an old reset link says to get a new link, not to si
   await page.getByRole('button', { name: /save|set|update/i }).click();
   await expect(page.getByRole('alert')).toHaveText('This reset link is too old to change your password now. Get a new link, then try again.');
   await expect(page.getByText('Sign out and back in')).toHaveCount(0);
+  const logout = page.waitForRequest((r) => r.url().includes('/auth/v1/logout'));
   await page.getByRole('button', { name: 'Get a new link' }).click();
+  // Only this browser signs out, so the app on their phone stays signed in.
+  expect(new URL((await logout).url()).searchParams.get('scope')).toBe('local');
   await expect(page).toHaveURL(/\/auth\?mode=forgot/);
   await expect(page.getByRole('button', { name: 'Send the link' })).toBeVisible();
 });
@@ -281,4 +284,17 @@ test('a bad API key on the forgot form reads as our fault', async ({ page }) => 
   await forgotWith(page);
   await expect(page.getByRole('alert')).toHaveText(OURS);
   await expect(page.getByText('Invalid API key')).toHaveCount(0);
+});
+
+test("an old reset link whose sign-out can't reach the server still lands on the forgot form", async ({ page }) => {
+  await signIn(page, { once: true });
+  await mockBackends(page, { authFails: { updateUser: 'reauth-needed' } });
+  await page.route('**/auth/v1/logout**', (route) => route.abort());
+  await page.goto('/reset-password');
+  await page.getByLabel('New password', { exact: true }).fill('a longer password');
+  await page.getByLabel('New password again').fill('a longer password');
+  await page.getByRole('button', { name: /save|set|update/i }).click();
+  await page.getByRole('button', { name: 'Get a new link' }).click();
+  await expect(page).toHaveURL(/\/auth\?mode=forgot/);
+  await expect(page.getByRole('button', { name: 'Send the link' })).toBeVisible();
 });

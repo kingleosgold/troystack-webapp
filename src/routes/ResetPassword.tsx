@@ -33,10 +33,15 @@ export default function ResetPassword() {
   }, [done, navigate]);
 
   // The old reset link still holds a session, and the sign-in page sends anyone signed in
-  // home, so sign it out first or the forgot form never shows.
+  // home, so sign it out first or the forgot form never shows. Only this browser signs out,
+  // so the app on their phone stays signed in. If the server can't be reached the page
+  // reloads on the forgot form rather than home.
+  const [leaving, setLeaving] = useState(false);
   const newLink = async () => {
+    setLeaving(true);
     try {
-      await signOut();
+      const { error: err } = await signOut({ scope: 'local', fallback: '/auth?mode=forgot' });
+      if (err) return; // signOut is already reloading onto the forgot form
     } catch (e) {
       console.error('Sign-out before a new reset link threw', e);
     }
@@ -72,7 +77,9 @@ export default function ResetPassword() {
         <h1 className="mt-4 text-[24px] font-semibold tracking-tight text-fg">Set a new password</h1>
       </div>
       <div className="mt-6 rounded-2xl border border-line bg-surface p-5 sm:p-6">
-        {loading || resetFor === undefined ? (
+        {leaving ? (
+          <p className="text-center text-[14px] text-fg-3">Taking you to a new link</p>
+        ) : loading || resetFor === undefined ? (
           <p className="text-center text-[14px] text-fg-3">Checking your reset link</p>
         ) : done ? (
           <p className="text-center text-[14px] text-up" role="status">Your password is updated. Taking you home.</p>
