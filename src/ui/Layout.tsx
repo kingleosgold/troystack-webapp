@@ -478,6 +478,15 @@ function isFullBleed(pathname: string): boolean {
   return pathname === '/troy' || pathname.startsWith('/troy/');
 }
 
+/**
+ * Sign-up and sign-in keep the phone's tab bar off, so it doesn't sit over the
+ * form on a small screen or pull someone out halfway to checkout. The top bar
+ * and its menu stay, so there's still a way back.
+ */
+function hidesBottomTabs(pathname: string): boolean {
+  return isFullBleed(pathname) || pathname === '/auth' || pathname === '/auth/';
+}
+
 export default function AppShell() {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   // The menu belongs to the page it was opened on, so moving to another page closes it.
@@ -485,6 +494,7 @@ export default function AppShell() {
   const { pathname, hash } = useLocation();
   const mainRef = useRef<HTMLDivElement>(null);
   const fullBleed = isFullBleed(pathname);
+  const showTabs = !hidesBottomTabs(pathname);
 
   useEffect(() => {
     try {
@@ -516,7 +526,7 @@ export default function AppShell() {
       <div className={cx('flex min-h-screen flex-col transition-[padding] duration-200', collapsed ? 'lg:pl-[72px]' : 'lg:pl-[252px]')}>
         <MobileTopBar onMenu={() => setMenuPath(pathname)} />
         <DesktopTopBar />
-        <main id="main" ref={mainRef} className={cx('flex-1 min-w-0', fullBleed ? '' : 'pb-24 lg:pb-0')}>
+        <main id="main" ref={mainRef} className={cx('flex-1 min-w-0', showTabs ? 'pb-24 lg:pb-0' : '')}>
           <ErrorBoundary resetKey={pathname}>
             <Suspense fallback={<PageLoading />}>
               <Outlet />
@@ -525,7 +535,7 @@ export default function AppShell() {
           {!fullBleed && <Footer />}
         </main>
       </div>
-      {!fullBleed && <BottomTabs />}
+      {showTabs && <BottomTabs />}
       <MenuSheet open={menuOpen} onClose={() => setMenuPath(null)} />
     </div>
   );
