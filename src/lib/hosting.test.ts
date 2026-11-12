@@ -72,6 +72,20 @@ describe('Vercel routing', () => {
     expect((vercel.redirects ?? []).indexOf(rules[0])).toBe(2);
   });
 
+  // app.troystack.com served the whole app as a second copy. Jon ruled 11/11
+  // that it gets a host redirect, and that guest stacks kept in that host's
+  // browser storage stay behind, since synced accounts lose nothing.
+  it('sends app.troystack.com to troystack.com in one hop, its home page included', () => {
+    const rules = (vercel.redirects ?? []).filter((item: { has?: Array<{ value: string }> }) => item.has?.[0]?.value === 'app.troystack.com');
+    expect(rules).toEqual([
+      expect.objectContaining({ source: '/', destination: 'https://troystack.com/', permanent: true }),
+      expect.objectContaining({ source: '/:path*', destination: 'https://troystack.com/:path*', permanent: true }),
+    ]);
+    // Ahead of every path rule, so app.troystack.com/dashboard isn't two hops.
+    const firstPathRule = (vercel.redirects ?? []).findIndex((item: { has?: unknown }) => !item.has);
+    expect((vercel.redirects ?? []).indexOf(rules[1])).toBeLessThan(firstPathRule);
+  });
+
   // Links and emails from the old marketing site point at these files.
   it('serves the images the old troystack.com linked to', () => {
     for (const f of ['icon.png', 'og-calculator.png', 'og-speculation.png', 'og-junk-silver.png', 'screenshot.png']) {
