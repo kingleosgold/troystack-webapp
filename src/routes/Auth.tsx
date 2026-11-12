@@ -43,6 +43,21 @@ function isExistingAccount(err: { code?: string; message: string }): boolean {
   return err.code === 'user_already_exists' || /already registered/i.test(err.message);
 }
 
+/**
+ * Plain words for a sign-in that failed for a reason other than the password.
+ * supabase-js reports an outage as "{}" and a dropped connection as "Failed to fetch".
+ */
+function signInTrouble(err: { code?: string; message: string; status?: number }): string {
+  if (err.status === 429 || err.code === 'over_request_rate_limit') return 'Too many tries just now. Wait a minute, then sign in.';
+  if (!err.status || err.status >= 500) return "Couldn't reach TroyStack. Check your connection and try again.";
+  return err.message;
+}
+
+/** The password typed doesn't match, as against a rate limit or a dropped connection. */
+function isWrongPassword(err: { code?: string; message: string }): boolean {
+  return err.code === 'invalid_credentials' || err.message === 'Invalid login credentials';
+}
+
 export default function Auth() {
   const [params] = useSearchParams();
   const { user, loading, isConfigured, signIn, signUp, signInWithGoogle, signInWithApple, resetPasswordForEmail } = useAuth();
@@ -121,14 +136,23 @@ export default function Auth() {
         const campaign = forCheckout ? checkoutIntentCampaign() : undefined;
         const { error: err, needsConfirmation } = await signUp(email.trim(), password);
         if (!err) countStep('signup', forCheckout ? plan : null, campaign);
+        // Supabase refuses a weak password before it looks for the email, so a
+        // weak password on an existing account shows the password rule, not this.
         if (err && isExistingAccount(err)) {
           // Most people who land here already use this password in the
           // iPhone app, so try it before asking them to switch forms.
           const { error: inErr } = await signIn(email.trim(), password);
           if (inErr) {
+            // The account is there either way, so the sign-in form is the right one.
             setMode('signin');
-            setPassword('');
-            setError(EXISTING_ACCOUNT);
+            if (isWrongPassword(inErr)) {
+              setPassword('');
+              setError(EXISTING_ACCOUNT);
+            } else {
+              // A rate limit or a dropped connection says nothing about the
+              // password, so keep it and say what actually went wrong.
+              setError(signInTrouble(inErr));
+            }
           }
         } else if (err) setError(err.message);
         else if (needsConfirmation) {
@@ -141,7 +165,7 @@ export default function Auth() {
         }
       } else {
         const { error: err } = await signIn(email.trim(), password);
-        if (err) setError(err.message === 'Invalid login credentials' ? "That email and password don't match an account." : err.message);
+        if (err) setError(isWrongPassword(err) ? "That email and password don't match an account." : signInTrouble(err));
       }
     } catch {
       setError('Something went wrong. Try again in a moment.');
