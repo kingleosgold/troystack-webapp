@@ -142,6 +142,41 @@ test('someone with an account can still sign in from the checkout form', async (
   await expect(page.getByText(/free for 7 days/)).toHaveCount(0);
 });
 
+test('someone who already has an account and types it into the sign-up form is signed in and sent to checkout', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password' });
+  const checkouts: Array<Record<string, unknown>> = [];
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/stripe/create-checkout-session') && r.method() === 'POST') checkouts.push(r.postDataJSON());
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
+  await page.route('https://checkout.stripe.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe checkout</h1>' }));
+  await page.goto('/gold');
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  await page.getByLabel('Email').fill('app-user@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('their-app-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  expect(checkouts).toHaveLength(1);
+  expect(checkouts[0].price_id).toBe('price_e2e_lifetime');
+  // No account was made, so no sign-up is counted.
+  expect(steps.map((s) => s.step)).not.toContain('signup');
+});
+
+test("an existing account whose password doesn't match lands on sign-in with the email kept", async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'other' });
+  await page.goto('/auth?redirect=checkout&plan=yearly');
+  await page.getByLabel('Email').fill('app-user@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('not-their-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('alert')).toHaveText(/already an account for that email/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to get Gold');
+  await expect(page.getByLabel('Email')).toHaveValue('app-user@example.com');
+  await expect(page.getByLabel('Password', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Forgot password?' })).toBeVisible();
+  await expect(page.getByText('User already registered')).toHaveCount(0);
+});
+
 test('the Gold page counts the view, the plan tap and the sign-up, and nothing about who', async ({ page }) => {
   await mockBackends(page);
   const steps: Array<Record<string, unknown>> = [];
