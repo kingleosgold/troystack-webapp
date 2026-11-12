@@ -262,3 +262,30 @@ test("a stored session that can't be read gets the phone card, never the free we
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => (window as unknown as { sawTry?: boolean }).sawTry ?? false)).toBe(false);
 });
+
+test('a sheet that opens on the app counts its view apart, and its card form counts under the campaign', async ({ page }, testInfo) => {
+  await signIn(page);
+  await mockBackends(page);
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
+  // Settings opens the sheet with no plan picked. A signed-in free account is
+  // counted once its plan has loaded.
+  await page.goto('/settings');
+  await page.getByRole('button', { name: /Try Gold free for a week/ }).click();
+  const sheet = page.getByRole('dialog');
+  const start = sheet.getByRole('button', { name: 'Start my free week' });
+  if (testInfo.project.name === 'iphone') {
+    await expect.poll(() => steps.length).toBe(1);
+    expect(steps).toEqual([{ step: 'gold_view', campaign: 'webapp-settings-app' }]);
+    await sheet.getByRole('button', { name: 'Rather start it here with a card?' }).click();
+    await expect(start).toBeVisible();
+    await expect.poll(() => steps.length).toBe(2);
+    expect(steps[1]).toEqual({ step: 'gold_view', campaign: 'webapp-settings' });
+  } else {
+    await expect(start).toBeVisible();
+    await expect.poll(() => steps.length).toBe(1);
+    expect(steps).toEqual([{ step: 'gold_view', campaign: 'webapp-settings' }]);
+  }
+});

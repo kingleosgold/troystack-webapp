@@ -240,11 +240,21 @@ export function TrialSheet({ open, onClose, reason, campaign, plan, start = fals
   // Each opening mounts a fresh sheet. One opened from anywhere but the Gold
   // page counts as a view of the plans under that surface's campaign, so the
   // funnel shows which part of the site sends people to Gold. The Gold page
-  // already counted its own view.
+  // already counted its own view. It counts once the account's plan is known,
+  // so a Gold account isn't counted. A sheet that opens on the app first, as
+  // on an iPhone, counts under the campaign with -app on the end, and its card
+  // form counts under the campaign itself when it's opened. So a campaign's
+  // views are the ones that showed card checkout, and its taps divide by them.
+  const viewed = useRef(false);
   useEffect(() => {
-    if (open && !plan && !isGold) countStep('gold_view', null, campaign);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per opening, under the campaign it opened with
-  }, []);
+    if (!open || plan || checking || isGold || viewed.current) return;
+    viewed.current = true;
+    countStep('gold_view', null, cardFirst ? campaign : `${campaign}-app`);
+  }, [open, plan, checking, isGold, cardFirst, campaign]);
+  const openCardOnIphone = () => {
+    setShowWebOnIphone(true);
+    if (!plan) countStep('gold_view', null, campaign);
+  };
   const block = blocked && blocked.userId === user?.id ? blocked.block : null;
   const close = () => {
     setBlocked(null);
@@ -309,7 +319,7 @@ export function TrialSheet({ open, onClose, reason, campaign, plan, start = fals
                     <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} onPlanChange={setPicked} />
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setShowWebOnIphone(true)} className="text-[13px] font-semibold text-gold hover:text-gold-2">
+                  <button type="button" onClick={openCardOnIphone} className="text-[13px] font-semibold text-gold hover:text-gold-2">
                     Rather start it here with a card?
                   </button>
                 )
