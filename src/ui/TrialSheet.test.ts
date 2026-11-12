@@ -4,6 +4,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CheckoutCampaign, WebPlan } from '../lib/checkout';
+import { TrialSheet } from './TrialSheet';
+
+// Lets act() flush effects without React warning that this isn't a test setup.
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // The sheet's funnel counts, checked without a browser. Each test sets who is
 // signed in, how far their plan has loaded and what device this is, then
@@ -57,8 +61,6 @@ vi.mock('../lib/checkout', async (importOriginal) => {
 // The App Store buttons are their own component with their own counts.
 vi.mock('./AppStore', () => ({ InstallPath: () => null }));
 
-const { TrialSheet } = await import('./TrialSheet');
-
 let root: Root;
 let host: HTMLDivElement;
 
@@ -66,11 +68,12 @@ interface Opening {
   open?: boolean;
   campaign?: CheckoutCampaign;
   plan?: WebPlan;
+  start?: boolean;
 }
 
-function render({ open = true, campaign = 'webapp-settings', plan }: Opening = {}) {
+function render({ open = true, campaign = 'webapp-settings', plan, start }: Opening = {}) {
   act(() => {
-    root.render(h(MemoryRouter, null, h(TrialSheet, { open, onClose: () => undefined, campaign, plan })));
+    root.render(h(MemoryRouter, null, h(TrialSheet, { open, onClose: () => undefined, campaign, plan, start })));
   });
 }
 
@@ -133,6 +136,28 @@ describe('the sheet counts its view', () => {
     expect(counts).toEqual([['gold_view', null, 'webapp-settings']]);
   });
 
+  it('counts a guest who signs in while the sheet is open once, not again when their plan lands', () => {
+    state.user = null;
+    render();
+    state.user = { id: 'user-1' };
+    state.planLoading = true;
+    render();
+    state.planLoading = false;
+    render();
+    expect(counts).toEqual([['gold_view', null, 'webapp-settings']]);
+  });
+
+  it('counts a plan that reloads under an open sheet once', () => {
+    render();
+    state.planLoading = true;
+    render();
+    state.planLoading = false;
+    render();
+    expect(counts).toEqual([['gold_view', null, 'webapp-settings']]);
+  });
+
+  // The site remounts the sheet for each opening, so this checks the open
+  // guard on its own rather than a lifecycle the site runs.
   it('counts nothing when the sheet closes before the plan loads', () => {
     state.planLoading = true;
     render();
@@ -149,8 +174,19 @@ describe('the sheet counts its view', () => {
     expect(counts).toEqual([['gold_view', null, 'webapp-settings']]);
   });
 
-  it('leaves the view to the Gold page when a plan was picked on the way in', () => {
+  it('leaves the view and the tap to the Gold page when a plan was picked on the way in', async () => {
+    state.user = null;
     render({ campaign: 'webapp-gold', plan: 'monthly' });
+    await click(button('Start my free week'));
+    expect(counts).toEqual([]);
+  });
+
+  it('counts nothing when the Gold page starts checkout on its own', async () => {
+    openCheckout.mockResolvedValue(true);
+    await act(async () => {
+      root.render(h(MemoryRouter, null, h(TrialSheet, { open: true, onClose: () => undefined, campaign: 'webapp-gold', plan: 'yearly', start: true })));
+    });
+    expect(openCheckout).toHaveBeenCalledTimes(1);
     expect(counts).toEqual([]);
   });
 });
