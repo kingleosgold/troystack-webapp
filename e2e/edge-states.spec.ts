@@ -609,7 +609,10 @@ test.describe('signing out', () => {
 
     await page.getByRole('button', { name: 'Save my new password' }).click();
     await page.getByRole('button', { name: 'Get a new link' }).click();
+    const logout = page.waitForRequest((r) => r.url().includes('/auth/v1/logout'));
     await page.getByRole('dialog', { name: 'Sign out now?' }).getByRole('button', { name: 'Sign out anyway' }).click();
+    // Only this browser signs out, so the app on their phone stays signed in.
+    expect(new URL((await logout).url()).searchParams.get('scope')).toBe('local');
     await expect(page).toHaveURL(/\/auth\?mode=forgot/);
     await expect(page.getByRole('button', { name: 'Send the link' })).toBeVisible();
   });
