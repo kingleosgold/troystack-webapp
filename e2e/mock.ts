@@ -120,9 +120,10 @@ export interface MockOptions {
    * The email already has an account, so sign-up is refused the way Supabase
    * refuses it. 'same-password' signs in with the password typed, 'other'
    * doesn't (as for an account made with Apple or Google, which has no
-   * password), and 'rate-limited' refuses the sign-in for too many tries.
+   * password), 'rate-limited' refuses the sign-in for too many tries and
+   * 'outage' answers the sign-in with a 503.
    */
-  existingAccount?: 'same-password' | 'other' | 'rate-limited';
+  existingAccount?: 'same-password' | 'other' | 'rate-limited' | 'outage';
 }
 
 /** The API's words for each reason checkout gives on a 409. */
@@ -450,6 +451,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (url.pathname === '/auth/v1/token' && req.method() === 'POST') {
       if (opts.existingAccount === 'other') return fulfillAuthError(route, 400, 'invalid_credentials', 'Invalid login credentials');
       if (opts.existingAccount === 'rate-limited') return fulfillAuthError(route, 429, 'over_request_rate_limit', 'Request rate limit reached');
+      if (opts.existingAccount === 'outage') return route.fulfill({ status: 503, headers: CORS, body: '' });
       return fulfillJson(route, sessionFor());
     }
     // A new email account gets its session at once, as production confirms email sign-ups.

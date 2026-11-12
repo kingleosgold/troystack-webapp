@@ -43,6 +43,16 @@ function isExistingAccount(err: { code?: string; message: string }): boolean {
   return err.code === 'user_already_exists' || /already registered/i.test(err.message);
 }
 
+/**
+ * Plain words for a sign-in that failed for a reason other than the password.
+ * supabase-js reports an outage as "{}" and a dropped connection as "Failed to fetch".
+ */
+function signInTrouble(err: { code?: string; message: string; status?: number }): string {
+  if (err.status === 429 || err.code === 'over_request_rate_limit') return 'Too many tries just now. Wait a minute, then sign in.';
+  if (!err.status || err.status >= 500) return "Couldn't reach TroyStack. Check your connection and try again.";
+  return err.message;
+}
+
 /** The password typed doesn't match, as against a rate limit or a dropped connection. */
 function isWrongPassword(err: { code?: string; message: string }): boolean {
   return err.code === 'invalid_credentials' || err.message === 'Invalid login credentials';
@@ -141,7 +151,7 @@ export default function Auth() {
             } else {
               // A rate limit or a dropped connection says nothing about the
               // password, so keep it and say what actually went wrong.
-              setError(inErr.message);
+              setError(signInTrouble(inErr));
             }
           }
         } else if (err) setError(err.message);
@@ -155,7 +165,7 @@ export default function Auth() {
         }
       } else {
         const { error: err } = await signIn(email.trim(), password);
-        if (err) setError(isWrongPassword(err) ? "That email and password don't match an account." : err.message);
+        if (err) setError(isWrongPassword(err) ? "That email and password don't match an account." : signInTrouble(err));
       }
     } catch {
       setError('Something went wrong. Try again in a moment.');

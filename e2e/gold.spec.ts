@@ -198,12 +198,22 @@ test('a rate limit on the existing-account sign-in shows the real reason and kee
   await page.getByLabel('Email').fill('app-user@example.com');
   await page.getByLabel('Password', { exact: true }).fill('their-app-password');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByRole('alert')).toHaveText(/rate limit/i);
+  await expect(page.getByRole('alert')).toHaveText('Too many tries just now. Wait a minute, then sign in.');
   await expect(page.getByRole('alert')).not.toHaveText(/already an account/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to get Gold');
   await expect(page.getByLabel('Email')).toHaveValue('app-user@example.com');
   await expect(page.getByLabel('Password', { exact: true })).toHaveValue('their-app-password');
   expect(checkouts).toHaveLength(0);
+});
+
+test('an outage on the existing-account sign-in says so in plain words and keeps the password', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'outage' });
+  await page.goto('/auth?redirect=checkout&plan=yearly');
+  await page.getByLabel('Email').fill('app-user@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('their-app-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('alert')).toHaveText("Couldn't reach TroyStack. Check your connection and try again.");
+  await expect(page.getByLabel('Password', { exact: true })).toHaveValue('their-app-password');
 });
 
 test('the Gold page counts the view, the plan tap and the sign-up, and nothing about who', async ({ page }) => {
