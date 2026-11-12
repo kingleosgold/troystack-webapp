@@ -35,6 +35,14 @@ const HEADINGS: Record<Mode, { title: string; sub: string }> = {
   forgot: { title: 'Reset your password', sub: "Enter your email and we'll send you a link to set a new one." },
 };
 
+const EXISTING_ACCOUNT =
+  "There's already an account for that email. Enter its password to sign in, or use Apple or Google if that's how you made it.";
+
+/** Supabase refuses a sign-up for an email that already has an account. */
+function isExistingAccount(err: { code?: string; message: string }): boolean {
+  return err.code === 'user_already_exists' || /already registered/i.test(err.message);
+}
+
 export default function Auth() {
   const [params] = useSearchParams();
   const { user, loading, isConfigured, signIn, signUp, signInWithGoogle, signInWithApple, resetPasswordForEmail } = useAuth();
@@ -113,7 +121,16 @@ export default function Auth() {
         const campaign = forCheckout ? checkoutIntentCampaign() : undefined;
         const { error: err, needsConfirmation } = await signUp(email.trim(), password);
         if (!err) countStep('signup', forCheckout ? plan : null, campaign);
-        if (err) setError(err.message);
+        if (err && isExistingAccount(err)) {
+          // Most people who land here already use this password in the
+          // iPhone app, so try it before asking them to switch forms.
+          const { error: inErr } = await signIn(email.trim(), password);
+          if (inErr) {
+            setMode('signin');
+            setPassword('');
+            setError(EXISTING_ACCOUNT);
+          }
+        } else if (err) setError(err.message);
         else if (needsConfirmation) {
           setNotice(
             forCheckout

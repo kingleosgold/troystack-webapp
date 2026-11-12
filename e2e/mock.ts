@@ -116,6 +116,11 @@ export interface MockOptions {
    * the sign-in sync lost the race with the plan read.
    */
   syncRestoresGold?: boolean;
+  /**
+   * The email already has an account, so sign-up is refused the way Supabase
+   * refuses it. 'same-password' signs in with the password typed, 'other' doesn't.
+   */
+  existingAccount?: 'same-password' | 'other';
 }
 
 /** The API's words for each reason checkout gives on a 409. */
@@ -422,9 +427,15 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     }
     if (url.pathname.startsWith('/auth/v1/user')) return fulfillJson(route, sessionUser());
     // Email and password sign-in on the page itself, with no reload.
-    if (url.pathname === '/auth/v1/token' && req.method() === 'POST') return fulfillJson(route, sessionFor());
+    if (url.pathname === '/auth/v1/token' && req.method() === 'POST') {
+      if (opts.existingAccount === 'other') return fulfillJson(route, { code: 'invalid_credentials', msg: 'Invalid login credentials' }, 400);
+      return fulfillJson(route, sessionFor());
+    }
     // A new email account gets its session at once, as production confirms email sign-ups.
-    if (url.pathname === '/auth/v1/signup' && req.method() === 'POST') return fulfillJson(route, sessionFor());
+    if (url.pathname === '/auth/v1/signup' && req.method() === 'POST') {
+      if (opts.existingAccount) return fulfillJson(route, { code: 'user_already_exists', msg: 'User already registered' }, 422);
+      return fulfillJson(route, sessionFor());
+    }
     if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204, headers: CORS });
     return fulfillJson(route, {});
   });
