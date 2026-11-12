@@ -140,7 +140,7 @@ function fulfillJson(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, headers: { ...CORS, 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 }
 
-type AuthFailure = 'server-fault' | 'server-fault-html' | 'weak-password' | 'wrong-password' | 'rate-limited' | 'rate-limited-bare' | 'outage' | 'unconfirmed' | 'email-rate-limited';
+type AuthFailure = 'server-fault' | 'server-fault-html' | 'weak-password' | 'wrong-password' | 'rate-limited' | 'rate-limited-bare' | 'outage' | 'unconfirmed' | 'email-rate-limited' | 'email-exists' | 'reauth-needed' | 'bad-api-key';
 
 /** Answers an auth call the way Supabase does when it fails for this reason. */
 function fulfillAuthFailure(route: Route, why: AuthFailure) {
@@ -152,6 +152,10 @@ function fulfillAuthFailure(route: Route, why: AuthFailure) {
   if (why === 'rate-limited') return fulfillAuthError(route, 429, 'over_request_rate_limit', 'Request rate limit reached');
   if (why === 'email-rate-limited') return fulfillAuthError(route, 429, 'over_email_send_rate_limit', 'email rate limit exceeded');
   if (why === 'unconfirmed') return fulfillAuthError(route, 400, 'email_not_confirmed', 'Email not confirmed');
+  if (why === 'email-exists') return fulfillAuthError(route, 422, 'email_exists', 'A user with this email address has already been registered');
+  if (why === 'reauth-needed') return fulfillAuthError(route, 400, 'reauthentication_needed', 'Password update requires reauthentication.');
+  // The gateway in front of Supabase Auth refuses a bad key with a 401 and no code.
+  if (why === 'bad-api-key') return route.fulfill({ status: 401, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify({ message: 'Invalid API key' }) });
   // A rate limit from a proxy in front of Supabase, as plain text rather than JSON, with CORS so the page sees it.
   // Without CORS a real browser blocks it and it reads as a dropped connection, like 'outage'.
   if (why === 'rate-limited-bare') return route.fulfill({ status: 429, headers: { ...CORS, 'content-type': 'text/plain' }, body: 'Too Many Requests' });

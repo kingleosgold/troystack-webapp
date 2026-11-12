@@ -1,5 +1,14 @@
 export type AuthErr = { code?: string; message: string; status?: number; name?: string };
 
+/** What a form says when the auth call threw instead of answering. Matches the helper's own fault line. */
+export const AUTH_THREW = 'Something went wrong on our side. Try again in a minute.';
+
+/** Says AUTH_THREW and logs what threw, so a catch block never hides the reason. */
+export function authThrew(e: unknown): string {
+  console.error('Auth call threw', e);
+  return AUTH_THREW;
+}
+
 /**
  * Plain words for an auth call that failed for a reason other than the
  * password. supabase-js reports an outage as "{}" and a dropped connection as
@@ -15,6 +24,9 @@ export function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string
   // so the words don't promise anything about this one address.
   if (err.code === 'over_email_send_rate_limit') return "We've sent a lot of emails just now. Wait a few minutes, then try again.";
   if (err.code === 'email_not_confirmed') return 'Confirm your email first. Tap the link we sent you, then sign in.';
+  // Supabase asks for a fresh sign-in before a password change when the session is old.
+  if (err.code === 'reauthentication_needed') return 'Sign out and back in, then change your password.';
+  if (err.code === 'email_exists') return 'Another account already uses that email.';
   if (err.status === 429 || err.code === 'over_request_rate_limit') return `Too many tries just now. Wait a minute, then ${then}.`;
   if (err.name === 'AuthUnknownError') {
     console.error('Auth failed on the server', err.name, err.status, err.code, err.message);
@@ -22,6 +34,14 @@ export function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string
   }
   if (err.status !== undefined && err.status >= 500 && ![502, 503, 504].includes(err.status)) {
     // A fault that won't clear on a retry, so keep the real reason where we can find it.
+    console.error('Auth failed on the server', err.name, err.status, err.code, err.message);
+    return 'Something went wrong on our side. Try again later.';
+  }
+  // A 401 with no code comes from the gateway in front of Supabase Auth, as with a bad or
+  // rotated API key. Hosted Supabase Auth sends a code on its own 401s, and supabase-js turns
+  // a lost session into a 400 AuthSessionMissingError, so neither lands here. An older
+  // self-hosted Auth that leaves the code off would read as our fault, which we accept.
+  if (err.status === 401 && !err.code) {
     console.error('Auth failed on the server', err.name, err.status, err.code, err.message);
     return 'Something went wrong on our side. Try again later.';
   }
@@ -42,7 +62,7 @@ export function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string
   const words = err.message?.trim() ?? '';
   if (!words || words === '{}' || words === '""') {
     console.error('Auth failed with no message', err.name, err.status, err.code);
-    return 'Something went wrong on our side. Try again in a minute.';
+    return AUTH_THREW;
   }
   return err.message;
 }

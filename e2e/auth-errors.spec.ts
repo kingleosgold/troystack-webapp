@@ -41,10 +41,13 @@ test('an outage on the sign-in form says so in plain words', async ({ page }) =>
   await expect(page.getByText('{}')).toHaveCount(0);
 });
 
-test('a plain text rate limit from a proxy reads as our fault and asks for a minute', async ({ page }) => {
+test('a plain text rate limit from a proxy reads as our fault, asks for a minute and logs it', async ({ page }) => {
+  const logged: string[] = [];
+  page.on('console', (m) => { if (m.type() === 'error') logged.push(m.text()); });
   await mockBackends(page, { authFails: { signIn: 'rate-limited-bare' } });
   await signInWith(page);
   await expect(page.getByRole('alert')).toHaveText(NOT_JSON);
+  await expect.poll(() => logged.some((t) => t.includes('Auth failed on the server') && t.includes('AuthUnknownError'))).toBe(true);
 });
 
 test('an unconfirmed email on the sign-in form points to the link', async ({ page }) => {
@@ -178,4 +181,56 @@ test("a weak password in Settings keeps Supabase's own words", async ({ page }) 
   await sheet.getByLabel('New password').fill('a longer password');
   await sheet.getByRole('button', { name: 'Save' }).click();
   await expect(sheet.getByText('Password should be at least 8 characters.')).toBeVisible();
+});
+
+test('a fault on our side on the forgot form says so', async ({ page }) => {
+  await mockBackends(page, { authFails: { recover: 'server-fault' } });
+  await forgotWith(page);
+  await expect(page.getByRole('alert')).toHaveText(OURS);
+});
+
+test('a bad API key on sign-in reads as our fault, not a wrong password, and logs it', async ({ page }) => {
+  const logged: string[] = [];
+  page.on('console', (m) => { if (m.type() === 'error') logged.push(m.text()); });
+  await mockBackends(page, { authFails: { signIn: 'bad-api-key' } });
+  await signInWith(page);
+  await expect(page.getByRole('alert')).toHaveText(OURS);
+  await expect(page.getByText('Invalid API key')).toHaveCount(0);
+  await expect.poll(() => logged.some((t) => t.includes('Auth failed on the server') && t.includes('401'))).toBe(true);
+});
+
+async function changeEmailInSettings(page: Page) {
+  await page.goto('/settings');
+  await page.getByText('Email and password').click();
+  const sheet = page.getByRole('dialog', { name: /email (or|and) (a )?password/i });
+  await sheet.getByLabel('New email').fill('taken@example.com');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  return sheet;
+}
+
+test('a new email that another account has says so in Settings', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { authFails: { updateUser: 'email-exists' } });
+  const sheet = await changeEmailInSettings(page);
+  await expect(sheet.getByText('Another account already uses that email.')).toBeVisible();
+  await expect(page.getByText('has already been registered')).toHaveCount(0);
+});
+
+test('an outage while changing the email in Settings says so in plain words', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { authFails: { updateUser: 'outage' } });
+  const sheet = await changeEmailInSettings(page);
+  await expect(sheet.getByText(OUTAGE)).toBeVisible();
+  await expect(page.getByText('{}')).toHaveCount(0);
+});
+
+test('a password change that needs a fresh sign-in says so in Settings', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { authFails: { updateUser: 'reauth-needed' } });
+  await page.goto('/settings');
+  await page.getByText('Email and password').click();
+  const sheet = page.getByRole('dialog', { name: /email (or|and) (a )?password/i });
+  await sheet.getByLabel('New password').fill('a longer password');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(sheet.getByText('Sign out and back in, then change your password.')).toBeVisible();
 });
