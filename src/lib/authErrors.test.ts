@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { authTrouble } from './authErrors';
+import { AUTH_THREW, authThrew, authTrouble } from './authErrors';
 
 const OUTAGE = "Couldn't reach TroyStack. Check your connection and try again in a minute.";
 const OURS = 'Something went wrong on our side. Try again later.';
@@ -47,5 +47,43 @@ describe('authTrouble', () => {
     expect(authTrouble({ message: 'Password should be at least 8 characters.', status: 422, code: 'weak_password' }, 'try again')).toBe(
       'Password should be at least 8 characters.',
     );
+  });
+
+  it('says a session that ran out means signing in again', () => {
+    expect(authTrouble({ message: 'Session expired', status: 403, code: 'session_expired' }, 'try again')).toBe(
+      "You've been signed out. Sign in again, then try again.",
+    );
+  });
+
+  it('asks for a fresh sign-in when Supabase wants one before a password change', () => {
+    const out = 'Sign out and back in, then change your password.';
+    expect(authTrouble({ message: 'Password update requires reauthentication.', status: 400, code: 'reauthentication_needed' }, 'try again')).toBe(out);
+    expect(authTrouble({ message: 'Verification code is invalid', status: 400, code: 'reauthentication_not_valid' }, 'try again')).toBe(out);
+  });
+
+  it('says plainly when the new email is taken', () => {
+    expect(authTrouble({ message: 'A user with this email address has already been registered', status: 422, code: 'email_exists' }, 'try again')).toBe(
+      'Another account already uses that email.',
+    );
+  });
+
+  it('reads a 401 with no code as our fault and logs it', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(authTrouble({ name: 'AuthApiError', message: 'Invalid API key', status: 401 }, 'sign in')).toBe(OURS);
+    expect(log).toHaveBeenCalledWith('Auth failed on the server', 'AuthApiError', 401, undefined, 'Invalid API key');
+  });
+
+  it("keeps a coded 401's own handling", () => {
+    expect(authTrouble({ message: 'Session not found', status: 401, code: 'session_not_found' }, 'try again')).toBe(
+      "You've been signed out. Sign in again, then try again.",
+    );
+  });
+
+  it('says one fault line for a throw and logs what threw', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const boom = new TypeError('x is undefined');
+    expect(authThrew(boom)).toBe(AUTH_THREW);
+    expect(AUTH_THREW).toBe('Something went wrong on our side. Try again in a minute.');
+    expect(log).toHaveBeenCalledWith('Auth call threw', boom);
   });
 });

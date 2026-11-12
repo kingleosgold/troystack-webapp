@@ -7,7 +7,7 @@ import { countStep } from '../lib/funnel';
 import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { Button, Field, Input } from '../ui/primitives';
 import { NewTabNote } from '../ui/NewTabNote';
-import { authTrouble, type AuthErr } from '../lib/authErrors';
+import { authThrew, authTrouble, type AuthErr } from '../lib/authErrors';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
@@ -158,8 +158,8 @@ export default function Auth() {
         const { error: err } = await signIn(email.trim(), password);
         if (err) setError(isWrongPassword(err) ? "That email and password don't match an account." : authTrouble(err, 'sign in'));
       }
-    } catch {
-      setError('Something went wrong. Try again in a moment.');
+    } catch (e) {
+      setError(authThrew(e));
     } finally {
       setBusy(false);
     }

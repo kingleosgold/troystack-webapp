@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { stillSignedInAs } from '../lib/account';
 import { Button, Field, Input } from '../ui/primitives';
-import { authTrouble } from '../lib/authErrors';
+import { authThrew, authTrouble } from '../lib/authErrors';
 
 export default function ResetPassword() {
   usePageMeta({ title: 'Set a new password', canonical: '/reset-password', noindex: true });
@@ -43,8 +43,8 @@ export default function ResetPassword() {
       if (!stillSignedInAs(owner)) return;
       if (err) setError(authTrouble(err, 'try again'));
       else setDone(true);
-    } catch {
-      if (stillSignedInAs(owner)) setError('Something went wrong. Try again in a moment.');
+    } catch (e) {
+      if (stillSignedInAs(owner)) setError(authThrew(e));
     } finally {
       setBusy(false);
     }
