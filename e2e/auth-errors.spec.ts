@@ -189,11 +189,14 @@ test('a fault on our side on the forgot form says so', async ({ page }) => {
   await expect(page.getByRole('alert')).toHaveText(OURS);
 });
 
-test('a bad API key on sign-in reads as our fault, not a wrong password', async ({ page }) => {
+test('a bad API key on sign-in reads as our fault, not a wrong password, and logs it', async ({ page }) => {
+  const logged: string[] = [];
+  page.on('console', (m) => { if (m.type() === 'error') logged.push(m.text()); });
   await mockBackends(page, { authFails: { signIn: 'bad-api-key' } });
   await signInWith(page);
   await expect(page.getByRole('alert')).toHaveText(OURS);
   await expect(page.getByText('Invalid API key')).toHaveCount(0);
+  await expect.poll(() => logged.some((t) => t.includes('Auth failed on the server') && t.includes('401'))).toBe(true);
 });
 
 async function changeEmailInSettings(page: Page) {
