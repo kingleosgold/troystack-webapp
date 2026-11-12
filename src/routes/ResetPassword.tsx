@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSignOut } from '../contexts/SignOutContext';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { stillSignedInAs } from '../lib/account';
 import { Button, Field, Input } from '../ui/primitives';
@@ -11,7 +12,7 @@ const RESET_TOO_OLD = 'This reset link is too old to change your password now. G
 export default function ResetPassword() {
   usePageMeta({ title: 'Set a new password', canonical: '/reset-password', noindex: true });
   const navigate = useNavigate();
-  const { user, loading, updateEmailPassword, signOut } = useAuth();
+  const { user, loading, updateEmailPassword } = useAuth();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -33,19 +34,16 @@ export default function ResetPassword() {
   }, [done, navigate]);
 
   // The old reset link still holds a session, and the sign-in page sends anyone signed in
-  // home, so sign it out first or the forgot form never shows. Only this browser signs out,
-  // so the app on their phone stays signed in. If the server can't be reached the page
-  // reloads on the forgot form rather than home.
+  // home, so sign it out first or the forgot form never shows. It goes through the same
+  // sign-out as everywhere else, so changes still waiting to reach the account get their
+  // chance and an ask before they're dropped. Only this browser signs out, so the app on
+  // their phone stays signed in, and a sign-out that can't reach the server still lands
+  // on the forgot form.
+  const { requestSignOutWith } = useSignOut();
   const [leaving, setLeaving] = useState(false);
-  const newLink = async () => {
+  const newLink = () => {
     setLeaving(true);
-    try {
-      const { error: err } = await signOut({ scope: 'local', fallback: '/auth?mode=forgot' });
-      if (err) return; // signOut is already reloading onto the forgot form
-    } catch (e) {
-      console.error('Sign-out before a new reset link threw', e);
-    }
-    navigate('/auth?mode=forgot');
+    requestSignOutWith({ scope: 'local', then: '/auth?mode=forgot' });
   };
 
   const submit = async (e: FormEvent) => {
@@ -77,7 +75,7 @@ export default function ResetPassword() {
         <h1 className="mt-4 text-[24px] font-semibold tracking-tight text-fg">Set a new password</h1>
       </div>
       <div className="mt-6 rounded-2xl border border-line bg-surface p-5 sm:p-6">
-        {leaving ? (
+        {leaving && !user ? (
           <p className="text-center text-[14px] text-fg-3">Taking you to a new link</p>
         ) : loading || resetFor === undefined ? (
           <p className="text-center text-[14px] text-fg-3">Checking your reset link</p>
@@ -110,7 +108,7 @@ export default function ResetPassword() {
               </p>
             )}
             {error === RESET_TOO_OLD && (
-              <button type="button" onClick={() => void newLink()} className="inline-flex text-[13px] font-semibold text-fg underline underline-offset-2">
+              <button type="button" onClick={newLink} className="inline-flex text-[13px] font-semibold text-fg underline underline-offset-2">
                 Get a new link
               </button>
             )}

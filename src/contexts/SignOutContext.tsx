@@ -6,9 +6,14 @@ import { sendQueuedChanges } from '../hooks/useHoldings';
 import { dropQueuedChanges, readPending, readRefused, sendBeforeSignOut } from '../services/pendingWrites';
 import { Button, Sheet } from '../ui/primitives';
 
+/** scope 'local' signs out only this browser, and then is where the page goes after. */
+export type SignOutOptions = { scope?: 'global' | 'local'; then?: string };
+
 interface SignOutContextValue {
   /** Signs out, after the account's waiting changes get a chance to go. */
   requestSignOut: () => void;
+  /** The same, signing out with these options. Kept apart so an onClick can't pass its event in. */
+  requestSignOutWith: (opts: SignOutOptions) => void;
   /** True while a sign-out is under way or waiting on an answer. */
   signingOut: boolean;
 }
@@ -35,7 +40,7 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
   // Changes the account refused while they were being sent before signing out.
   const [refusedNow, setRefusedNow] = useState(0);
   // The account being signed out, and a send still going when the wait ran out.
-  const leaving = useRef<{ userId: string; stillSending: Promise<void> | null } | null>(null);
+  const leaving = useRef<{ userId: string; stillSending: Promise<void> | null; opts?: SignOutOptions } | null>(null);
   // Each sign-out gets a number. Staying signed in moves it on, and a
   // sign-out whose number has moved on stops where it is.
   const flow = useRef(0);
@@ -61,12 +66,14 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
       busy.current = false;
       return;
     }
+    const then = left?.opts?.then ?? '/';
     try {
-      await signOut();
+      // If the server can't be reached, the page starts over at the same place.
+      await signOut({ scope: left?.opts?.scope, fallback: then });
     } finally {
       busy.current = false;
     }
-    navigate('/');
+    navigate(then);
     // A send still going when the account signed out can finish after, and
     // what it leaves goes too, unless the same account has signed back in.
     if (left?.stillSending) {
@@ -77,7 +84,7 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
     }
   }, [signOut, navigate, show]);
 
-  const requestSignOut = useCallback(() => {
+  const startSignOut = useCallback((opts?: SignOutOptions) => {
     const userId = signedInAs.current;
     if (!userId || busy.current) return;
     busy.current = true;
@@ -101,7 +108,7 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
           show(null);
           return;
         }
-        leaving.current = { userId, stillSending: result.stillSending };
+        leaving.current = { userId, stillSending: result.stillSending, opts };
         // Changes the account refused just now were dropped, and signing out
         // would clear the note that says so. So the account hears about them
         // first, with the choice to stay and check the stack.
@@ -148,7 +155,11 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
     if (left) void qc.invalidateQueries({ queryKey: ['holdings', left.userId] });
   }, [qc, show]);
 
-  const value = useMemo(() => ({ requestSignOut, signingOut: phase !== null }), [requestSignOut, phase]);
+  const requestSignOut = useCallback(() => startSignOut(), [startSignOut]);
+  const value = useMemo(
+    () => ({ requestSignOut, requestSignOutWith: startSignOut, signingOut: phase !== null }),
+    [requestSignOut, startSignOut, phase],
+  );
   const one = waiting === 1;
 
   return (

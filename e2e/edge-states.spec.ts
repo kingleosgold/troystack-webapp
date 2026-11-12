@@ -590,6 +590,30 @@ test.describe('signing out', () => {
     expect(await keysFor(page)).toEqual([false, false]);
   });
 
+  test("a new reset link asks first when changes can't be sent, and signing out lands on the forgot form", async ({ page }) => {
+    await signIn(page, { once: true });
+    const mock = await mockBackends(page, { authFails: { updateUser: 'reauth-needed' } });
+    await addWhileOffline(page, mock);
+    await goInApp(page, '/reset-password');
+    await page.getByLabel('New password', { exact: true }).fill('a longer password');
+    await page.getByLabel('New password again').fill('a longer password');
+    await page.getByRole('button', { name: 'Save my new password' }).click();
+    await page.getByRole('button', { name: 'Get a new link' }).click();
+    const ask = page.getByRole('dialog', { name: 'Sign out now?' });
+    await expect(ask.getByText("One change you made hasn't reached your account yet. If you sign out, it's dropped from this browser.")).toBeVisible();
+    await ask.getByRole('button', { name: 'Stay signed in' }).click();
+    await expect(ask).toBeHidden();
+    await expect(page).toHaveURL(/\/reset-password$/);
+    expect((await keysFor(page))[0], 'the waiting change is still here').toBe(true);
+    await expect(page.getByLabel('New password', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Save my new password' }).click();
+    await page.getByRole('button', { name: 'Get a new link' }).click();
+    await page.getByRole('dialog', { name: 'Sign out now?' }).getByRole('button', { name: 'Sign out anyway' }).click();
+    await expect(page).toHaveURL(/\/auth\?mode=forgot/);
+    await expect(page.getByRole('button', { name: 'Send the link' })).toBeVisible();
+  });
+
   test("asks first when changes can't be sent, and staying keeps them", async ({ page }) => {
     await signIn(page);
     const mock = await mockBackends(page);
