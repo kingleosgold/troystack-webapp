@@ -1325,6 +1325,19 @@ test.describe('the policies without JavaScript', () => {
   }
 });
 
+// Serves matching pages with the given robots tag in place of any the build
+// wrote, so a page never carries two.
+async function serveRobotsTag(page: Page, match: (u: URL) => boolean, content: string) {
+  await page.route(match, async (route) => {
+    if (route.request().resourceType() !== 'document') return route.fallback();
+    const response = await route.fetch();
+    const body = (await response.text())
+      .replace(/\s*<meta name="robots"[^>]*>/g, '')
+      .replace('</head>', `<meta name="robots" content="${content}" /></head>`);
+    await route.fulfill({ response, body });
+  });
+}
+
 // The server's robots tag stands while a Signal item loads and when a load
 // fails for a reason that may pass. Only a 404 is noindex. An in-app move gets
 // the tag the server sent with the first page, never the last page's.
@@ -1333,15 +1346,7 @@ test('a Signal item keeps the server\'s robots tag while it loads or fails and w
   const robots = page.locator('meta[name="robots"]');
   // Stands in for the tag the server writes into a Signal item's page, which
   // the preview build doesn't do.
-  await page.route(
-    (u) => u.pathname.startsWith('/signal/'),
-    async (route) => {
-      if (route.request().resourceType() !== 'document') return route.fallback();
-      const response = await route.fetch();
-      const body = (await response.text()).replace('</head>', '<meta name="robots" content="server" /></head>');
-      await route.fulfill({ response, body });
-    },
-  );
+  await serveRobotsTag(page, (u) => u.pathname.startsWith('/signal/'), 'server');
 
   // Nothing touches the server's tag while the item loads. Once it loads, the
   // item writes its own.
@@ -1405,6 +1410,34 @@ test('a Signal item keeps the server\'s robots tag while it loads or fails and w
   await expect(page).toHaveURL(/\/signal\/flaky-500$/);
   await expect(page.getByText("This piece didn't load.")).toBeVisible({ timeout: 15_000 });
   await expect(robots).toHaveAttribute('content', 'server');
+});
+
+// A first page the server sent as noindex, like a missing page, doesn't hand
+// its tag to a Signal item opened in the app whose load fails.
+test('a failed Signal item opened in the app drops a noindex the first page came with', async ({ page }) => {
+  await mockBackends(page);
+  const robots = page.locator('meta[name="robots"]');
+  await serveRobotsTag(page, (u) => u.pathname === '/no-such-page', 'noindex, follow');
+  await page.goto('/no-such-page');
+  await expect(page.getByRole('heading', { name: "That page isn't here" })).toBeVisible();
+  await expect(robots).toHaveCount(1);
+  await expect(robots).toHaveAttribute('content', 'noindex, follow');
+
+  const asks: string[] = [];
+  await page.route(
+    (u) => u.pathname === '/v1/stack-signal/flaky-after-404',
+    (route) => {
+      asks.push(route.request().url());
+      return route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
+    },
+  );
+  await page.evaluate(() => {
+    history.pushState({}, '', '/signal/flaky-after-404');
+    dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect.poll(() => asks.length, { timeout: 15_000 }).toBe(2);
+  await expect(page.getByText("This piece didn't load.")).toBeVisible();
+  await expect(robots).toHaveCount(0);
 });
 
 // Links from the old troystack.com, like /privacy#third-party-services, land on their section.
