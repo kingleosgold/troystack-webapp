@@ -54,6 +54,29 @@ test('a guest on a computer sees the free week beside the list', async ({ page }
   await expect(card(page).getByRole('button', { name: 'Try Gold free for a week' })).toBeVisible();
 });
 
+test("the sheet opened beside the list counts its view and the plan picked, under the list's campaign", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the iPhone keeps the App Store button');
+  await mockBackends(page);
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
+  await page.goto('/signal');
+  await card(page).getByRole('button', { name: 'Try Gold free for a week' }).click();
+  await expect.poll(() => steps.length).toBe(1);
+  await page.getByRole('dialog').getByRole('button', { name: 'Start my free week' }).click();
+  await expect(page).toHaveURL(/\/auth\?redirect=checkout&plan=yearly/);
+  // A second open of the sheet is a second view.
+  await page.goBack();
+  await card(page).getByRole('button', { name: 'Try Gold free for a week' }).click();
+  await expect.poll(() => steps.length).toBe(3);
+  expect(steps).toEqual([
+    { step: 'gold_view', campaign: 'webapp-signal-list' },
+    { step: 'plan_tap', plan: 'yearly', campaign: 'webapp-signal-list' },
+    { step: 'gold_view', campaign: 'webapp-signal-list' },
+  ]);
+});
+
 for (const tier of ['gold', 'lifetime'] as const) {
   test(`an account with ${tier} isn't offered Gold beside the list`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'the iPhone never sees the free week here');

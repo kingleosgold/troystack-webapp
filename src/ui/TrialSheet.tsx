@@ -10,6 +10,7 @@ import { GOLD_FEATURES } from '../lib/gold';
 import { stillSignedInAs } from '../lib/account';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
+import { countStep } from '../lib/funnel';
 
 
 interface Props {
@@ -80,8 +81,16 @@ function WebCheckout({
     onPlanChange?.(plan);
   }, [plan, onPlanChange]);
 
+  // The Gold page counts its own taps and opens the sheet with the plan
+  // picked. Opened anywhere else, the sheet is where the plan is picked, so
+  // it counts the pick, once a plan for each opening.
+  const counted = useRef(new Set<WebPlan>());
   const go = async () => {
     setError(null);
+    if (!initialPlan && !counted.current.has(plan)) {
+      counted.current.add(plan);
+      countStep('plan_tap', plan, campaign);
+    }
     if (!user) {
       rememberCheckout(plan, campaign);
       onClose();
@@ -228,6 +237,14 @@ export function TrialSheet({ open, onClose, reason, campaign, plan, start = fals
   // What checkout said is in the way, for the account it said it about. It
   // stays until the sheet closes.
   const [blocked, setBlocked] = useState<{ userId: string; block: Blocked } | null>(null);
+  // Each opening mounts a fresh sheet. One opened from anywhere but the Gold
+  // page counts as a view of the plans under that surface's campaign, so the
+  // funnel shows which part of the site sends people to Gold. The Gold page
+  // already counted its own view.
+  useEffect(() => {
+    if (open && !plan && !isGold) countStep('gold_view', null, campaign);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per opening, under the campaign it opened with
+  }, []);
   const block = blocked && blocked.userId === user?.id ? blocked.block : null;
   const close = () => {
     setBlocked(null);
