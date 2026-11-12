@@ -274,6 +274,8 @@ export default function Settings() {
       setNewEmail('');
       setNewPassword('');
       setBanner({ tone: 'up', text: emailChanged ? 'Check both inboxes to confirm the new email.' : 'Your password is updated.' });
+    } catch {
+      if (stillSignedInAs(owner)) setCredsError('Something went wrong. Try again in a moment.');
     } finally {
       credsSaving.current = false;
       setSavingCreds(false);

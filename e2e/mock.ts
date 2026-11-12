@@ -16,7 +16,7 @@ export const MESSAGES_PATH = /^\/v1\/troy\/conversations\/[^/]+\/messages$/;
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-headers': '*',
-  'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+  'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
 };
 
 export interface MockOptions {
@@ -152,8 +152,9 @@ function fulfillAuthFailure(route: Route, why: AuthFailure) {
   if (why === 'rate-limited') return fulfillAuthError(route, 429, 'over_request_rate_limit', 'Request rate limit reached');
   if (why === 'email-rate-limited') return fulfillAuthError(route, 429, 'over_email_send_rate_limit', 'email rate limit exceeded');
   if (why === 'unconfirmed') return fulfillAuthError(route, 400, 'email_not_confirmed', 'Email not confirmed');
-  // A rate limit from a proxy in front of Supabase, as plain text rather than JSON.
-  if (why === 'rate-limited-bare') return route.fulfill({ status: 429, body: 'Too Many Requests' });
+  // A rate limit from a proxy in front of Supabase, as plain text rather than JSON, with CORS so the page sees it.
+  // Without CORS a real browser blocks it and it reads as a dropped connection, like 'outage'.
+  if (why === 'rate-limited-bare') return route.fulfill({ status: 429, headers: { ...CORS, 'content-type': 'text/plain' }, body: 'Too Many Requests' });
   return route.fulfill({ status: 503, headers: CORS, body: '' });
 }
 

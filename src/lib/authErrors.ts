@@ -28,5 +28,19 @@ export function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string
   if (!err.status || err.status === 502 || err.status === 503 || err.status === 504) {
     return "Couldn't reach TroyStack. Check your connection and try again in a minute.";
   }
+  if (
+    err.name === 'AuthSessionMissingError' ||
+    err.code === 'session_not_found' ||
+    err.code === 'refresh_token_not_found' ||
+    err.code === 'session_expired'
+  ) {
+    return "You've been signed out. Sign in again, then try again.";
+  }
+  // supabase-js turns a JSON body with no message into "{}", which reads as nothing.
+  const words = err.message?.trim() ?? '';
+  if (!words || words === '{}' || words === '""') {
+    console.error('Auth failed with no message', err.name, err.status, err.code);
+    return 'Something went wrong on our side. Try again in a minute.';
+  }
   return err.message;
 }
