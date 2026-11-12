@@ -165,18 +165,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // refused ones, so a shared browser keeps no holding details and a later
       // sign-in doesn't send stale changes.
       if (userId) dropQueuedChanges(userId);
-      if (error) {
-        // The sign-out didn't reach the server, a dropped connection say, and
-        // the client keeps its session when that happens. This browser still
-        // signs out: the stored session goes and the page starts over, signed
-        // out. Other devices stay signed in until their session ends.
+    } catch {
+      // storage blocked, nothing kept here to clear
+    }
+    if (error) {
+      // The sign-out didn't reach the server, a dropped connection say, and
+      // the client keeps its session when that happens. This browser still
+      // signs out: the stored session goes and the page starts over, signed
+      // out. Other devices stay signed in until their session ends. The page
+      // starts over even when storage can't be read, so it never sits there
+      // looking signed out while the client still holds the session.
+      try {
         for (const key of Object.keys(localStorage)) {
           if (/^sb-.+-auth-token/.test(key)) localStorage.removeItem(key);
         }
-        window.location.assign(opts?.fallback ?? '/');
+      } catch {
+        // storage blocked, nothing kept here to clear
       }
-    } catch {
-      // storage blocked, nothing kept here to clear
+      window.location.assign(opts?.fallback ?? '/');
     }
     return { error };
   };

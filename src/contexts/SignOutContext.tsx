@@ -12,8 +12,12 @@ export type SignOutOptions = { scope?: 'global' | 'local'; then?: string };
 interface SignOutContextValue {
   /** Signs out, after the account's waiting changes get a chance to go. */
   requestSignOut: () => void;
-  /** The same, signing out with these options. Kept apart so an onClick can't pass its event in. */
-  requestSignOutWith: (opts: SignOutOptions) => void;
+  /**
+   * The same, signing out with these options. Kept apart so an onClick can't
+   * pass its event in. It settles true once this browser signed out, and false
+   * when the sign-out ended without that, as when they chose to stay.
+   */
+  requestSignOutWith: (opts: SignOutOptions) => Promise<boolean>;
   /** True while a sign-out is under way or waiting on an answer. */
   signingOut: boolean;
 }
@@ -46,6 +50,13 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
   const flow = useRef(0);
   // True from a request until its sign-out ends, however it ends.
   const busy = useRef(false);
+  // Settles the sign-out under way, true once this browser signed out.
+  const outcome = useRef<((signedOut: boolean) => void) | null>(null);
+  const settle = useCallback((signedOut: boolean) => {
+    const done = outcome.current;
+    outcome.current = null;
+    done?.(signedOut);
+  }, []);
   const signedInAs = useRef<string | null>(user?.id ?? null);
   useEffect(() => {
     signedInAs.current = user?.id ?? null;
@@ -64,15 +75,22 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
     // signing out. Signing out now would sign out the new one, so it stops.
     if (left && signedInAs.current !== left.userId) {
       busy.current = false;
+      settle(false);
       return;
     }
     const then = left?.opts?.then ?? '/';
     try {
       // If the server can't be reached, the page starts over at the same place.
       await signOut({ scope: left?.opts?.scope, fallback: then });
+    } catch (e) {
+      // A sign-out that threw may not have signed out, so the page stays put.
+      console.error('signing out failed', e);
+      settle(false);
+      return;
     } finally {
       busy.current = false;
     }
+    settle(true);
     navigate(then);
     // A send still going when the account signed out can finish after, and
     // what it leaves goes too, unless the same account has signed back in.
@@ -82,13 +100,16 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
         if (signedInAs.current !== userId) dropQueuedChanges(userId);
       });
     }
-  }, [signOut, navigate, show]);
+  }, [signOut, navigate, show, settle]);
 
-  const startSignOut = useCallback((opts?: SignOutOptions) => {
+  const startSignOut = useCallback((opts?: SignOutOptions): Promise<boolean> => {
     const userId = signedInAs.current;
-    if (!userId || busy.current) return;
+    if (!userId || busy.current) return Promise.resolve(false);
     busy.current = true;
     const me = ++flow.current;
+    const settled = new Promise<boolean>((resolve) => {
+      outcome.current = resolve;
+    });
     void (async () => {
       // Once it asks, the answer ends the sign-out, not this.
       let asking = false;
@@ -106,6 +127,7 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
           // Another account signed in while the changes went, so this
           // sign-out is over and the new account stays signed in.
           show(null);
+          settle(false);
           return;
         }
         leaving.current = { userId, stillSending: result.stillSending, opts };
@@ -123,12 +145,16 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
         await finish();
       } catch (e) {
         console.error('signing out failed', e);
-        if (flow.current === me) show(null);
+        if (flow.current === me) {
+          show(null);
+          settle(false);
+        }
       } finally {
         if (flow.current === me && !asking) busy.current = false;
       }
     })();
-  }, [finish, qc, show]);
+    return settled;
+  }, [finish, qc, show, settle]);
 
   // Another account signing in ends a sign-out waiting on an answer for the
   // one before it.
@@ -139,8 +165,9 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
       flow.current += 1;
       busy.current = false;
       show(null);
+      settle(false);
     }
-  }, [user, show]);
+  }, [user, show, settle]);
 
   // Closing the sheet, or choosing to stay, keeps the account signed in and
   // ends this sign-out, so the next one can start right away.
@@ -151,11 +178,14 @@ export function SignOutProvider({ children }: { children: ReactNode }) {
     flow.current += 1;
     busy.current = false;
     show(null);
+    settle(false);
     // Whatever did go out shows once the stack is read again.
     if (left) void qc.invalidateQueries({ queryKey: ['holdings', left.userId] });
-  }, [qc, show]);
+  }, [qc, show, settle]);
 
-  const requestSignOut = useCallback(() => startSignOut(), [startSignOut]);
+  const requestSignOut = useCallback(() => {
+    void startSignOut();
+  }, [startSignOut]);
   const value = useMemo(
     () => ({ requestSignOut, requestSignOutWith: startSignOut, signingOut: phase !== null }),
     [requestSignOut, startSignOut, phase],
