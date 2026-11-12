@@ -28,6 +28,8 @@ export function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string
   if (!err.status || err.status === 502 || err.status === 503 || err.status === 504) {
     return "Couldn't reach TroyStack. Check your connection and try again in a minute.";
   }
+  // A fallback. Settings and the reset page usually see the sign-out first and show nothing,
+  // since supabase-js drops the session before it hands back this error.
   if (
     err.name === 'AuthSessionMissingError' ||
     err.code === 'session_not_found' ||
