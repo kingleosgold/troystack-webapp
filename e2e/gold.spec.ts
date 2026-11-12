@@ -164,7 +164,14 @@ test('someone who already has an account and types it into the sign-up form is s
 });
 
 test("an existing account whose password doesn't match lands on sign-in with the email kept", async ({ page }) => {
+  // 'other' is also what an Apple or Google account answers, since it has no password.
   await mockBackends(page, { existingAccount: 'other' });
+  const checkouts: unknown[] = [];
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/stripe/create-checkout-session') && r.method() === 'POST') checkouts.push(r.postDataJSON());
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
   await page.goto('/auth?redirect=checkout&plan=yearly');
   await page.getByLabel('Email').fill('app-user@example.com');
   await page.getByLabel('Password', { exact: true }).fill('not-their-password');
@@ -175,6 +182,28 @@ test("an existing account whose password doesn't match lands on sign-in with the
   await expect(page.getByLabel('Password', { exact: true })).toHaveValue('');
   await expect(page.getByRole('button', { name: 'Forgot password?' })).toBeVisible();
   await expect(page.getByText('User already registered')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continue with Apple' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeVisible();
+  expect(checkouts).toHaveLength(0);
+  expect(steps.map((s) => s.step)).not.toContain('signup');
+});
+
+test('a rate limit on the existing-account sign-in shows the real reason and keeps the password', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'rate-limited' });
+  const checkouts: unknown[] = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/stripe/create-checkout-session') && r.method() === 'POST') checkouts.push(r.postDataJSON());
+  });
+  await page.goto('/auth?redirect=checkout&plan=yearly');
+  await page.getByLabel('Email').fill('app-user@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('their-app-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('alert')).toHaveText(/rate limit/i);
+  await expect(page.getByRole('alert')).not.toHaveText(/already an account/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in to get Gold');
+  await expect(page.getByLabel('Email')).toHaveValue('app-user@example.com');
+  await expect(page.getByLabel('Password', { exact: true })).toHaveValue('their-app-password');
+  expect(checkouts).toHaveLength(0);
 });
 
 test('the Gold page counts the view, the plan tap and the sign-up, and nothing about who', async ({ page }) => {

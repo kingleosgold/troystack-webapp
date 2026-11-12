@@ -118,9 +118,11 @@ export interface MockOptions {
   syncRestoresGold?: boolean;
   /**
    * The email already has an account, so sign-up is refused the way Supabase
-   * refuses it. 'same-password' signs in with the password typed, 'other' doesn't.
+   * refuses it. 'same-password' signs in with the password typed, 'other'
+   * doesn't (as for an account made with Apple or Google, which has no
+   * password), and 'rate-limited' refuses the sign-in for too many tries.
    */
-  existingAccount?: 'same-password' | 'other';
+  existingAccount?: 'same-password' | 'other' | 'rate-limited';
 }
 
 /** The API's words for each reason checkout gives on a 409. */
@@ -133,6 +135,24 @@ const CHECKOUT_REFUSALS: Record<string, string> = {
 
 function fulfillJson(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, headers: { ...CORS, 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
+}
+
+/**
+ * An auth error the way Supabase sends one. The API version header is what
+ * makes supabase-js read the error's code, so the page sees err.code as it
+ * does in production rather than only the message.
+ */
+function fulfillAuthError(route: Route, status: number, code: string, msg: string) {
+  return route.fulfill({
+    status,
+    headers: {
+      ...CORS,
+      'access-control-expose-headers': 'x-supabase-api-version',
+      'x-supabase-api-version': '2024-01-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ code, msg }),
+  });
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -428,12 +448,13 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (url.pathname.startsWith('/auth/v1/user')) return fulfillJson(route, sessionUser());
     // Email and password sign-in on the page itself, with no reload.
     if (url.pathname === '/auth/v1/token' && req.method() === 'POST') {
-      if (opts.existingAccount === 'other') return fulfillJson(route, { code: 'invalid_credentials', msg: 'Invalid login credentials' }, 400);
+      if (opts.existingAccount === 'other') return fulfillAuthError(route, 400, 'invalid_credentials', 'Invalid login credentials');
+      if (opts.existingAccount === 'rate-limited') return fulfillAuthError(route, 429, 'over_request_rate_limit', 'Request rate limit reached');
       return fulfillJson(route, sessionFor());
     }
     // A new email account gets its session at once, as production confirms email sign-ups.
     if (url.pathname === '/auth/v1/signup' && req.method() === 'POST') {
-      if (opts.existingAccount) return fulfillJson(route, { code: 'user_already_exists', msg: 'User already registered' }, 422);
+      if (opts.existingAccount) return fulfillAuthError(route, 422, 'user_already_exists', 'User already registered');
       return fulfillJson(route, sessionFor());
     }
     if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204, headers: CORS });
