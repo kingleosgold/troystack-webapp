@@ -1325,8 +1325,9 @@ test.describe('the policies without JavaScript', () => {
   }
 });
 
-// The server's robots tag stands while a Signal item loads. A failed load is noindex.
-test('a Signal item leaves robots alone while it loads and writes noindex if it fails', async ({ page }) => {
+// The server's robots tag stands while a Signal item loads and when a load
+// fails for a reason that may pass. Only a 404 is noindex.
+test('a Signal item leaves robots alone while it loads or fails and writes noindex on a 404', async ({ page }) => {
   await mockBackends(page);
   const robots = page.locator('meta[name="robots"]');
   // An indexable page first, so the tag holds index, follow before the item opens.
@@ -1342,13 +1343,29 @@ test('a Signal item leaves robots alone while it loads and writes noindex if it 
   await expect.poll(() => held.seen.length).toBeGreaterThan(0);
   await expect(robots).toHaveAttribute('content', 'server');
   held.release();
+  // Once it loads, the item writes its own tag.
+  await expect(robots).not.toHaveAttribute('content', 'server');
 
-  await page.route((u) => u.pathname.startsWith('/v1/stack-signal/missing'), (route) => route.fulfill({ status: 500, body: '{}' }));
+  // A 429 or 500 is a bad moment, not a missing page, so a crawler that hits
+  // one doesn't drop a recap from the index.
+  for (const status of [429, 500]) {
+    await page.evaluate(() => document.querySelector('meta[name="robots"]')?.setAttribute('content', 'server'));
+    await page.route((u) => u.pathname === `/v1/stack-signal/flaky-${status}`, (route) => route.fulfill({ status, contentType: 'application/json', body: '{}' }));
+    await page.evaluate((s) => {
+      history.pushState({}, '', `/signal/flaky-${s}`);
+      dispatchEvent(new PopStateEvent('popstate'));
+    }, status);
+    await expect(page.getByText("This piece didn't load.")).toBeVisible({ timeout: 15_000 });
+    await expect(robots).toHaveAttribute('content', 'server');
+  }
+
+  await page.route((u) => u.pathname.startsWith('/v1/stack-signal/missing'), (route) => route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"Not found"}' }));
   await page.evaluate(() => {
     history.pushState({}, '', '/signal/missing-item');
     dispatchEvent(new PopStateEvent('popstate'));
   });
-  await expect(robots).toHaveAttribute('content', 'noindex, follow', { timeout: 15_000 });
+  await expect(page.getByText("That piece isn't here anymore")).toBeVisible({ timeout: 15_000 });
+  await expect(robots).toHaveAttribute('content', 'noindex, follow');
 });
 
 // Links from the old troystack.com, like /privacy#third-party-services, land on their section.
