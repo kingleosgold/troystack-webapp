@@ -10,7 +10,7 @@ import { GOLD_FEATURES } from '../lib/gold';
 import { stillSignedInAs } from '../lib/account';
 import { useAuth } from '../contexts/AuthContext';
 import { useSubscription } from '../hooks/useSubscription';
-import { countStep } from '../lib/funnel';
+import { appCampaign, countStep } from '../lib/funnel';
 
 
 interface Props {
@@ -249,7 +249,7 @@ export function TrialSheet({ open, onClose, reason, campaign, plan, start = fals
   useEffect(() => {
     if (!open || plan || checking || isGold || viewed.current) return;
     viewed.current = true;
-    countStep('gold_view', null, cardFirst ? campaign : `${campaign}-app`);
+    countStep('gold_view', null, cardFirst ? campaign : appCampaign(campaign));
   }, [open, plan, checking, isGold, cardFirst, campaign]);
   const openCardOnIphone = () => {
     setShowWebOnIphone(true);

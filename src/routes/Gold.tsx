@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { useSubscription } from '../hooks/useSubscription';
 import { useTrial } from '../contexts/TrialContext';
+import { useAuth } from '../contexts/AuthContext';
 import SEO from '../lib/seo.json';
 import { GOLD } from '../lib/appStore';
 import { backedOutPlan, goldPagePlans, rememberGoldTap, siteCampaign, webCheckoutReady, type WebPlan } from '../lib/checkout';
-import { countStep } from '../lib/funnel';
+import { appCampaign, countStep } from '../lib/funnel';
 import { FREE_FEATURES, GOLD_FEATURES } from '../lib/gold';
 import { cx } from '../lib/cx';
 import { Button, Card } from '../ui/primitives';
@@ -24,7 +25,8 @@ const QUESTIONS = [
 
 export default function Gold() {
   usePageMeta({ ...SEO['/gold'], canonical: '/gold' });
-  const { isGold, tier, loading } = useSubscription();
+  const { user, loading: authLoading, sessionUnreadable } = useAuth();
+  const { isGold, tier, loading, unreadable } = useSubscription();
   const { openTrial } = useTrial();
   // A visitor from one of troystack.com's links keeps that page's site-* token
   // through the counts and checkout, so the funnel shows which page sent them.
@@ -43,15 +45,26 @@ export default function Gold() {
     openTrial({ campaign, plan, start: webCheckoutReady(plan) });
   };
   useEffect(() => {
-    if (tappedBefore === undefined) countStep('gold_view', null, campaign);
     // back=1 is for this landing only, so a reload or a shared link counts.
     if (params.has('back')) {
       const next = new URLSearchParams(params);
       next.delete('back');
       setParams(next, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one view per visit, under the token it landed with
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per landing
   }, []);
+  // One view per visit, under the token it landed with, counted the way the
+  // plan sheet counts. It waits until sign-in and the plan are known, so a
+  // Gold account isn't counted. A session or plan that can't be read still
+  // counts, since the page showed its plans. Where checkout can't run here the
+  // plans send people to the app, so the view counts under -app.
+  const viewed = useRef(false);
+  const known = (!authLoading && !(user && loading)) || sessionUnreadable || unreadable;
+  useEffect(() => {
+    if (viewed.current || tappedBefore !== undefined || !known || isGold) return;
+    viewed.current = true;
+    countStep('gold_view', null, webCheckoutReady() ? campaign : appCampaign(campaign));
+  }, [known, isGold, tappedBefore, campaign]);
   const plans = goldPagePlans();
 
   return (

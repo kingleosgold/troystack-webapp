@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { countStep, isAutomated } from './funnel';
+import { appCampaign, countStep, isAutomated } from './funnel';
 
 const CHROME = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36';
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
@@ -70,5 +70,23 @@ describe('countStep', () => {
     countStep('plan_tap', 'yearly', 'webapp-gold');
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(JSON.parse((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ step: 'plan_tap', plan: 'yearly', campaign: 'webapp-gold' });
+  });
+});
+
+describe('appCampaign', () => {
+  it('puts -app on a campaign', () => {
+    expect(appCampaign('webapp-settings')).toBe('webapp-settings-app');
+  });
+
+  it('cuts the longest site token to fit the API limit of 40', () => {
+    const longest = `site-${'a'.repeat(32)}`;
+    const out = appCampaign(longest);
+    expect(out.length).toBeLessThanOrEqual(40);
+    expect(out).toMatch(/^[a-z0-9-]{1,40}$/);
+    expect(out).toBe(`site-${'a'.repeat(31)}-app`);
+  });
+
+  it('never leaves a doubled dash where the cut lands', () => {
+    expect(appCampaign(`site-${'a'.repeat(30)}-b`)).toBe(`site-${'a'.repeat(30)}-app`);
   });
 });

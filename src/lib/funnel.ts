@@ -33,3 +33,12 @@ export function countStep(step: FunnelStep, plan?: WebPlan | null, campaign?: st
     // fetch missing or refused; the page goes on
   }
 }
+
+/**
+ * The campaign a view counts under when the plans showed the app first rather
+ * than card checkout. The API keeps campaigns to 40 characters, so a long
+ * site-* token is cut to fit before -app goes on.
+ */
+export function appCampaign(campaign: string): string {
+  return `${campaign.slice(0, 36).replace(/-+$/, '')}-app`;
+}
