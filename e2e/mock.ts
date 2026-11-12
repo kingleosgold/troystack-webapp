@@ -125,7 +125,7 @@ export interface MockOptions {
    */
   existingAccount?: 'same-password' | 'other' | 'rate-limited' | 'outage';
   /** How the plain sign-in, sign-up and reset calls fail, each on its own. */
-  authFails?: Partial<Record<'signIn' | 'signUp' | 'recover', AuthFailure>>;
+  authFails?: Partial<Record<'signIn' | 'signUp' | 'recover' | 'updateUser', AuthFailure>>;
 }
 
 /** The API's words for each reason checkout gives on a 409. */
@@ -140,17 +140,19 @@ function fulfillJson(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, headers: { ...CORS, 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 }
 
-type AuthFailure = 'server-fault' | 'weak-password' | 'wrong-password' | 'rate-limited' | 'rate-limited-bare' | 'outage' | 'unconfirmed' | 'email-rate-limited';
+type AuthFailure = 'server-fault' | 'server-fault-html' | 'weak-password' | 'wrong-password' | 'rate-limited' | 'rate-limited-bare' | 'outage' | 'unconfirmed' | 'email-rate-limited';
 
 /** Answers an auth call the way Supabase does when it fails for this reason. */
 function fulfillAuthFailure(route: Route, why: AuthFailure) {
   if (why === 'server-fault') return fulfillAuthError(route, 500, 'unexpected_failure', 'Database error saving new user');
+  // A 500 from a proxy or the platform that answers with an HTML page, not JSON.
+  if (why === 'server-fault-html') return route.fulfill({ status: 500, headers: { ...CORS, 'content-type': 'text/html' }, body: '<html><body>Internal Server Error</body></html>' });
   if (why === 'weak-password') return fulfillAuthError(route, 422, 'weak_password', 'Password should be at least 8 characters.');
   if (why === 'wrong-password') return fulfillAuthError(route, 400, 'invalid_credentials', 'Invalid login credentials');
   if (why === 'rate-limited') return fulfillAuthError(route, 429, 'over_request_rate_limit', 'Request rate limit reached');
   if (why === 'email-rate-limited') return fulfillAuthError(route, 429, 'over_email_send_rate_limit', 'email rate limit exceeded');
   if (why === 'unconfirmed') return fulfillAuthError(route, 400, 'email_not_confirmed', 'Email not confirmed');
-  // A rate limit from a proxy in front of Supabase, with no JSON and no CORS headers, so the browser hides it.
+  // A rate limit from a proxy in front of Supabase, as plain text rather than JSON.
   if (why === 'rate-limited-bare') return route.fulfill({ status: 429, body: 'Too Many Requests' });
   return route.fulfill({ status: 503, headers: CORS, body: '' });
 }
@@ -462,6 +464,9 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
         return fulfillJson(route, row ? [row] : [], 200);
       }
       return fulfillJson(route, [], 200);
+    }
+    if (url.pathname.startsWith('/auth/v1/user') && req.method() === 'PUT' && opts.authFails?.updateUser) {
+      return fulfillAuthFailure(route, opts.authFails.updateUser);
     }
     if (url.pathname.startsWith('/auth/v1/user')) return fulfillJson(route, sessionUser());
     // Email and password sign-in on the page itself, with no reload.
