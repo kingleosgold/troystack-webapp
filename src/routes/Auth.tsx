@@ -7,6 +7,7 @@ import { countStep } from '../lib/funnel';
 import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { Button, Field, Input } from '../ui/primitives';
 import { NewTabNote } from '../ui/NewTabNote';
+import { authTrouble, type AuthErr } from '../lib/authErrors';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
@@ -41,32 +42,6 @@ const EXISTING_ACCOUNT =
 /** Supabase refuses a sign-up for an email that already has an account. */
 function isExistingAccount(err: AuthErr): boolean {
   return err.code === 'user_already_exists' || /already registered/i.test(err.message);
-}
-
-type AuthErr = { code?: string; message: string; status?: number };
-
-/**
- * Plain words for an auth call that failed for a reason other than the
- * password. supabase-js reports an outage as "{}" and a dropped connection as
- * "Failed to fetch", both with no status. A 429 that comes back without CORS
- * headers looks the same, so that line holds for a rate limit too.
- */
-function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string {
-  // Checked before the status, since Supabase sends this one as a 429 too.
-  // GoTrue also sends this for its project-wide email cap and its resend guard,
-  // so the words don't promise anything about this one address.
-  if (err.code === 'over_email_send_rate_limit') return "We've sent a lot of emails just now. Wait a few minutes, then try again.";
-  if (err.code === 'email_not_confirmed') return 'Confirm your email first. Tap the link we sent you, then sign in.';
-  if (err.status === 429 || err.code === 'over_request_rate_limit') return `Too many tries just now. Wait a minute, then ${then}.`;
-  if (!err.status || err.status === 502 || err.status === 503 || err.status === 504) {
-    return "Couldn't reach TroyStack. Check your connection and try again in a minute.";
-  }
-  if (err.status >= 500) {
-    // A fault that won't clear on a retry, so keep the real reason where we can find it.
-    console.error('Auth failed on the server', err.status, err.code, err.message);
-    return 'Something went wrong on our side. Try again later.';
-  }
-  return err.message;
 }
 
 /** The password typed doesn't match, as against a rate limit or a dropped connection. */
@@ -193,7 +168,7 @@ export default function Auth() {
   const oauth = async (provider: 'google' | 'apple') => {
     setError(null);
     const { error: err } = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
-    if (err) setError(err.message);
+    if (err) setError(authTrouble(err, 'try again'));
   };
 
   return (

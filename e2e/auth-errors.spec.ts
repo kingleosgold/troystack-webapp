@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mockBackends } from './mock';
+import { mockBackends, signIn } from './mock';
 
 // Every way the sign-in, sign-up and reset forms can fail shows plain words,
 // never Supabase's own text or the "{}" supabase-js gives for an outage.
 
 const OUTAGE = "Couldn't reach TroyStack. Check your connection and try again in a minute.";
+const NOT_JSON = 'Something went wrong on our side. Try again in a minute.';
 
 async function signInWith(page: Page, password = 'typed-password') {
   await page.goto('/auth?mode=signin');
@@ -40,10 +41,10 @@ test('an outage on the sign-in form says so in plain words', async ({ page }) =>
   await expect(page.getByText('{}')).toHaveCount(0);
 });
 
-test('a rate limit the browser hides reads as a connection problem, since the page can\'t tell them apart', async ({ page }) => {
+test('a plain text rate limit from a proxy reads as our fault and asks for a minute', async ({ page }) => {
   await mockBackends(page, { authFails: { signIn: 'rate-limited-bare' } });
   await signInWith(page);
-  await expect(page.getByRole('alert')).toHaveText(OUTAGE);
+  await expect(page.getByRole('alert')).toHaveText(NOT_JSON);
 });
 
 test('an unconfirmed email on the sign-in form points to the link', async ({ page }) => {
@@ -99,4 +100,82 @@ test("Supabase's own words still show for a password that's too weak", async ({ 
   await mockBackends(page, { authFails: { signUp: 'weak-password' } });
   await signUpWith(page);
   await expect(page.getByRole('alert')).toHaveText('Password should be at least 8 characters.');
+});
+
+const OURS = 'Something went wrong on our side. Try again later.';
+
+async function forgotWith(page: Page) {
+  await page.goto('/auth?mode=forgot');
+  await page.getByLabel('Email').fill('someone@example.com');
+  await page.getByRole('button', { name: 'Send the link' }).click();
+}
+
+test('a fault on our side logs its reason for us to find', async ({ page }) => {
+  const logged: string[] = [];
+  page.on('console', (m) => { if (m.type() === 'error') logged.push(m.text()); });
+  await mockBackends(page, { authFails: { signUp: 'server-fault' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText(OURS);
+  await expect.poll(() => logged.some((t) => t.includes('Auth failed on the server') && t.includes('500'))).toBe(true);
+});
+
+test('a server error page that is HTML, not JSON, reads as our fault, not the connection', async ({ page }) => {
+  const logged: string[] = [];
+  page.on('console', (m) => { if (m.type() === 'error') logged.push(m.text()); });
+  await mockBackends(page, { authFails: { signIn: 'server-fault-html' } });
+  await signInWith(page);
+  await expect(page.getByRole('alert')).toHaveText(NOT_JSON);
+  await expect.poll(() => logged.some((t) => t.includes('Auth failed on the server') && t.includes('AuthUnknownError'))).toBe(true);
+});
+
+test('a rate limit on the forgot form says to wait and try again', async ({ page }) => {
+  await mockBackends(page, { authFails: { recover: 'rate-limited' } });
+  await forgotWith(page);
+  await expect(page.getByRole('alert')).toHaveText('Too many tries just now. Wait a minute, then try again.');
+});
+
+test('an outage on the forgot form says so in plain words', async ({ page }) => {
+  await mockBackends(page, { authFails: { recover: 'outage' } });
+  await forgotWith(page);
+  await expect(page.getByRole('alert')).toHaveText(OUTAGE);
+});
+
+test('an existing account whose email is unconfirmed points to the link', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signIn: 'unconfirmed' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText('Confirm your email first. Tap the link we sent you, then sign in.');
+});
+
+test('an outage while setting a new password from a reset link says so in plain words', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { authFails: { updateUser: 'outage' } });
+  await page.goto('/reset-password');
+  await page.getByLabel('New password', { exact: true }).fill('a longer password');
+  await page.getByLabel('New password again').fill('a longer password');
+  await page.getByRole('button', { name: /save|set|update/i }).click();
+  await expect(page.getByRole('alert')).toHaveText(OUTAGE);
+  await expect(page.getByText('{}')).toHaveCount(0);
+});
+
+test('an outage while changing the password in Settings says so in plain words', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { authFails: { updateUser: 'outage' } });
+  await page.goto('/settings');
+  await page.getByText('Email and password').click();
+  const sheet = page.getByRole('dialog', { name: /email (or|and) (a )?password/i });
+  await sheet.getByLabel('New password').fill('a longer password');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(sheet.getByText(OUTAGE)).toBeVisible();
+  await expect(page.getByText('{}')).toHaveCount(0);
+});
+
+test("a weak password in Settings keeps Supabase's own words", async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { authFails: { updateUser: 'weak-password' } });
+  await page.goto('/settings');
+  await page.getByText('Email and password').click();
+  const sheet = page.getByRole('dialog', { name: /email (or|and) (a )?password/i });
+  await sheet.getByLabel('New password').fill('a longer password');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(sheet.getByText('Password should be at least 8 characters.')).toBeVisible();
 });

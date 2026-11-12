@@ -21,6 +21,7 @@ import { downloadText } from '../lib/download';
 import { InstallPath } from '../ui/AppStore';
 import { NewTabNote } from '../ui/NewTabNote';
 import { Button, Field, Input, PageHeader, Segmented, Sheet } from '../ui/primitives';
+import { authTrouble } from '../lib/authErrors';
 
 /** What a checkout that didn't open leaves in the address for this page to say. */
 const CHECKOUT_NOTES = ['failed', 'have-gold', 'payment-issue', 'app-store', 'in-progress'];
@@ -267,12 +268,14 @@ export default function Settings() {
       const { error } = await updateEmailPassword(newEmail.trim(), newPassword);
       // Another account signed in while it saved, and the sheet went with the last one.
       if (!stillSignedInAs(owner)) return;
-      if (error) return setCredsError(error.message);
+      if (error) return setCredsError(authTrouble(error, 'try again'));
       credsSaving.current = false;
       setCredsOpen(false);
       setNewEmail('');
       setNewPassword('');
       setBanner({ tone: 'up', text: emailChanged ? 'Check both inboxes to confirm the new email.' : 'Your password is updated.' });
+    } catch {
+      if (stillSignedInAs(owner)) setCredsError('Something went wrong. Try again in a moment.');
     } finally {
       credsSaving.current = false;
       setSavingCreds(false);
