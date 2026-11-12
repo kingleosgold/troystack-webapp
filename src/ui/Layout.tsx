@@ -337,7 +337,7 @@ const TABS: NavItem[] = [
 
 function BottomTabs() {
   return (
-    <nav aria-label="Main" className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-line bg-bg-elev/95 backdrop-blur pb-safe">
+    <nav aria-label="Tabs" className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-line bg-bg-elev/95 backdrop-blur pb-safe">
       <ul className="grid grid-cols-5">
         {TABS.map((t) => (
           <li key={t.to}>
@@ -478,13 +478,18 @@ function isFullBleed(pathname: string): boolean {
   return pathname === '/troy' || pathname.startsWith('/troy/');
 }
 
+/** Pages whose form the phone's tab bar would sit over. */
+const FORM_PAGES = new Set(['/auth', '/reset-password']);
+
 /**
- * Sign-up and sign-in keep the phone's tab bar off, so it doesn't sit over the
- * form on a small screen or pull someone out halfway to checkout. The top bar
- * and its menu stay, so there's still a way back.
+ * Sign-up, sign-in and setting a new password keep the phone's tab bar off, so
+ * it doesn't sit over the form on a small screen or pull someone out halfway
+ * to checkout. The top bar and its menu stay, so there's still a way back. The
+ * router matches paths without regard to case, so this does too.
  */
 function hidesBottomTabs(pathname: string): boolean {
-  return isFullBleed(pathname) || pathname === '/auth' || pathname === '/auth/';
+  const path = pathname.toLowerCase().replace(/\/+$/, '') || '/';
+  return isFullBleed(pathname) || FORM_PAGES.has(path);
 }
 
 export default function AppShell() {

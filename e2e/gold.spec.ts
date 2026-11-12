@@ -434,18 +434,38 @@ test('a checkout link for a plan this site can\'t sell keeps the plain sign-up c
 test('an iPhone signing up for the free week sees the form with no tab bar over it', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'iphone', 'the tab bar only shows below the desktop width');
   await mockBackends(page);
-  const tabs = page.locator('nav[aria-label="Main"].fixed.bottom-0');
+  const tabs = page.getByRole('navigation', { name: 'Tabs' });
   await page.goto('/gold');
   await expect(tabs).toBeVisible();
   await page.goto('/auth?redirect=checkout&plan=yearly&mode=signup');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(tabs).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
-  // The top bar's menu is still there as a way back.
-  await expect(page.locator('div.sticky').first().getByRole('button').last()).toBeVisible();
+  // The top bar's menu is still there as a way back, and it opens.
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await expect(page.getByRole('link', { name: 'Gold' }).first()).toBeVisible();
   await page.goto('/auth?mode=signin');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(tabs).toHaveCount(0);
+  // The router takes /Auth too, and it gets the same page.
+  await page.goto('/Auth/?mode=signin');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(tabs).toHaveCount(0);
+  await page.goto('/reset-password');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Set a new password');
+  await expect(tabs).toHaveCount(0);
   await page.goto('/prices');
   await expect(tabs).toBeVisible();
+});
+
+test('an iPhone reaching sign-up from a button on the site sees no tab bar', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'the tab bar only shows below the desktop width');
+  await mockBackends(page);
+  const tabs = page.getByRole('navigation', { name: 'Tabs' });
+  await page.goto('/gold');
+  await expect(tabs).toBeVisible();
+  await page.getByLabel('Plans').getByRole('button', { name: 'Start free week' }).first().click();
+  await expect(page).toHaveURL(/\/auth/);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(tabs).toHaveCount(0);
 });
