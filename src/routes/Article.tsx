@@ -4,6 +4,7 @@ import { ArrowLeft, Check, ExternalLink, Share2 } from 'lucide-react';
 import { useArticle, usePodcast, useSignalFeed } from '../hooks/queries';
 import { usePageMeta } from '../hooks/usePageMeta';
 import { categoryLabel } from '../lib/signalApi';
+import { ApiError } from '../lib/apiClient';
 import { articleLd, jsonLdScript } from '../lib/structuredData';
 import { excerpt, formatDate, formatTimeET } from '../lib/text';
 import { money } from '../lib/format';
@@ -92,6 +93,7 @@ export default function Article() {
   const podcast = usePodcast();
   const a = article.data;
   const key = a?.slug || slug;
+  const missing = article.isError && article.error instanceof ApiError && article.error.status === 404;
 
   usePageMeta({
     title: a ? a.title : 'The Signal',
@@ -100,8 +102,10 @@ export default function Article() {
     canonical: key ? `/signal/${key}` : '/signal',
     image: a?.imageUrl || undefined,
     // Only Troy's recaps are indexed, as on troystack.com's Signal since April.
-    // While it loads, the server's tag stands. A failed load is noindex.
-    noindex: a ? !a.isDigest : article.isError ? true : null,
+    // While it loads, the server's tag stands, and so it does when the load
+    // fails for a reason that may pass, like a 429 or a 500, so a crawler's
+    // bad moment doesn't drop a recap from the index. Only a 404 is noindex.
+    noindex: a ? !a.isDigest : missing ? true : null,
   });
 
   const episode = useMemo(() => podcast.data?.episodes.find((e) => e.slug === key), [podcast.data, key]);
@@ -122,7 +126,7 @@ export default function Article() {
         </div>
       ) : article.isError || !a ? (
         <div className="mt-8">
-          {article.error && 'status' in article.error && (article.error as { status: number }).status === 404 ? (
+          {missing ? (
             <EmptyState title="That piece isn't here anymore" body="It may have been replaced by a newer take on the same story." action={<LinkButton to="/signal">Read the latest</LinkButton>} />
           ) : (
             <ErrorNote onRetry={() => article.refetch()}>This piece didn't load.</ErrorNote>
