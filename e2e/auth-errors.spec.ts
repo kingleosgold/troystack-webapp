@@ -244,7 +244,9 @@ test('a password change from an old reset link says to get a new link, not to si
   await page.getByRole('button', { name: /save|set|update/i }).click();
   await expect(page.getByRole('alert')).toHaveText('This reset link is too old to change your password now. Get a new link, then try again.');
   await expect(page.getByText('Sign out and back in')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Get a new link' })).toHaveAttribute('href', '/auth?mode=forgot');
+  await page.getByRole('button', { name: 'Get a new link' }).click();
+  await expect(page).toHaveURL(/\/auth\?mode=forgot/);
+  await expect(page.getByRole('button', { name: 'Send the link' })).toBeVisible();
 });
 
 test('a sign-up refused with email_exists still tries the password and lands on sign-in', async ({ page }) => {
@@ -260,8 +262,8 @@ test('a sign-up refused with email_exists still tries the password and lands on 
 test('a sign-up refused with email_exists signs in when the password matches', async ({ page }) => {
   await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'email-exists' } });
   await signUpWith(page);
+  await expect(page).not.toHaveURL(/\/auth/);
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await expect(page).not.toHaveURL(/mode=signup/);
 });
 
 test('a bad API key on sign-up reads as our fault and logs it', async ({ page }) => {

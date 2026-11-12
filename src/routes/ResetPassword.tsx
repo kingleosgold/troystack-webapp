@@ -11,7 +11,7 @@ const RESET_TOO_OLD = 'This reset link is too old to change your password now. G
 export default function ResetPassword() {
   usePageMeta({ title: 'Set a new password', canonical: '/reset-password', noindex: true });
   const navigate = useNavigate();
-  const { user, loading, updateEmailPassword } = useAuth();
+  const { user, loading, updateEmailPassword, signOut } = useAuth();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +31,17 @@ export default function ResetPassword() {
     const t = setTimeout(() => navigate('/', { replace: true }), 2000);
     return () => clearTimeout(t);
   }, [done, navigate]);
+
+  // The old reset link still holds a session, and the sign-in page sends anyone signed in
+  // home, so sign it out first or the forgot form never shows.
+  const newLink = async () => {
+    try {
+      await signOut();
+    } catch (e) {
+      console.error('Sign-out before a new reset link threw', e);
+    }
+    navigate('/auth?mode=forgot');
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -92,9 +103,9 @@ export default function ResetPassword() {
               </p>
             )}
             {error === RESET_TOO_OLD && (
-              <Link to="/auth?mode=forgot" className="inline-flex text-[13px] font-semibold text-fg underline underline-offset-2">
+              <button type="button" onClick={() => void newLink()} className="inline-flex text-[13px] font-semibold text-fg underline underline-offset-2">
                 Get a new link
-              </Link>
+              </button>
             )}
             <Button type="submit" size="lg" className="w-full" disabled={busy || !password}>
               {busy ? 'Saving' : 'Save my new password'}
