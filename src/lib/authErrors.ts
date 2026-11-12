@@ -25,9 +25,7 @@ export function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string
   if (err.code === 'over_email_send_rate_limit') return "We've sent a lot of emails just now. Wait a few minutes, then try again.";
   if (err.code === 'email_not_confirmed') return 'Confirm your email first. Tap the link we sent you, then sign in.';
   // Supabase asks for a fresh sign-in before a password change when the session is old.
-  if (err.code === 'reauthentication_needed' || err.code === 'reauthentication_not_valid') {
-    return 'Sign out and back in, then change your password.';
-  }
+  if (err.code === 'reauthentication_needed') return 'Sign out and back in, then change your password.';
   if (err.code === 'email_exists') return 'Another account already uses that email.';
   if (err.status === 429 || err.code === 'over_request_rate_limit') return `Too many tries just now. Wait a minute, then ${then}.`;
   if (err.name === 'AuthUnknownError') {
@@ -39,8 +37,10 @@ export function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string
     console.error('Auth failed on the server', err.name, err.status, err.code, err.message);
     return 'Something went wrong on our side. Try again later.';
   }
-  // A 401 with no code comes from the gateway, not Supabase Auth, as with a bad or
-  // rotated API key. Supabase's own 401s carry a code, so this one is ours to fix.
+  // A 401 with no code comes from the gateway in front of Supabase Auth, as with a bad or
+  // rotated API key. Hosted Supabase Auth sends a code on its own 401s, and supabase-js turns
+  // a lost session into a 400 AuthSessionMissingError, so neither lands here. An older
+  // self-hosted Auth that leaves the code off would read as our fault, which we accept.
   if (err.status === 401 && !err.code) {
     console.error('Auth failed on the server', err.name, err.status, err.code, err.message);
     return 'Something went wrong on our side. Try again later.';

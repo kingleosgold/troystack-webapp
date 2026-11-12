@@ -58,7 +58,6 @@ describe('authTrouble', () => {
   it('asks for a fresh sign-in when Supabase wants one before a password change', () => {
     const out = 'Sign out and back in, then change your password.';
     expect(authTrouble({ message: 'Password update requires reauthentication.', status: 400, code: 'reauthentication_needed' }, 'try again')).toBe(out);
-    expect(authTrouble({ message: 'Verification code is invalid', status: 400, code: 'reauthentication_not_valid' }, 'try again')).toBe(out);
   });
 
   it('says plainly when the new email is taken', () => {
@@ -73,10 +72,12 @@ describe('authTrouble', () => {
     expect(log).toHaveBeenCalledWith('Auth failed on the server', 'AuthApiError', 401, undefined, 'Invalid API key');
   });
 
-  it("keeps a coded 401's own handling", () => {
-    expect(authTrouble({ message: 'Session not found', status: 401, code: 'session_not_found' }, 'try again')).toBe(
-      "You've been signed out. Sign in again, then try again.",
+  it('leaves a 401 that Supabase Auth coded to its own words', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(authTrouble({ name: 'AuthApiError', message: 'This endpoint requires a Bearer token', status: 401, code: 'no_authorization' }, 'try again')).toBe(
+      'This endpoint requires a Bearer token',
     );
+    expect(log).not.toHaveBeenCalled();
   });
 
   it('says one fault line for a throw and logs what threw', () => {
