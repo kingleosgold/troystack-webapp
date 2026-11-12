@@ -43,7 +43,11 @@ export default function ResetPassword() {
   const [leaving, setLeaving] = useState(false);
   const newLink = () => {
     setLeaving(true);
-    requestSignOutWith({ scope: 'local', then: '/auth?mode=forgot' });
+    // If they chose to stay, or the sign-out ended some other way, the page
+    // goes back to what it shows for where things stand.
+    void requestSignOutWith({ scope: 'local', then: '/auth?mode=forgot' }).then((signedOut) => {
+      if (!signedOut) setLeaving(false);
+    });
   };
 
   const submit = async (e: FormEvent) => {

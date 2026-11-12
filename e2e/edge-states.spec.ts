@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { BRIEF_TEXT, FREE_USER_ID, mockBackends, SAMPLE_HOLDINGS, signIn, signInElsewhere, USER_ID } from './mock';
+import { BRIEF_TEXT, FREE_USER_ID, mockBackends, SAMPLE_HOLDINGS, signIn, signInElsewhere, signOutElsewhere, USER_ID } from './mock';
 
 // A value the site can't get says so, with a way to try again, instead of
 // reading as zero, as empty or as still loading. A plan it can't read yet is
@@ -615,6 +615,26 @@ test.describe('signing out', () => {
     expect(new URL((await logout).url()).searchParams.get('scope')).toBe('local');
     await expect(page).toHaveURL(/\/auth\?mode=forgot/);
     await expect(page.getByRole('button', { name: 'Send the link' })).toBeVisible();
+  });
+
+  test('a reset page whose sign-out they stayed out of says so when the browser signs out later', async ({ page }) => {
+    await signIn(page, { once: true });
+    const mock = await mockBackends(page, { authFails: { updateUser: 'reauth-needed' } });
+    await addWhileOffline(page, mock);
+    await goInApp(page, '/reset-password');
+    await page.getByLabel('New password', { exact: true }).fill('a longer password');
+    await page.getByLabel('New password again').fill('a longer password');
+    await page.getByRole('button', { name: 'Save my new password' }).click();
+    await page.getByRole('button', { name: 'Get a new link' }).click();
+    const ask = page.getByRole('dialog', { name: 'Sign out now?' });
+    await ask.getByRole('button', { name: 'Stay signed in' }).click();
+    await expect(ask).toBeHidden();
+    // Another tab signs this browser out. The page says where things stand,
+    // not that it's taking them somewhere.
+    await signOutElsewhere(page);
+    await expect(page.getByText("This browser signed out, so this reset link doesn't apply anymore.", { exact: false })).toBeVisible();
+    await expect(page.getByText('Taking you to a new link')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/reset-password$/);
   });
 
   test("asks first when changes can't be sent, and staying keeps them", async ({ page }) => {
