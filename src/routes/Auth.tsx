@@ -276,9 +276,10 @@ export default function Auth() {
             : `We sent a new link to ${resendFor}. Tap it, then sign in.`,
         );
         // The button goes away once it's sent, so focus moves on to the form,
-        // unless the person already moved it somewhere else.
+        // unless the person already moved it somewhere else. A click on the
+        // page itself lands on main, which counts as nowhere.
         const at = document.activeElement;
-        if (!at || at === document.body || at === resendRef.current) passwordRef.current?.focus();
+        if (!at || at === document.body || at === document.getElementById('main') || at === resendRef.current) passwordRef.current?.focus();
       }
     } catch (e) {
       if (mine === resendSeq.current) setError(authThrew(e));

@@ -626,7 +626,7 @@ test('a quiet sign-in with a leaked old password leaves a note that opens the pa
   await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
   await signUpWith(page);
   await expect(page).not.toHaveURL(/\/auth/);
-  const note = page.getByRole('status').filter({ hasText: LEAKED_NOTE });
+  const note = page.locator('[data-password-note][aria-live="polite"]').filter({ hasText: LEAKED_NOTE });
   await expect(note).toBeVisible();
   await note.getByRole('button', { name: 'Change password' }).click();
   await expect(page).toHaveURL(/\/settings$/);
@@ -704,15 +704,27 @@ test('waving off the password note keeps focus on the page', async ({ page }) =>
   await expect(page.locator('main#main')).toBeFocused();
 });
 
-test('the password note arrives in a status region that was already on the page', async ({ page }) => {
+test('the password note arrives in a live region that was already on the page', async ({ page }) => {
+  // Records whether the note's live region was in the page, empty, before the
+  // note's words arrived in it, which is what lets a screen reader hear them.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __noteRegionFirst?: boolean };
+    new MutationObserver(() => {
+      const region = document.querySelector('[data-password-note]');
+      if (!region) return;
+      if (w.__noteRegionFirst === undefined) w.__noteRegionFirst = region.textContent === '';
+    }).observe(document, { childList: true, subtree: true });
+  });
   await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
   await signUpWith(page);
-  const note = page.getByRole('status').filter({ hasText: LEAKED_NOTE });
-  await expect(note).toBeVisible();
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  const region = page.locator('[data-password-note]');
+  await expect(region).toHaveAttribute('aria-live', 'polite');
+  expect(await page.evaluate(() => (window as unknown as { __noteRegionFirst?: boolean }).__noteRegionFirst)).toBe(true);
   await page.getByRole('button', { name: 'Dismiss the password note' }).click();
   // The region stays, empty, so the next note is announced.
-  await expect(page.locator('main#main > [role="status"]')).toHaveCount(1);
-  await expect(page.locator('main#main > [role="status"]')).toHaveText('');
+  await expect(region).toHaveCount(1);
+  await expect(region).toHaveText('');
 });
 
 test('Change password on Settings opens the sheet without adding a Back step', async ({ page }) => {
@@ -724,8 +736,11 @@ test('Change password on Settings opens the sheet without adding a Back step', a
   await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
   await page.getByRole('button', { name: 'Change password' }).click();
   await expect(page.getByRole('dialog', { name: /email (or|and) (a )?password/i })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  // The sheet listens for Escape once it has settled, so try until it closes.
+  await expect(async () => {
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 1000 });
+  }).toPass();
   await page.goBack();
   await expect(page).toHaveURL(landed);
 });

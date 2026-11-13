@@ -533,7 +533,7 @@ export default function AppShell() {
         <MobileTopBar onMenu={() => setMenuPath(pathname)} />
         <DesktopTopBar />
         <main id="main" ref={mainRef} tabIndex={-1} className={cx('flex-1 min-w-0 focus:outline-none', showTabs ? 'pb-24 lg:pb-0' : '')}>
-          {showTabs && <PasswordNote />}
+          <PasswordNote show={showTabs} />
           <ErrorBoundary resetKey={pathname}>
             <Suspense fallback={<PageLoading />}>
               <Outlet />

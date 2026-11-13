@@ -94,7 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // A sign-out that didn't come through signOut below, as an expired
+      // session or a sign-out everywhere from another device, drops the note too.
+      if (event === 'SIGNED_OUT') clearPasswordNote();
       setSignedInAs(session?.user?.id ?? null);
       setSession(session);
       setUser(session?.user ?? null);
