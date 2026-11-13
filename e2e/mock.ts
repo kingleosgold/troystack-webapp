@@ -94,6 +94,8 @@ export interface MockOptions {
   briefDelayMs?: number;
   /** How long the receipt scan count takes to answer. */
   scanStatusDelayMs?: number;
+  /** How long a confirmation email resend takes to answer. */
+  resendDelayMs?: number;
   /**
    * The visitor count says questions are left, but they were used on another
    * device on the same connection, so the next question is refused.
@@ -521,6 +523,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     }
     if (url.pathname === '/auth/v1/resend' && req.method() === 'POST') {
       resends.push(req.postDataJSON() as { type?: string; email?: string });
+      if (opts.resendDelayMs) await wait(opts.resendDelayMs);
       if (opts.authFails?.resend) return fulfillAuthFailure(route, opts.authFails.resend);
       return fulfillJson(route, {});
     }
