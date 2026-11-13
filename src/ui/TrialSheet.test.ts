@@ -23,6 +23,7 @@ const state = vi.hoisted(() => ({
 
 const counts = vi.hoisted(() => [] as unknown[][]);
 const openCheckout = vi.hoisted(() => vi.fn());
+const rememberGoldTap = vi.hoisted(() => vi.fn());
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({ user: state.user, session: state.user ? { access_token: 'token' } : null }),
@@ -56,6 +57,7 @@ vi.mock('../lib/checkout', async (importOriginal) => {
     webCheckoutReady: () => true,
     openCheckout,
     rememberCheckout: () => undefined,
+    rememberGoldTap,
   };
 });
 
@@ -98,6 +100,7 @@ beforeEach(() => {
   state.android = false;
   counts.length = 0;
   openCheckout.mockReset();
+  rememberGoldTap.mockReset();
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
@@ -189,6 +192,7 @@ describe('the sheet counts its view', () => {
     });
     expect(openCheckout).toHaveBeenCalledTimes(1);
     expect(counts).toEqual([]);
+    expect(rememberGoldTap).not.toHaveBeenCalled();
   });
 });
 
@@ -251,5 +255,43 @@ describe('the plan tap', () => {
       ['plan_tap', 'yearly', 'webapp-settings'],
       ['plan_tap', 'monthly', 'webapp-settings'],
     ]);
+  });
+
+  it('counts a different plan picked in a sheet the Gold page opened, and remembers it as the Gold tap', async () => {
+    openCheckout.mockRejectedValue(new Error('Network down'));
+    render({ campaign: 'webapp-gold', plan: 'yearly' });
+    await click(button('Start my free week'));
+    expect(counts).toEqual([]);
+    await click(button(/^Monthly/));
+    await click(button('Start my free week'));
+    await click(button('Start my free week'));
+    expect(counts).toEqual([['plan_tap', 'monthly', 'webapp-gold']]);
+    expect(rememberGoldTap.mock.calls).toEqual([['monthly', 'webapp-gold']]);
+  });
+
+  it('counts nothing again when a Gold page sheet goes back to the plan it opened on', async () => {
+    openCheckout.mockRejectedValue(new Error('Network down'));
+    render({ campaign: 'site-home', plan: 'monthly' });
+    await click(button(/^Yearly/));
+    await click(button(/^Monthly/));
+    await click(button('Start my free week'));
+    expect(counts).toEqual([]);
+    expect(rememberGoldTap).not.toHaveBeenCalled();
+  });
+
+  it('counts a guest who changes plan in a Gold page sheet before sign-up', async () => {
+    state.user = null;
+    render({ campaign: 'webapp-gold', plan: 'monthly' });
+    await click(button(/^Lifetime/));
+    await click(button(/^Get Lifetime/));
+    expect(counts).toEqual([['plan_tap', 'lifetime', 'webapp-gold']]);
+    expect(rememberGoldTap.mock.calls).toEqual([['lifetime', 'webapp-gold']]);
+  });
+
+  it('does not touch the Gold tap from a sheet opened anywhere else', async () => {
+    state.user = null;
+    render();
+    await click(button('Start my free week'));
+    expect(rememberGoldTap).not.toHaveBeenCalled();
   });
 });

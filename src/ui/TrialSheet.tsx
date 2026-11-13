@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { Button, Sheet } from './primitives';
 import { InstallPath } from './AppStore';
 import { GOLD, isAndroid, isAppleMobile } from '../lib/appStore';
-import { CHECKOUT_WAIT, checkoutBlock, forgetCheckout, openBillingPortal, openCheckout, rememberCheckout, sheetReturnPath, webCheckoutReady, webPlans, type CheckoutCampaign, type WebPlan } from '../lib/checkout';
+import { CHECKOUT_WAIT, checkoutBlock, forgetCheckout, openBillingPortal, openCheckout, rememberCheckout, rememberGoldTap, sheetReturnPath, webCheckoutReady, webPlans, type CheckoutCampaign, type WebPlan } from '../lib/checkout';
 import { cx } from '../lib/cx';
 import { GOLD_FEATURES } from '../lib/gold';
 import { stillSignedInAs } from '../lib/account';
@@ -81,15 +81,19 @@ function WebCheckout({
     onPlanChange?.(plan);
   }, [plan, onPlanChange]);
 
-  // The Gold page counts its own taps and opens the sheet with the plan
-  // picked. Opened anywhere else, the sheet is where the plan is picked, so
-  // it counts the pick, once a plan for each opening.
-  const counted = useRef(new Set<WebPlan>());
+  // The sheet counts each plan someone goes on with, once a plan for each
+  // opening. The Gold page counts its own tap and opens the sheet with that
+  // plan picked, so that one has counted already. A different plan picked in
+  // a sheet the Gold page opened is a new pick and counts, and it becomes the
+  // Gold page's remembered tap, so backing out of Stripe on it doesn't count
+  // it again there.
+  const counted = useRef(new Set<WebPlan>(initialPlan ? [initialPlan] : []));
   const go = async () => {
     setError(null);
-    if (!initialPlan && !counted.current.has(plan)) {
+    if (!counted.current.has(plan)) {
       counted.current.add(plan);
       countStep('plan_tap', plan, campaign);
+      if (initialPlan) rememberGoldTap(plan, campaign);
     }
     if (!user) {
       rememberCheckout(plan, campaign);
