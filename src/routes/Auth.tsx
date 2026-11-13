@@ -60,6 +60,11 @@ function isWrongPassword(err: AuthErr): boolean {
   return err.code === 'invalid_credentials' || err.message === 'Invalid login credentials';
 }
 
+/** The account is there and the password matched, but its email was never confirmed. Older GoTrue sends only the words. */
+function isUnconfirmed(err: AuthErr): boolean {
+  return err.code === 'email_not_confirmed' || /email not confirmed/i.test(err.message ?? '');
+}
+
 export default function Auth() {
   const [params] = useSearchParams();
   const { user, loading, isConfigured, signIn, signUp, signInWithGoogle, signInWithApple, resetPasswordForEmail } = useAuth();
@@ -182,7 +187,7 @@ export default function Auth() {
           // it, and checkout opens on this form, so try it as a sign-in before
           // asking for a new password.
           const { error: inErr } = await signIn(email.trim(), password);
-          if (inErr && inErr.code === 'email_not_confirmed') {
+          if (inErr && isUnconfirmed(inErr)) {
             // The account is there with this password, it only needs the link.
             setMode('signin');
             setError(authTrouble(inErr, 'sign in'));

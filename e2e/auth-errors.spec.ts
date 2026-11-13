@@ -427,9 +427,9 @@ test('a stand-in user for another email still goes to sign-in', async ({ page })
   await page.goto('/auth?mode=signup');
   await page.getByLabel('Email').fill('someone-else@example.com');
   await page.getByLabel('Password', { exact: true }).fill('a-good-password');
-  const sent = page.waitForResponse((r) => r.url().includes('/auth/v1/signup'));
+  const sent = page.waitForRequest((r) => r.url().includes('/auth/v1/signup'));
   await page.getByRole('button', { name: 'Create account' }).click();
-  expect(((await (await sent).json()) as { email: string }).email).toBe('someone-else@example.com');
+  expect(((await sent).postDataJSON() as { email: string }).email).toBe('someone-else@example.com');
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
   await expect(page.getByLabel('Email')).toHaveValue('someone-else@example.com');
 });
