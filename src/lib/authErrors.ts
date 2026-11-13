@@ -21,6 +21,11 @@ function isLeakedPassword(err: AuthErr): boolean {
   return /known to be weak|easy to guess|pwned|leaked/i.test(err.message ?? '');
 }
 
+/** The account is there and the password matched, but its email was never confirmed. Older GoTrue sends only the words. */
+export function isUnconfirmed(err: AuthErr): boolean {
+  return err.code === 'email_not_confirmed' || /email not confirmed/i.test(err.message ?? '');
+}
+
 /** What a form says when the auth call threw instead of answering. Matches the helper's own fault line. */
 export const AUTH_THREW = 'Something went wrong on our side. Try again in a minute.';
 
@@ -45,7 +50,7 @@ export function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string
   // GoTrue also sends this for its project-wide email cap and its resend guard,
   // so the words don't promise anything about this one address.
   if (err.code === 'over_email_send_rate_limit') return "We've sent a lot of emails just now. Wait a few minutes, then try again.";
-  if (err.code === 'email_not_confirmed') return 'Confirm your email first. Tap the link we sent you, then sign in.';
+  if (isUnconfirmed(err)) return 'Confirm your email first. Tap the link we sent you, then sign in.';
   // Supabase asks for a fresh sign-in before a password change when the session is old.
   if (err.code === 'reauthentication_needed') return 'Sign out and back in, then change your password.';
   if (err.code === 'email_exists') return 'Another account already uses that email.';

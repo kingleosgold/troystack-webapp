@@ -131,7 +131,7 @@ export interface MockOptions {
    */
   hideExistingAccount?: boolean;
   /** How the plain sign-in, sign-up and reset calls fail, each on its own. */
-  authFails?: Partial<Record<'signIn' | 'signUp' | 'recover' | 'updateUser', AuthFailure>>;
+  authFails?: Partial<Record<'signIn' | 'signUp' | 'recover' | 'updateUser' | 'resend', AuthFailure>>;
 }
 
 /** The API's words for each reason checkout gives on a 409. */
@@ -220,6 +220,8 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
   /** The body of every holdings insert, in order. */
   const inserts: unknown[] = [];
   const accountDeletes: string[] = [];
+  /** The body of every confirmation email resend, in order. */
+  const resends: Array<{ type?: string; email?: string }> = [];
   /** Every holdings update, its query and body, in order. */
   const patches: Array<{ query: string; body: Record<string, unknown> }> = [];
   /** The body of every visitor question, in order. */
@@ -517,6 +519,11 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       if (opts.authFails?.recover) return fulfillAuthFailure(route, opts.authFails.recover);
       return fulfillJson(route, {});
     }
+    if (url.pathname === '/auth/v1/resend' && req.method() === 'POST') {
+      resends.push(req.postDataJSON() as { type?: string; email?: string });
+      if (opts.authFails?.resend) return fulfillAuthFailure(route, opts.authFails.resend);
+      return fulfillJson(route, {});
+    }
     if (url.pathname === '/auth/v1/logout') return route.fulfill({ status: 204, headers: CORS });
     return fulfillJson(route, {});
   });
@@ -526,6 +533,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
 
   return {
     calls,
+    resends,
     accountDeletes,
     inserts,
     patches,
