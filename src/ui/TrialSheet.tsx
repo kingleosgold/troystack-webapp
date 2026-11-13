@@ -22,6 +22,11 @@ interface Props {
   plan?: WebPlan;
   /** Start checkout on that plan as soon as the sheet can, with no second tap */
   start?: boolean;
+  /**
+   * Set only when the Gold page opened the sheet. The plans its taps already
+   * counted, the one tapped now and any picked before a back-out from Stripe.
+   */
+  counted?: readonly WebPlan[];
 }
 
 /** What checkout said is in the way that the sheet shows instead of the plans. */
@@ -51,9 +56,12 @@ function WebCheckout({
   onBlocked,
   onPlanChange,
   autoStart = false,
+  counted: countedBefore,
 }: {
   campaign: CheckoutCampaign;
   initialPlan?: WebPlan;
+  /** Plans the Gold page already counted, when it opened this sheet */
+  counted?: readonly WebPlan[];
   /** Go on to sign-up or Stripe on mount, when initialPlan can be bought here */
   autoStart?: boolean;
   onClose: () => void;
@@ -82,18 +90,19 @@ function WebCheckout({
   }, [plan, onPlanChange]);
 
   // The sheet counts each plan someone goes on with, once a plan for each
-  // opening. The Gold page counts its own tap and opens the sheet with that
-  // plan picked, so that one has counted already. A different plan picked in
-  // a sheet the Gold page opened is a new pick and counts, and it joins the
-  // Gold page's remembered taps, so backing out of Stripe doesn't count it or
-  // the first pick again there.
-  const counted = useRef(new Set<WebPlan>(initialPlan ? [initialPlan] : []));
+  // opening. The Gold page counts its own tap and opens the sheet saying which
+  // plans have counted, the one tapped and, after a back-out from Stripe, any
+  // this tab picked before it. Another plan picked in a sheet the Gold page
+  // opened is a new pick and counts, and it joins the Gold page's remembered
+  // taps, so backing out of Stripe doesn't count it or the first pick again.
+  const fromGoldPage = countedBefore !== undefined;
+  const counted = useRef(new Set<WebPlan>(countedBefore ?? []));
   const go = async () => {
     setError(null);
     if (!counted.current.has(plan)) {
       counted.current.add(plan);
       countStep('plan_tap', plan, campaign);
-      if (initialPlan) rememberGoldTap(plan, campaign);
+      if (fromGoldPage) rememberGoldTap(plan, campaign);
     }
     if (!user) {
       rememberCheckout(plan, campaign);
@@ -222,7 +231,7 @@ function PaymentIssue() {
   );
 }
 
-export function TrialSheet({ open, onClose, reason, campaign, plan, start = false }: Props) {
+export function TrialSheet({ open, onClose, reason, campaign, plan, start = false, counted }: Props) {
   const { user } = useAuth();
   const location = useLocation();
   const { isGold, loading: planLoading } = useSubscription();
@@ -250,14 +259,15 @@ export function TrialSheet({ open, onClose, reason, campaign, plan, start = fals
   // form counts under the campaign itself when it's opened. So a campaign's
   // views are the ones that showed card checkout, and its taps divide by them.
   const viewed = useRef(false);
+  const fromGoldPage = counted !== undefined;
   useEffect(() => {
-    if (!open || plan || checking || isGold || viewed.current) return;
+    if (!open || fromGoldPage || checking || isGold || viewed.current) return;
     viewed.current = true;
     countStep('gold_view', null, cardFirst ? campaign : appCampaign(campaign));
-  }, [open, plan, checking, isGold, cardFirst, campaign]);
+  }, [open, fromGoldPage, checking, isGold, cardFirst, campaign]);
   const openCardOnIphone = () => {
     setShowWebOnIphone(true);
-    if (!plan) countStep('gold_view', null, campaign);
+    if (!fromGoldPage) countStep('gold_view', null, campaign);
   };
   const block = blocked && blocked.userId === user?.id ? blocked.block : null;
   const close = () => {
@@ -320,7 +330,7 @@ export function TrialSheet({ open, onClose, reason, campaign, plan, start = fals
               {iphone && web && (
                 showWebOnIphone ? (
                   <div className="pt-1">
-                    <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} onPlanChange={setPicked} />
+                    <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} onPlanChange={setPicked} counted={counted} />
                   </div>
                 ) : (
                   <button type="button" onClick={openCardOnIphone} className="text-[13px] font-semibold text-gold hover:text-gold-2">
@@ -331,7 +341,7 @@ export function TrialSheet({ open, onClose, reason, campaign, plan, start = fals
             </div>
           ) : (
             <div className="space-y-5">
-              <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} onPlanChange={setPicked} autoStart={start} />
+              <WebCheckout campaign={campaign} initialPlan={plan} onClose={close} onBlocked={onBlocked} onPlanChange={setPicked} counted={counted} autoStart={start} />
               {!android && (
                 <div className="rounded-2xl border border-line bg-surface-2 p-4">
                   <p className="mb-3 text-[13px] text-fg-2">

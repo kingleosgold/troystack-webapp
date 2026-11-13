@@ -10,6 +10,11 @@ interface TrialRequest {
   plan?: WebPlan;
   /** The plan was already picked, so checkout starts without asking again */
   start?: boolean;
+  /**
+   * Set by the Gold page only. The plans its taps already counted on the way
+   * in, so the sheet counts none of them again and remembers what it adds.
+   */
+  counted?: readonly WebPlan[];
 }
 
 interface TrialContextValue {
@@ -38,7 +43,7 @@ export function TrialProvider({ children }: { children: ReactNode }) {
   return (
     <TrialContext.Provider value={value}>
       {children}
-      <TrialSheet key={opened} open={req !== null} onClose={close} reason={req?.reason} campaign={req?.campaign ?? 'webapp-trial'} plan={req?.plan} start={req?.start} />
+      <TrialSheet key={opened} open={req !== null} onClose={close} reason={req?.reason} campaign={req?.campaign ?? 'webapp-trial'} plan={req?.plan} start={req?.start} counted={req?.counted} />
     </TrialContext.Provider>
   );
 }
