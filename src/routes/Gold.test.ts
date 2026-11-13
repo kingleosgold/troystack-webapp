@@ -13,18 +13,26 @@ import Gold from './Gold';
 // through the real remembered list in sessionStorage, so a back-out visit
 // reads what this tab picked before, as it does live.
 
-const state = vi.hoisted(() => ({ sold: ['yearly', 'monthly', 'lifetime'] as string[], gold: false, subLoading: false }));
+const state = vi.hoisted(() => ({
+  sold: ['yearly', 'monthly', 'lifetime'] as string[],
+  gold: false,
+  subLoading: false,
+  unreadable: false,
+  signedIn: true,
+  authLoading: false,
+  sessionUnreadable: false,
+}));
 const counts = vi.hoisted(() => [] as unknown[][]);
 const openTrial = vi.hoisted(() => vi.fn());
 
 vi.mock('../hooks/usePageMeta', () => ({ usePageMeta: () => undefined }));
 
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'user-1' }, loading: false, sessionUnreadable: false }),
+  useAuth: () => ({ user: state.signedIn ? { id: 'user-1' } : null, loading: state.authLoading, sessionUnreadable: state.sessionUnreadable }),
 }));
 
 vi.mock('../hooks/useSubscription', () => ({
-  useSubscription: () => ({ isGold: state.gold, tier: state.gold ? 'gold' : 'free', loading: state.subLoading, unreadable: false }),
+  useSubscription: () => ({ isGold: state.gold, tier: state.gold ? 'gold' : 'free', loading: state.subLoading, unreadable: state.unreadable }),
 }));
 
 vi.mock('../contexts/TrialContext', () => ({ useTrial: () => ({ openTrial }) }));
@@ -92,6 +100,10 @@ beforeEach(() => {
   state.sold = ['yearly', 'monthly', 'lifetime'];
   state.gold = false;
   state.subLoading = false;
+  state.unreadable = false;
+  state.signedIn = true;
+  state.authLoading = false;
+  state.sessionUnreadable = false;
   seen.search = '';
   counts.length = 0;
   openTrial.mockReset();
@@ -235,6 +247,56 @@ describe('a Gold account or a plan still loading', () => {
     state.subLoading = false;
     render('/gold');
     expect(counts).toEqual([]);
+  });
+});
+
+describe("a plan or a session that can't be read", () => {
+  // useSubscription keeps loading true while it marks a plan unreadable, and
+  // AuthContext keeps loading true while it marks a session unreadable, so
+  // each unreadable case holds both flags the way the hooks report them.
+  it('counts the view once for a plan that can\'t be read, and keeps the plan buttons off', () => {
+    state.subLoading = true;
+    state.unreadable = true;
+    render('/gold');
+    expect(counts).toEqual([['gold_view', null, 'webapp-gold']]);
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[aria-label="Plans"] button'));
+    expect(buttons).toHaveLength(3);
+    expect(buttons.every((b) => b.disabled)).toBe(true);
+
+    // A retry that lands doesn't count the view again.
+    state.subLoading = false;
+    state.unreadable = false;
+    render('/gold');
+    expect(counts).toEqual([['gold_view', null, 'webapp-gold']]);
+    const after = Array.from(document.querySelectorAll<HTMLButtonElement>('[aria-label="Plans"] button'));
+    expect(after.every((b) => !b.disabled)).toBe(true);
+  });
+
+  it('counts the view once for a stored session that can\'t be read, and lets the plans be tapped', () => {
+    state.signedIn = false;
+    state.authLoading = true;
+    state.sessionUnreadable = true;
+    render('/gold');
+    expect(counts).toEqual([['gold_view', null, 'webapp-gold']]);
+
+    tap('yearly');
+    expect(taps()).toEqual([['plan_tap', 'yearly', 'webapp-gold']]);
+    expect(openTrial).toHaveBeenCalledWith(expect.objectContaining({ plan: 'yearly', start: true }));
+  });
+
+  it('counts no view while a session is still loading and readable', () => {
+    state.signedIn = false;
+    state.authLoading = true;
+    render('/gold');
+    expect(counts).toEqual([]);
+  });
+
+  it('counts a plan that can\'t be read under -app where the web sells nothing', () => {
+    state.sold = [];
+    state.subLoading = true;
+    state.unreadable = true;
+    render('/gold');
+    expect(counts).toEqual([['gold_view', null, 'webapp-gold-app']]);
   });
 });
 
