@@ -7,7 +7,7 @@ import { countStep } from '../lib/funnel';
 import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { Button, Field, Input } from '../ui/primitives';
 import { NewTabNote } from '../ui/NewTabNote';
-import { authThrew, authTrouble, isWeakPassword, type AuthErr } from '../lib/authErrors';
+import { authThrew, authTrouble, isUnconfirmed, isWeakPassword, type AuthErr } from '../lib/authErrors';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
@@ -60,14 +60,9 @@ function isWrongPassword(err: AuthErr): boolean {
   return err.code === 'invalid_credentials' || err.message === 'Invalid login credentials';
 }
 
-/** The account is there and the password matched, but its email was never confirmed. Older GoTrue sends only the words. */
-function isUnconfirmed(err: AuthErr): boolean {
-  return err.code === 'email_not_confirmed' || /email not confirmed/i.test(err.message ?? '');
-}
-
 export default function Auth() {
   const [params] = useSearchParams();
-  const { user, loading, isConfigured, signIn, signUp, signInWithGoogle, signInWithApple, resetPasswordForEmail } = useAuth();
+  const { user, loading, isConfigured, signIn, signUp, signInWithGoogle, signInWithApple, resetPasswordForEmail, resendConfirmation } = useAuth();
   // Someone sent here to buy Gold is usually new, so the form they'd fill
   // in opens first and signing in is one tap away.
   const [mode, setMode] = useState<Mode>(() => {
@@ -86,6 +81,10 @@ export default function Auth() {
   const [offerSignUp, setOfferSignUp] = useState(false);
   // Supabase turned the password away, so the field is marked as the one to fix.
   const [passwordRefused, setPasswordRefused] = useState(false);
+  // The email of an account that's there but never confirmed. Its first link
+  // has likely expired, so the form offers a new one for that address.
+  const [resendFor, setResendFor] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
 
   const plan = params.get('plan');
@@ -134,6 +133,7 @@ export default function Auth() {
     setNotice(null);
     setOfferSignUp(false);
     setPasswordRefused(false);
+    setResendFor(null);
   };
 
   // A refused password is the thing to change, so the cursor goes back to it
@@ -151,6 +151,7 @@ export default function Auth() {
     setNotice(null);
     setOfferSignUp(false);
     setPasswordRefused(false);
+    setResendFor(null);
     setBusy(true);
     try {
       if (mode === 'forgot') {
@@ -178,6 +179,7 @@ export default function Auth() {
               // A rate limit or a dropped connection says nothing about the
               // password, so keep it and say what actually went wrong.
               setError(authTrouble(inErr, 'sign in'));
+              if (isUnconfirmed(inErr)) setResendFor(email.trim());
             }
           }
         } else if (err && isWeakPassword(err)) {
@@ -191,6 +193,7 @@ export default function Auth() {
             // The account is there with this password, it only needs the link.
             setMode('signin');
             setError(authTrouble(inErr, 'sign in'));
+            setResendFor(email.trim());
           } else if (inErr) {
             setError(authTrouble(err, 'try again'));
             setPasswordRefused(true);
@@ -211,12 +214,41 @@ export default function Auth() {
         if (err && isWrongPassword(err)) {
           setError("That email and password don't match an account.");
           setOfferSignUp(true);
-        } else if (err) setError(authTrouble(err, 'sign in'));
+        } else if (err) {
+          setError(authTrouble(err, 'sign in'));
+          if (isUnconfirmed(err)) setResendFor(email.trim());
+        }
       }
     } catch (e) {
       setError(authThrew(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const resend = async () => {
+    if (!resendFor || resending) return;
+    setResending(true);
+    try {
+      const { error: err } = await resendConfirmation(resendFor);
+      if (err) {
+        setError(authTrouble(err, 'try again'));
+      } else {
+        // One link at a time, so the offer goes once it's sent.
+        setError(null);
+        setResendFor(null);
+        setNotice(
+          forCheckout
+            ? `We sent a new link to ${resendFor}. Tap it and you'll go straight to checkout.`
+            : `We sent a new link to ${resendFor}. Tap it, then sign in.`,
+        );
+        // The button goes away once it's sent, so focus moves on to the form.
+        passwordRef.current?.focus();
+      }
+    } catch (e) {
+      setError(authThrew(e));
+    } finally {
+      setResending(false);
     }
   };
 
@@ -226,6 +258,7 @@ export default function Auth() {
     setNotice(null);
     setOfferSignUp(false);
     setPasswordRefused(false);
+    setResendFor(null);
     const { error: err } = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
     if (err) setError(authTrouble(err, 'try again'));
   };
@@ -321,6 +354,19 @@ export default function Auth() {
                   </button>
                 </p>
               )}
+              {resendFor && resendFor === email.trim() && (
+                <p className="mt-1.5 text-[13px] text-fg-2">
+                  Link expired or lost?{' '}
+                  <button
+                    type="button"
+                    onClick={() => void resend()}
+                    disabled={resending}
+                    className="font-semibold text-gold hover:text-gold-2 disabled:opacity-60"
+                  >
+                    {resending ? 'Sending' : 'Send a new link'}
+                  </button>
+                </p>
+              )}
             </div>
           )}
           {notice && (
@@ -328,7 +374,7 @@ export default function Auth() {
               {notice}
             </p>
           )}
-          <Button type="submit" size="lg" className="w-full" disabled={busy || !email.trim() || (mode !== 'forgot' && !password)}>
+          <Button type="submit" size="lg" className="w-full" disabled={busy || resending || !email.trim() || (mode !== 'forgot' && !password)}>
             {busy ? 'One moment' : mode === 'signup' ? 'Create account' : mode === 'forgot' ? 'Send the link' : 'Sign in'}
           </Button>
         </form>

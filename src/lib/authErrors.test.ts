@@ -7,6 +7,12 @@ const OURS = 'Something went wrong on our side. Try again later.';
 describe('authTrouble', () => {
   afterEach(() => vi.restoreAllMocks());
 
+  it('points an unconfirmed email to the link by its code or, from older GoTrue, by its words', () => {
+    const CONFIRM = 'Confirm your email first. Tap the link we sent you, then sign in.';
+    expect(authTrouble({ message: 'Email not confirmed', status: 400, code: 'email_not_confirmed' }, 'sign in')).toBe(CONFIRM);
+    expect(authTrouble({ message: 'Email not confirmed', status: 400 }, 'sign in')).toBe(CONFIRM);
+  });
+
   it('reads a dropped connection as a connection problem', () => {
     expect(authTrouble({ name: 'AuthRetryableFetchError', message: 'Failed to fetch', status: 0 }, 'sign in')).toBe(OUTAGE);
     expect(authTrouble({ name: 'AuthRetryableFetchError', message: '{}', status: 503 }, 'sign in')).toBe(OUTAGE);

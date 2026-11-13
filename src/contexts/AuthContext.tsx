@@ -29,6 +29,7 @@ interface AuthContextType {
   linkWithApple: () => Promise<{ error: AuthError | null }>;
   updateEmailPassword: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   resetPasswordForEmail: (email: string) => Promise<{ error: AuthError | null }>;
+  resendConfirmation: (email: string) => Promise<{ error: AuthError | null }>;
   getLinkedProviders: () => string[];
   hasEmailPassword: () => boolean;
 }
@@ -228,6 +229,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  // A fresh confirmation link for an email account that never tapped its first
+  // one. It lands where the sign-up link does, so nothing about it differs.
+  const resendConfirmation = async (email: string) => {
+    const { error } = await supabase.auth.resend({ type: 'signup', email });
+    return { error };
+  };
+
   const getLinkedProviders = (): string[] => {
     if (!user?.identities) return [];
     return user.identities.map((identity) => identity.provider);
@@ -253,6 +261,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     linkWithApple,
     updateEmailPassword,
     resetPasswordForEmail,
+    resendConfirmation,
     getLinkedProviders,
     hasEmailPassword,
   };

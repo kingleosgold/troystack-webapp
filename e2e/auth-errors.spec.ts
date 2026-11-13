@@ -433,3 +433,69 @@ test('a stand-in user for another email still goes to sign-in', async ({ page })
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
   await expect(page.getByLabel('Email')).toHaveValue('someone-else@example.com');
 });
+
+test('an unconfirmed email on the sign-in form can send a new link to that address', async ({ page }) => {
+  const mock = await mockBackends(page, { authFails: { signIn: 'unconfirmed' } });
+  await signInWith(page);
+  await expect(page.getByRole('alert')).toHaveText('Confirm your email first. Tap the link we sent you, then sign in.');
+  // A changed email isn't the account that was refused, so the offer waits for it to match again.
+  await page.getByLabel('Email').fill('someone-else@example.com');
+  await expect(page.getByRole('button', { name: 'Send a new link' })).toHaveCount(0);
+  await page.getByLabel('Email').fill('someone@example.com');
+  await page.getByRole('button', { name: 'Send a new link' }).click();
+  await expect(page.getByRole('status')).toHaveText('We sent a new link to someone@example.com. Tap it, then sign in.');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Send a new link' })).toHaveCount(0);
+  await expect(page.getByLabel('Password', { exact: true })).toBeFocused();
+  expect(mock.resends).toEqual([expect.objectContaining({ type: 'signup', email: 'someone@example.com' })]);
+});
+
+test('a leaked password on sign-up for an unconfirmed account can send a new link', async ({ page }) => {
+  const mock = await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password', signIn: 'unconfirmed' } });
+  await signUpWith(page);
+  await page.getByRole('button', { name: 'Send a new link' }).click();
+  await expect(page.getByRole('status')).toHaveText('We sent a new link to new-person@example.com. Tap it, then sign in.');
+  expect(mock.resends).toEqual([expect.objectContaining({ type: 'signup', email: 'new-person@example.com' })]);
+});
+
+test('an existing unconfirmed account on sign-up can send a new link', async ({ page }) => {
+  const mock = await mockBackends(page, { existingAccount: 'same-password', authFails: { signIn: 'unconfirmed' } });
+  await signUpWith(page);
+  await page.getByRole('button', { name: 'Send a new link' }).click();
+  await expect(page.getByRole('status')).toHaveText('We sent a new link to new-person@example.com. Tap it, then sign in.');
+  expect(mock.resends).toHaveLength(1);
+});
+
+test('too many emails on a resend says to wait and keeps the offer', async ({ page }) => {
+  await mockBackends(page, { authFails: { signIn: 'unconfirmed', resend: 'email-rate-limited' } });
+  await signInWith(page);
+  await page.getByRole('button', { name: 'Send a new link' }).click();
+  await expect(page.getByRole('alert')).toHaveText("We've sent a lot of emails just now. Wait a few minutes, then try again.");
+  await expect(page.getByRole('button', { name: 'Send a new link' })).toBeVisible();
+});
+
+test('a wrong password offers no new link', async ({ page }) => {
+  await mockBackends(page, { authFails: { signIn: 'wrong-password' } });
+  await signInWith(page);
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send a new link' })).toHaveCount(0);
+});
+
+test('a new link on the way to checkout says checkout opens from it', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signIn: 'unconfirmed' } });
+  await page.goto('/auth?redirect=checkout&plan=yearly');
+  await page.getByLabel('Email').fill('new-person@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('a-good-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await page.getByRole('button', { name: 'Send a new link' }).click();
+  await expect(page.getByRole('status')).toHaveText("We sent a new link to new-person@example.com. Tap it and you'll go straight to checkout.");
+});
+
+test('switching forms drops the new link offer', async ({ page }) => {
+  await mockBackends(page, { authFails: { signIn: 'unconfirmed' } });
+  await signInWith(page);
+  await expect(page.getByRole('button', { name: 'Send a new link' })).toBeVisible();
+  await page.getByRole('button', { name: 'Forgot password?' }).click();
+  await page.getByRole('button', { name: 'Back to sign in' }).click();
+  await expect(page.getByRole('button', { name: 'Send a new link' })).toHaveCount(0);
+});
