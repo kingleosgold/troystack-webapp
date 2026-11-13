@@ -16,7 +16,7 @@ interface AuthContextType {
    */
   sessionUnreadable: boolean;
   isConfigured: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; needsConfirmation: boolean }>;
+  signUp: (email: string, password: string) => Promise<{ error: AuthError | null; needsConfirmation: boolean; existingAccount: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signInWithApple: () => Promise<{ error: AuthError | null }>;
@@ -109,8 +109,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       password,
     });
+    // With email confirmation on, Supabase hides an email that already has a
+    // confirmed account. It answers with a stand-in user that has no
+    // identities and no session, and sends no email, so that counts as the
+    // account being there rather than a link on its way.
+    const existingAccount = !error && !data.session && Array.isArray(data.user?.identities) && data.user.identities.length === 0;
     // With email confirmation on, Supabase returns a user but no session yet.
-    return { error, needsConfirmation: !error && !data.session };
+    return { error, needsConfirmation: !error && !data.session && !existingAccount, existingAccount };
   };
 
   const signIn = async (email: string, password: string) => {

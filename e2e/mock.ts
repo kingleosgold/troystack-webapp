@@ -124,6 +124,12 @@ export interface MockOptions {
    * 'outage' answers the sign-in with a 503.
    */
   existingAccount?: 'same-password' | 'other' | 'rate-limited' | 'outage';
+  /**
+   * Sign-up for an existing account answers the way hosted Supabase does with
+   * email confirmation on: a stand-in user with no identities and no session,
+   * instead of a refusal.
+   */
+  hideExistingAccount?: boolean;
   /** How the plain sign-in, sign-up and reset calls fail, each on its own. */
   authFails?: Partial<Record<'signIn' | 'signUp' | 'recover' | 'updateUser', AuthFailure>>;
 }
@@ -140,7 +146,7 @@ function fulfillJson(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, headers: { ...CORS, 'content-type': 'application/json' }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 }
 
-type AuthFailure = 'server-fault' | 'server-fault-html' | 'weak-password' | 'wrong-password' | 'rate-limited' | 'rate-limited-bare' | 'outage' | 'unconfirmed' | 'email-rate-limited' | 'email-exists' | 'reauth-needed' | 'bad-api-key';
+type AuthFailure = 'server-fault' | 'server-fault-html' | 'weak-password' | 'leaked-password' | 'wrong-password' | 'rate-limited' | 'rate-limited-bare' | 'outage' | 'unconfirmed' | 'email-rate-limited' | 'email-exists' | 'reauth-needed' | 'bad-api-key';
 
 /** Answers an auth call the way Supabase does when it fails for this reason. */
 function fulfillAuthFailure(route: Route, why: AuthFailure) {
@@ -148,6 +154,18 @@ function fulfillAuthFailure(route: Route, why: AuthFailure) {
   // A 500 from a proxy or the platform that answers with an HTML page, not JSON.
   if (why === 'server-fault-html') return route.fulfill({ status: 500, headers: { ...CORS, 'content-type': 'text/html' }, body: '<html><body>Internal Server Error</body></html>' });
   if (why === 'weak-password') return fulfillAuthError(route, 422, 'weak_password', 'Password should be at least 8 characters.');
+  // Supabase's leaked password check, as hosted Supabase sent it to a real sign-up on 11/13.
+  if (why === 'leaked-password') {
+    return route.fulfill({
+      status: 422,
+      headers: { ...CORS, 'access-control-expose-headers': 'x-supabase-api-version', 'x-supabase-api-version': '2024-01-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        code: 'weak_password',
+        message: 'Password is known to be weak and easy to guess, please choose a different one.',
+        weak_password: { reasons: ['pwned'] },
+      }),
+    });
+  }
   if (why === 'wrong-password') return fulfillAuthError(route, 400, 'invalid_credentials', 'Invalid login credentials');
   if (why === 'rate-limited') return fulfillAuthError(route, 429, 'over_request_rate_limit', 'Request rate limit reached');
   if (why === 'email-rate-limited') return fulfillAuthError(route, 429, 'over_email_send_rate_limit', 'email rate limit exceeded');
@@ -485,6 +503,9 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     // A new email account gets its session at once, as production confirms email sign-ups.
     if (url.pathname === '/auth/v1/signup' && req.method() === 'POST') {
       if (opts.authFails?.signUp) return fulfillAuthFailure(route, opts.authFails.signUp);
+      if (opts.existingAccount && opts.hideExistingAccount) {
+        return fulfillJson(route, { id: '00000000-0000-4000-8000-0000000000aa', aud: 'authenticated', role: '', email: 'new-person@example.com', identities: [], user_metadata: {}, app_metadata: {}, created_at: '2026-11-13T00:00:00Z', updated_at: '2026-11-13T00:00:00Z' });
+      }
       if (opts.existingAccount) return fulfillAuthError(route, 422, 'user_already_exists', 'User already registered');
       return fulfillJson(route, sessionFor());
     }

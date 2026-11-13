@@ -99,6 +99,72 @@ test('a fault on our side says so instead of blaming the connection', async ({ p
   await expect(page.getByRole('alert')).toHaveText('Something went wrong on our side. Try again later.');
 });
 
+test('a leaked password on sign-up says so in plain words, keeps the email and goes back to the password', async ({ page }) => {
+  await mockBackends(page, { authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText(
+    "That password shows up in lists of leaked passwords, so it isn't safe to use. Pick a longer one you don't use anywhere else.",
+  );
+  await expect(page.getByText(/known to be weak/)).toHaveCount(0);
+  // Still the sign-up form, with what was typed still there.
+  await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
+  await expect(page.getByLabel('Email')).toHaveValue('new-person@example.com');
+  await expect(page.getByLabel('Password', { exact: true })).toBeFocused();
+});
+
+test('the sign-up form says what a good password is before anyone types', async ({ page }) => {
+  await mockBackends(page);
+  await page.goto('/auth?mode=signup');
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAccessibleDescription(
+    "Use a longer password you don't use anywhere else. Common ones get turned away.",
+  );
+  await page.getByRole('button', { name: 'Have an account? Sign in' }).click();
+  await expect(page.getByText('Common ones get turned away.')).toHaveCount(0);
+});
+
+test('a sign-in that matches no account offers to make one with the same email', async ({ page }) => {
+  await mockBackends(page, { authFails: { signIn: 'wrong-password' } });
+  await signInWith(page);
+  await expect(page.getByRole('alert')).toHaveText("That email and password don't match an account.");
+  await page.getByRole('button', { name: 'Make one with this email' }).click();
+  await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
+  await expect(page.getByLabel('Password', { exact: true })).toBeFocused();
+  await expect(page.getByLabel('Email')).toHaveValue('someone@example.com');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('a sign-up Supabase hides behind a stand-in user goes to sign-in, not a link that never comes', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'other', hideExistingAccount: true });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText(
+    "There's already an account for that email. Enter its password to sign in, or use Apple or Google if that's how you made it.",
+  );
+  await expect(page.getByText(/Check your email/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+});
+
+test('a sign-up Supabase hides behind a stand-in user signs in when the password matches', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', hideExistingAccount: true });
+  await signUpWith(page);
+  await expect(page).not.toHaveURL(/\/auth/);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('a leaked password marks the password field and ties the reason to it', async ({ page }) => {
+  await mockBackends(page, { authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  const field = page.getByLabel('Password', { exact: true });
+  await expect(field).toHaveAttribute('aria-invalid', 'true');
+  await expect(field).toHaveAccessibleDescription(/lists of leaked passwords/);
+});
+
+test('a sign-in that fails for another reason does not offer a new account', async ({ page }) => {
+  await mockBackends(page, { authFails: { signIn: 'rate-limited' } });
+  await signInWith(page);
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Make one with this email' })).toHaveCount(0);
+});
+
 test("Supabase's own words still show for a password that's too weak", async ({ page }) => {
   await mockBackends(page, { authFails: { signUp: 'weak-password' } });
   await signUpWith(page);

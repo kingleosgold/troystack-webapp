@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AUTH_THREW, authThrew, authTrouble } from './authErrors';
+import { AUTH_THREW, LEAKED_PASSWORD, authThrew, authTrouble, isWeakPassword } from './authErrors';
 
 const OUTAGE = "Couldn't reach TroyStack. Check your connection and try again in a minute.";
 const OURS = 'Something went wrong on our side. Try again later.';
@@ -86,5 +86,36 @@ describe('authTrouble', () => {
     expect(authThrew(boom)).toBe(AUTH_THREW);
     expect(AUTH_THREW).toBe('Something went wrong on our side. Try again in a minute.');
     expect(log).toHaveBeenCalledWith('Auth call threw', boom);
+  });
+});
+
+describe('weak passwords', () => {
+  const leaked = {
+    name: 'AuthWeakPasswordError',
+    code: 'weak_password',
+    status: 422,
+    message: 'Password is known to be weak and easy to guess, please choose a different one.',
+    reasons: ['pwned'],
+  };
+
+  it('says a leaked password is leaked, in plain words', () => {
+    expect(authTrouble(leaked, 'try again')).toBe(LEAKED_PASSWORD);
+    expect(authTrouble({ ...leaked, reasons: undefined }, 'try again')).toBe(LEAKED_PASSWORD);
+  });
+
+  it("keeps Supabase's words for a short password, which already say what to fix", () => {
+    const short = { name: 'AuthWeakPasswordError', code: 'weak_password', status: 422, message: 'Password should be at least 8 characters.', reasons: ['length'] };
+    expect(authTrouble(short, 'try again')).toBe('Password should be at least 8 characters.');
+  });
+
+  it('knows a weak password by its code or its name', () => {
+    expect(isWeakPassword(leaked)).toBe(true);
+    expect(isWeakPassword({ code: 'weak_password', message: 'x' })).toBe(true);
+    expect(isWeakPassword({ name: 'AuthWeakPasswordError', message: 'x' })).toBe(true);
+    expect(isWeakPassword({ code: 'invalid_credentials', message: 'Invalid login credentials' })).toBe(false);
+  });
+
+  it('never calls a leak anything but weak_password', () => {
+    expect(authTrouble({ code: 'validation_failed', status: 422, message: 'Password is known to be weak and easy to guess, please choose a different one.' }, 'try again')).not.toBe(LEAKED_PASSWORD);
   });
 });

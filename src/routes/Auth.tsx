@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { usePageMeta } from '../hooks/usePageMeta';
@@ -7,7 +7,7 @@ import { countStep } from '../lib/funnel';
 import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { Button, Field, Input } from '../ui/primitives';
 import { NewTabNote } from '../ui/NewTabNote';
-import { authThrew, authTrouble, type AuthErr } from '../lib/authErrors';
+import { authThrew, authTrouble, isWeakPassword, type AuthErr } from '../lib/authErrors';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
@@ -35,6 +35,9 @@ const HEADINGS: Record<Mode, { title: string; sub: string }> = {
   signup: { title: 'Make your free account', sub: 'Track your stack and ask Troy three questions a day, free. The same account works in the iPhone app.' },
   forgot: { title: 'Reset your password', sub: "Enter your email and we'll send you a link to set a new one." },
 };
+
+/** Shown under the password on the sign-up form, before anyone types, so a refusal isn't the first they hear of it. */
+export const PASSWORD_HINT = "Use a longer password you don't use anywhere else. Common ones get turned away.";
 
 const EXISTING_ACCOUNT =
   "There's already an account for that email. Enter its password to sign in, or use Apple or Google if that's how you made it.";
@@ -73,6 +76,12 @@ export default function Auth() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // A sign-in that didn't match may be someone with no account yet, so the
+  // form offers to make one with the email already typed.
+  const [offerSignUp, setOfferSignUp] = useState(false);
+  // Supabase turned the password away, so the field is marked as the one to fix.
+  const [passwordRefused, setPasswordRefused] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   const plan = params.get('plan');
   const forCheckout = params.get('redirect') === 'checkout' && isWebPlan(plan);
@@ -118,12 +127,25 @@ export default function Auth() {
     setMode(m);
     setError(null);
     setNotice(null);
+    setOfferSignUp(false);
+    setPasswordRefused(false);
+  };
+
+  // A refused password is the thing to change, so the cursor goes back to it
+  // with the text picked, and the email stays as typed.
+  const retypePassword = () => {
+    const el = passwordRef.current;
+    if (!el) return;
+    el.focus();
+    el.select();
   };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setNotice(null);
+    setOfferSignUp(false);
+    setPasswordRefused(false);
     setBusy(true);
     try {
       if (mode === 'forgot') {
@@ -133,11 +155,11 @@ export default function Auth() {
       } else if (mode === 'signup') {
         // Read before signing up, since signing in uses the waiting plan up.
         const campaign = forCheckout ? checkoutIntentCampaign() : undefined;
-        const { error: err, needsConfirmation } = await signUp(email.trim(), password);
-        if (!err) countStep('signup', forCheckout ? plan : null, campaign);
+        const { error: err, needsConfirmation, existingAccount } = await signUp(email.trim(), password);
+        if (!err && !existingAccount) countStep('signup', forCheckout ? plan : null, campaign);
         // Supabase refuses a weak password before it looks for the email, so a
         // weak password on an existing account shows the password rule, not this.
-        if (err && isExistingAccount(err)) {
+        if (existingAccount || (err && isExistingAccount(err))) {
           // Most people who land here already use this password in the
           // iPhone app, so try it before asking them to switch forms.
           const { error: inErr } = await signIn(email.trim(), password);
@@ -153,8 +175,13 @@ export default function Auth() {
               setError(authTrouble(inErr, 'sign in'));
             }
           }
-        } else if (err) setError(authTrouble(err, 'try again'));
-        else if (needsConfirmation) {
+        } else if (err) {
+          setError(authTrouble(err, 'try again'));
+          if (isWeakPassword(err)) {
+            setPasswordRefused(true);
+            retypePassword();
+          }
+        } else if (needsConfirmation) {
           setNotice(
             forCheckout
               ? "Check your email and tap the link to confirm your account. You'll go straight to checkout from there."
@@ -164,7 +191,10 @@ export default function Auth() {
         }
       } else {
         const { error: err } = await signIn(email.trim(), password);
-        if (err) setError(isWrongPassword(err) ? "That email and password don't match an account." : authTrouble(err, 'sign in'));
+        if (err && isWrongPassword(err)) {
+          setError("That email and password don't match an account.");
+          setOfferSignUp(true);
+        } else if (err) setError(authTrouble(err, 'sign in'));
       }
     } catch (e) {
       setError(authThrew(e));
@@ -222,6 +252,7 @@ export default function Auth() {
             <div className="relative">
               <Field label="Password" htmlFor="auth-password">
                 <Input
+                  ref={passwordRef}
                   id="auth-password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
@@ -229,6 +260,8 @@ export default function Auth() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pr-16"
+                  aria-describedby={[mode === 'signup' && 'auth-password-hint', passwordRefused && error && 'auth-error'].filter(Boolean).join(' ') || undefined}
+                  aria-invalid={passwordRefused || undefined}
                 />
               </Field>
               <button
@@ -241,10 +274,33 @@ export default function Auth() {
               </button>
             </div>
           )}
-          {error && (
-            <p className="text-[13px] text-down" role="alert">
-              {error}
+          {mode === 'signup' && (
+            <p id="auth-password-hint" className="-mt-2 text-[12px] text-fg-3">
+              {PASSWORD_HINT}
             </p>
+          )}
+          {error && (
+            <div className="rounded-xl border border-down/40 bg-down-soft px-3.5 py-3">
+              <p id="auth-error" className="text-[13px] font-medium text-down" role="alert">
+                {error}
+              </p>
+              {offerSignUp && mode === 'signin' && (
+                <p className="mt-1.5 text-[13px] text-fg-2">
+                  No account yet?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // The button goes away with the error, so focus moves on to what's next.
+                      switchMode('signup');
+                      passwordRef.current?.focus();
+                    }}
+                    className="font-semibold text-gold hover:text-gold-2"
+                  >
+                    Make one with this email
+                  </button>
+                </p>
+              )}
+            </div>
           )}
           {notice && (
             <p className="text-[13px] text-up" role="status">
