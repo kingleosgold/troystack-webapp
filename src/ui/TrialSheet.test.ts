@@ -196,6 +196,26 @@ describe('the sheet counts its view', () => {
     expect(counts).toEqual([]);
     expect(rememberGoldTap).not.toHaveBeenCalled();
   });
+
+  it('stays open when the checkout the Gold page started fails, and a plan switched to then counts once and goes on alone', async () => {
+    openCheckout.mockRejectedValueOnce(new Error('Network down')).mockResolvedValueOnce(true);
+    await act(async () => {
+      root.render(h(MemoryRouter, null, h(TrialSheet, { open: true, onClose: () => undefined, campaign: 'webapp-gold', plan: 'yearly', start: true, counted: ['yearly'] })));
+    });
+    expect(openCheckout).toHaveBeenCalledTimes(1);
+    expect(openCheckout.mock.calls[0][2]).toBe('yearly');
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe('Network down');
+    expect(button('Start my free week').disabled).toBe(false);
+    await click(button(/^Monthly/));
+    // Switching doesn't start checkout again by itself.
+    expect(openCheckout).toHaveBeenCalledTimes(1);
+    await click(button('Start my free week'));
+    expect(openCheckout).toHaveBeenCalledTimes(2);
+    expect(openCheckout.mock.calls[1][2]).toBe('monthly');
+    expect(document.querySelector('[role="alert"]')).toBeNull();
+    expect(counts).toEqual([['plan_tap', 'monthly', 'webapp-gold']]);
+    expect(rememberGoldTap.mock.calls).toEqual([['monthly', 'webapp-gold']]);
+  });
 });
 
 describe('on an iPhone', () => {
