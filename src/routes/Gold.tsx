@@ -42,7 +42,9 @@ export default function Gold() {
   const start = (plan: WebPlan) => {
     if (!tappedBefore?.includes(plan)) countStep('plan_tap', plan, campaign);
     rememberGoldTap(plan, campaign);
-    openTrial({ campaign, plan, start: webCheckoutReady(plan) });
+    // The sheet hears every plan already counted, so a plan picked before the
+    // back-out and picked again there after a failed checkout counts once.
+    openTrial({ campaign, plan, start: webCheckoutReady(plan), counted: [plan, ...(tappedBefore ?? []).filter((p) => p !== plan)] });
   };
   useEffect(() => {
     // back=1 is for this landing only, so a reload or a shared link counts.
