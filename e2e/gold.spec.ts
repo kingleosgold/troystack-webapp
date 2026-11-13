@@ -284,6 +284,47 @@ test('a visitor from a troystack.com link keeps its page token from the Gold pag
   expect(checkouts[0].campaign).toBe('site-pricing');
 });
 
+for (const tier of ['gold', 'lifetime'] as const) {
+  test(`an account with ${tier} opens the Gold page without a view counted`, async ({ page }) => {
+    await signIn(page);
+    await mockBackends(page, { tier });
+    const steps: Array<Record<string, unknown>> = [];
+    page.on('request', (r) => {
+      if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+    });
+    await page.goto('/gold');
+    await expect(page.getByRole('link', { name: 'See your plan in Settings' })).toBeVisible();
+    await page.waitForTimeout(500);
+    expect(steps).toEqual([]);
+  });
+}
+
+test('a free account on the Gold page counts one view once its slow plan lands', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page);
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/rest/v1/profiles**', async (route) => {
+    await held;
+    await route.fallback().catch(() => undefined);
+  });
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
+  await page.goto('/gold');
+  await expect(page.getByRole('button', { name: 'Get Lifetime' })).toBeDisabled();
+  await page.waitForTimeout(500);
+  expect(steps).toEqual([]);
+  release();
+  await expect(page.getByRole('button', { name: 'Get Lifetime' })).toBeEnabled();
+  await expect.poll(() => steps.length).toBe(1);
+  await page.waitForTimeout(500);
+  expect(steps).toEqual([{ step: 'gold_view', campaign: 'webapp-gold' }]);
+});
+
 test('a token that is not a troystack.com page counts as the Gold page', async ({ page }) => {
   await mockBackends(page);
   const steps: Array<Record<string, unknown>> = [];

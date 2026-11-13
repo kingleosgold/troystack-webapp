@@ -32,7 +32,8 @@ vi.mock('../hooks/useSubscription', () => ({
   useSubscription: () => ({ isGold: state.isGold, loading: state.planLoading }),
 }));
 
-vi.mock('../lib/funnel', () => ({
+vi.mock('../lib/funnel', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/funnel')>()),
   countStep: (...args: unknown[]) => {
     counts.push(args);
   },
@@ -205,6 +206,12 @@ describe('on an iPhone', () => {
       ['gold_view', null, 'webapp-settings-app'],
       ['gold_view', null, 'webapp-settings'],
     ]);
+  });
+
+  it('cuts a long site token so its -app view fits the API', () => {
+    const long = `site-${'a'.repeat(32)}` as CheckoutCampaign;
+    render({ campaign: long });
+    expect(counts).toEqual([['gold_view', null, `site-${'a'.repeat(31)}-app`]]);
   });
 
   it('counts a tap from the card form under the plain campaign', async () => {
