@@ -211,23 +211,55 @@ describe('a plan tapped on the Gold page', () => {
   it('is the plan back from Stripe under the same campaign', async () => {
     const c = await withPrices({ monthly: 'price_m' });
     c.rememberGoldTap('yearly', 'webapp-gold', now);
-    expect(c.backedOutPlan('1', 'webapp-gold', now + 60_000)).toBe('yearly');
+    expect(c.backedOutPlans('1', 'webapp-gold', now + 60_000)).toEqual(['yearly']);
+  });
+
+  it('keeps every plan tapped under the campaign, so a switch and a back-out count each once', async () => {
+    const c = await withPrices({ monthly: 'price_m' });
+    c.rememberGoldTap('yearly', 'webapp-gold', now);
+    c.rememberGoldTap('monthly', 'webapp-gold', now + 1000);
+    c.rememberGoldTap('yearly', 'webapp-gold', now + 2000);
+    expect(c.goldTap(now + 2000)).toEqual({ plans: ['monthly', 'yearly'], campaign: 'webapp-gold' });
+    expect(c.backedOutPlans('1', 'webapp-gold', now + 3000)).toEqual(['monthly', 'yearly']);
+  });
+
+  it('starts the list over under another campaign', async () => {
+    const c = await withPrices({ monthly: 'price_m' });
+    c.rememberGoldTap('yearly', 'webapp-gold', now);
+    c.rememberGoldTap('monthly', 'site-pricing' as never, now + 1000);
+    expect(c.goldTap(now + 1000)).toEqual({ plans: ['monthly'], campaign: 'site-pricing' });
+    expect(c.backedOutPlans('1', 'webapp-gold', now + 1000)).toBeUndefined();
+  });
+
+  it('starts the list over once the last tap is stale', async () => {
+    const c = await withPrices({ monthly: 'price_m' });
+    c.rememberGoldTap('yearly', 'webapp-gold', now);
+    c.rememberGoldTap('monthly', 'webapp-gold', now + 31 * 60 * 1000);
+    expect(c.goldTap(now + 31 * 60 * 1000)).toEqual({ plans: ['monthly'], campaign: 'webapp-gold' });
+  });
+
+  it('reads the one plan a tab kept before the list', async () => {
+    const c = await withPrices({ monthly: 'price_m' });
+    store.set('stg_gold_tap', JSON.stringify({ plan: 'lifetime', campaign: 'webapp-gold', at: now }));
+    expect(c.backedOutPlans('1', 'webapp-gold', now)).toEqual(['lifetime']);
+    c.rememberGoldTap('monthly', 'webapp-gold', now + 1000);
+    expect(c.goldTap(now + 1000)).toEqual({ plans: ['lifetime', 'monthly'], campaign: 'webapp-gold' });
   });
 
   it("isn't, without back=1 or under another campaign", async () => {
     const c = await withPrices({ monthly: 'price_m' });
     c.rememberGoldTap('yearly', 'webapp-gold', now);
-    expect(c.backedOutPlan(null, 'webapp-gold', now)).toBeUndefined();
-    expect(c.backedOutPlan('0', 'webapp-gold', now)).toBeUndefined();
-    expect(c.backedOutPlan('1', 'site-pricing', now)).toBeUndefined();
+    expect(c.backedOutPlans(null, 'webapp-gold', now)).toBeUndefined();
+    expect(c.backedOutPlans('0', 'webapp-gold', now)).toBeUndefined();
+    expect(c.backedOutPlans('1', 'site-pricing', now)).toBeUndefined();
   });
 
   it('lasts half an hour, so the same tab back much later counts again', async () => {
     const c = await withPrices({ monthly: 'price_m' });
     c.rememberGoldTap('monthly', 'site-pricing' as never, now);
-    expect(c.goldTap(now + 30 * 60 * 1000)).toEqual({ plan: 'monthly', campaign: 'site-pricing' });
+    expect(c.goldTap(now + 30 * 60 * 1000)).toEqual({ plans: ['monthly'], campaign: 'site-pricing' });
     expect(c.goldTap(now + 30 * 60 * 1000 + 1)).toBeNull();
-    expect(c.backedOutPlan('1', 'site-pricing', now + 31 * 60 * 1000)).toBeUndefined();
+    expect(c.backedOutPlans('1', 'site-pricing', now + 31 * 60 * 1000)).toBeUndefined();
   });
 
   it("isn't one with no time, a time ahead of the clock, an unknown plan or a broken value", async () => {
@@ -239,6 +271,10 @@ describe('a plan tapped on the Gold page', () => {
     store.set('stg_gold_tap', JSON.stringify({ plan: 'weekly', campaign: 'webapp-gold', at: now }));
     expect(c.goldTap(now)).toBeNull();
     store.set('stg_gold_tap', JSON.stringify({ plan: 'monthly', campaign: 7, at: now }));
+    expect(c.goldTap(now)).toBeNull();
+    store.set('stg_gold_tap', JSON.stringify({ plans: ['weekly'], campaign: 'webapp-gold', at: now }));
+    expect(c.goldTap(now)).toBeNull();
+    store.set('stg_gold_tap', JSON.stringify({ plans: 'monthly', campaign: 'webapp-gold', at: now }));
     expect(c.goldTap(now)).toBeNull();
     store.set('stg_gold_tap', '{not json');
     expect(c.goldTap(now)).toBeNull();
