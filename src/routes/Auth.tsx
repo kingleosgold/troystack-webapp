@@ -143,7 +143,6 @@ export default function Auth() {
 
   const switchMode = (m: Mode) => {
     formSeq.current += 1;
-    setBusy(false);
     setMode(m);
     setError(null);
     setNotice(null);
@@ -246,7 +245,9 @@ export default function Auth() {
     } catch (e) {
       if (!stale()) setError(authThrew(e));
     } finally {
-      if (!stale()) setBusy(false);
+      // Only one request runs at a time, so the button holds until this one
+      // settles even on a new form. A late sign-in still saves its session.
+      setBusy(false);
     }
   };
 
@@ -290,7 +291,6 @@ export default function Auth() {
     setPasswordRefused(false);
     dropResend();
     const mine = ++formSeq.current;
-    setBusy(false);
     const { error: err } = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
     if (err && mine === formSeq.current) setError(authTrouble(err, 'try again'));
   };

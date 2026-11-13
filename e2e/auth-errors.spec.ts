@@ -565,14 +565,15 @@ test('a sign-in still out when the form switches leaves no word on the new form'
   const answered = page.waitForResponse((r) => r.url().includes('/auth/v1/token'));
   await expect(page.getByRole('button', { name: 'One moment' })).toBeVisible();
   await page.getByRole('button', { name: 'New here? Make an account' }).click();
-  // The new form is ready at once, not held by the sign-in still out.
+  // One request at a time, so the new form waits for the old answer to settle.
+  await expect(page.getByRole('button', { name: 'One moment' })).toBeDisabled();
+  await answered;
   await page.getByLabel('Password', { exact: true }).fill('a-good-password');
   await expect(page.getByRole('button', { name: 'Create account' })).toBeEnabled();
-  await answered;
   await page.waitForTimeout(200);
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Make one with this email' })).toHaveCount(0);
-  await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Sign in');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Make your free account');
 });
 
 test('a sign-up still out when the form switches leaves no word on the new form', async ({ page }) => {
@@ -597,4 +598,23 @@ test('a reset still out when the form switches leaves no word behind', async ({ 
   await answered;
   await page.waitForTimeout(200);
   await expect(page.getByRole('status')).toHaveText('');
+});
+
+test('an existing account answering late after a switch to the forgot form tries no sign-in and stays put', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'other', authFails: { signUp: 'email-exists' }, authDelayMs: 1000 });
+  const signIns: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/auth/v1/token')) signIns.push(r.url());
+  });
+  const answered = page.waitForResponse((r) => r.url().includes('/auth/v1/signup'));
+  await signUpWith(page);
+  await page.getByRole('button', { name: 'Have an account? Sign in' }).click();
+  await page.getByRole('button', { name: 'Forgot password?' }).click();
+  await answered;
+  await page.waitForTimeout(500);
+  // The person moved on, so the quiet sign-in with the old password never goes out.
+  expect(signIns).toHaveLength(0);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Reset your password');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Send the link' })).toBeEnabled();
 });
