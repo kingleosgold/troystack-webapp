@@ -291,6 +291,75 @@ describe("a plan or a session that can't be read", () => {
     expect(counts).toEqual([]);
   });
 
+  it('waits on the plan of someone the listener reports while their stored session can\'t be read', () => {
+    state.authLoading = true;
+    state.sessionUnreadable = true;
+    state.subLoading = true;
+    render('/gold');
+    expect(counts).toEqual([]);
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[aria-label="Plans"] button'));
+    expect(buttons.every((b) => b.disabled)).toBe(true);
+
+    // Their plan lands as free, so the view counts once and the plans open.
+    state.subLoading = false;
+    render('/gold');
+    expect(counts).toEqual([['gold_view', null, 'webapp-gold']]);
+    tap('monthly');
+    expect(taps()).toEqual([['plan_tap', 'monthly', 'webapp-gold']]);
+    expect(openTrial).toHaveBeenLastCalledWith(expect.objectContaining({ plan: 'monthly', start: true }));
+  });
+
+  it('counts no view when the listener reports a Gold account whose stored session can\'t be read', () => {
+    state.authLoading = true;
+    state.sessionUnreadable = true;
+    state.subLoading = true;
+    render('/gold');
+    state.gold = true;
+    state.subLoading = false;
+    render('/gold');
+    expect(counts).toEqual([]);
+    expect(host.textContent).toContain('You have Gold on this account.');
+  });
+
+  it('counts the view once when the reported user\'s plan read fails too, with the plan buttons off', () => {
+    state.authLoading = true;
+    state.sessionUnreadable = true;
+    state.subLoading = true;
+    render('/gold');
+    expect(counts).toEqual([]);
+    state.unreadable = true;
+    render('/gold');
+    expect(counts).toEqual([['gold_view', null, 'webapp-gold']]);
+    const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[aria-label="Plans"] button'));
+    expect(buttons.every((b) => b.disabled)).toBe(true);
+  });
+
+  it('keeps the one guest view when the listener reports a Gold account only after the session read failed', () => {
+    // A known gap. The view counted as a guest before anyone was reported, and
+    // the page doesn't take it back or count again.
+    state.signedIn = false;
+    state.authLoading = true;
+    state.sessionUnreadable = true;
+    render('/gold');
+    expect(counts).toEqual([['gold_view', null, 'webapp-gold']]);
+    state.signedIn = true;
+    state.subLoading = true;
+    render('/gold');
+    state.gold = true;
+    state.subLoading = false;
+    render('/gold');
+    expect(counts).toEqual([['gold_view', null, 'webapp-gold']]);
+  });
+
+  it('counts a stored session that can\'t be read under -app where the web sells nothing', () => {
+    state.sold = [];
+    state.signedIn = false;
+    state.authLoading = true;
+    state.sessionUnreadable = true;
+    render('/gold');
+    expect(counts).toEqual([['gold_view', null, 'webapp-gold-app']]);
+  });
+
   it('counts a plan that can\'t be read under -app where the web sells nothing', () => {
     state.sold = [];
     state.subLoading = true;
