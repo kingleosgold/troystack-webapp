@@ -205,7 +205,10 @@ export function takeNextPath(now = Date.now()): string | null {
 // how checkout knows the view and those taps already counted, so a back-out
 // can say so, and only for someone who came through the Gold page. Every plan
 // tapped under the campaign is kept, so one picked, switched in the sheet and
-// picked again after a back-out still counts once. A tap under another
+// picked again after a back-out still counts once. The Gold page reads the
+// list just once, when it lands with back=1, so a plan picked in a sheet on
+// that same visit can count again when it's tapped on the page. That's one
+// count for each opening, not one for the whole campaign. A tap under another
 // campaign starts the list over. The list lasts the half hour a sign-up or
 // checkout intent lasts from its newest tap, so the same tab back much later
 // counts its view again.

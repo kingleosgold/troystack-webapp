@@ -220,6 +220,24 @@ describe('on an iPhone', () => {
     expect(counts).toEqual([['gold_view', null, `site-${'a'.repeat(31)}-app`]]);
   });
 
+  it('opens a Gold page sheet on card checkout and counts nothing the page already did', async () => {
+    state.user = null;
+    render({ campaign: 'webapp-gold', plan: 'monthly', counted: ['monthly'] });
+    expect(() => button('Rather start it here with a card?')).toThrow();
+    await click(button('Start my free week'));
+    expect(counts).toEqual([]);
+    expect(rememberGoldTap).not.toHaveBeenCalled();
+  });
+
+  it('counts a plan switched to in a Gold page sheet under the plain campaign', async () => {
+    state.user = null;
+    render({ campaign: 'webapp-gold', plan: 'monthly', counted: ['monthly'] });
+    await click(button(/^Yearly/));
+    await click(button('Start my free week'));
+    expect(counts).toEqual([['plan_tap', 'yearly', 'webapp-gold']]);
+    expect(rememberGoldTap.mock.calls).toEqual([['yearly', 'webapp-gold']]);
+  });
+
   it('counts a tap from the card form under the plain campaign', async () => {
     state.user = null;
     render();
