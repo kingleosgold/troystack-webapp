@@ -438,12 +438,15 @@ test('an unconfirmed email on the sign-in form can send a new link to that addre
   const mock = await mockBackends(page, { authFails: { signIn: 'unconfirmed' } });
   await signInWith(page);
   await expect(page.getByRole('alert')).toHaveText('Confirm your email first. Tap the link we sent you, then sign in.');
-  // Changing the field after the error doesn't move where the link goes.
+  // A changed email isn't the account that was refused, so the offer waits for it to match again.
   await page.getByLabel('Email').fill('someone-else@example.com');
+  await expect(page.getByRole('button', { name: 'Send a new link' })).toHaveCount(0);
+  await page.getByLabel('Email').fill('someone@example.com');
   await page.getByRole('button', { name: 'Send a new link' }).click();
   await expect(page.getByRole('status')).toHaveText('We sent a new link to someone@example.com. Tap it, then sign in.');
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Send a new link' })).toHaveCount(0);
+  await expect(page.getByLabel('Password', { exact: true })).toBeFocused();
   expect(mock.resends).toEqual([expect.objectContaining({ type: 'signup', email: 'someone@example.com' })]);
 });
 
@@ -475,5 +478,24 @@ test('a wrong password offers no new link', async ({ page }) => {
   await mockBackends(page, { authFails: { signIn: 'wrong-password' } });
   await signInWith(page);
   await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send a new link' })).toHaveCount(0);
+});
+
+test('a new link on the way to checkout says checkout opens from it', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signIn: 'unconfirmed' } });
+  await page.goto('/auth?redirect=checkout&plan=yearly');
+  await page.getByLabel('Email').fill('new-person@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('a-good-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await page.getByRole('button', { name: 'Send a new link' }).click();
+  await expect(page.getByRole('status')).toHaveText("We sent a new link to new-person@example.com. Tap it and you'll go straight to checkout.");
+});
+
+test('switching forms drops the new link offer', async ({ page }) => {
+  await mockBackends(page, { authFails: { signIn: 'unconfirmed' } });
+  await signInWith(page);
+  await expect(page.getByRole('button', { name: 'Send a new link' })).toBeVisible();
+  await page.getByRole('button', { name: 'Forgot password?' }).click();
+  await page.getByRole('button', { name: 'Back to sign in' }).click();
   await expect(page.getByRole('button', { name: 'Send a new link' })).toHaveCount(0);
 });

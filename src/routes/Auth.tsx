@@ -237,7 +237,13 @@ export default function Auth() {
         // One link at a time, so the offer goes once it's sent.
         setError(null);
         setResendFor(null);
-        setNotice(`We sent a new link to ${resendFor}. Tap it, then sign in.`);
+        setNotice(
+          forCheckout
+            ? `We sent a new link to ${resendFor}. Tap it and you'll go straight to checkout.`
+            : `We sent a new link to ${resendFor}. Tap it, then sign in.`,
+        );
+        // The button goes away once it's sent, so focus moves on to the form.
+        passwordRef.current?.focus();
       }
     } catch (e) {
       setError(authThrew(e));
@@ -348,7 +354,7 @@ export default function Auth() {
                   </button>
                 </p>
               )}
-              {resendFor && (
+              {resendFor && resendFor === email.trim() && (
                 <p className="mt-1.5 text-[13px] text-fg-2">
                   Link expired or lost?{' '}
                   <button
@@ -368,7 +374,7 @@ export default function Auth() {
               {notice}
             </p>
           )}
-          <Button type="submit" size="lg" className="w-full" disabled={busy || !email.trim() || (mode !== 'forgot' && !password)}>
+          <Button type="submit" size="lg" className="w-full" disabled={busy || resending || !email.trim() || (mode !== 'forgot' && !password)}>
             {busy ? 'One moment' : mode === 'signup' ? 'Create account' : mode === 'forgot' ? 'Send the link' : 'Sign in'}
           </Button>
         </form>
