@@ -140,6 +140,10 @@ describe('a fresh visit', () => {
       ['gold_view', null, 'site-pricing'],
       ['plan_tap', 'yearly', 'site-pricing'],
     ]);
+    // The sheet and the remembered tap carry the site token too, so checkout
+    // credits the link and a back-out from Stripe knows the tap counted.
+    expect(openTrial).toHaveBeenLastCalledWith(expect.objectContaining({ campaign: 'site-pricing', plan: 'yearly', counted: ['yearly'] }));
+    expect(goldTap()).toEqual({ plans: ['yearly'], campaign: 'site-pricing' });
   });
 });
 
