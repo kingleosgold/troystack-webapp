@@ -85,6 +85,10 @@ export default function Auth() {
   // has likely expired, so the form offers a new one for that address.
   const [resendFor, setResendFor] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
+  // Bumped by anything that moves the form on, so a resend that answers late
+  // can't write over what the person did since.
+  const resendSeq = useRef(0);
+  const resendRef = useRef<HTMLButtonElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
   const plan = params.get('plan');
@@ -127,13 +131,20 @@ export default function Auth() {
     );
   }
 
+  // Drops the new link offer and any send still in flight.
+  const dropResend = () => {
+    resendSeq.current += 1;
+    setResendFor(null);
+    setResending(false);
+  };
+
   const switchMode = (m: Mode) => {
     setMode(m);
     setError(null);
     setNotice(null);
     setOfferSignUp(false);
     setPasswordRefused(false);
-    setResendFor(null);
+    dropResend();
   };
 
   // A refused password is the thing to change, so the cursor goes back to it
@@ -151,7 +162,7 @@ export default function Auth() {
     setNotice(null);
     setOfferSignUp(false);
     setPasswordRefused(false);
-    setResendFor(null);
+    dropResend();
     setBusy(true);
     try {
       if (mode === 'forgot') {
@@ -228,9 +239,13 @@ export default function Auth() {
 
   const resend = async () => {
     if (!resendFor || resending) return;
+    const mine = ++resendSeq.current;
     setResending(true);
     try {
       const { error: err } = await resendConfirmation(resendFor);
+      // The person switched forms, signed in again or tried Apple or Google
+      // while this was out, so its answer no longer belongs on the page.
+      if (mine !== resendSeq.current) return;
       if (err) {
         setError(authTrouble(err, 'try again'));
       } else {
@@ -242,13 +257,15 @@ export default function Auth() {
             ? `We sent a new link to ${resendFor}. Tap it and you'll go straight to checkout.`
             : `We sent a new link to ${resendFor}. Tap it, then sign in.`,
         );
-        // The button goes away once it's sent, so focus moves on to the form.
-        passwordRef.current?.focus();
+        // The button goes away once it's sent, so focus moves on to the form,
+        // unless the person already moved it somewhere else.
+        const at = document.activeElement;
+        if (!at || at === document.body || at === resendRef.current) passwordRef.current?.focus();
       }
     } catch (e) {
-      setError(authThrew(e));
+      if (mine === resendSeq.current) setError(authThrew(e));
     } finally {
-      setResending(false);
+      if (mine === resendSeq.current) setResending(false);
     }
   };
 
@@ -258,7 +275,7 @@ export default function Auth() {
     setNotice(null);
     setOfferSignUp(false);
     setPasswordRefused(false);
-    setResendFor(null);
+    dropResend();
     const { error: err } = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
     if (err) setError(authTrouble(err, 'try again'));
   };
@@ -357,11 +374,13 @@ export default function Auth() {
               {resendFor && resendFor === email.trim() && (
                 <p className="mt-1.5 text-[13px] text-fg-2">
                   Link expired or lost?{' '}
+                  {/* aria-disabled rather than disabled, so focus stays on the button while it sends and after a failed send. */}
                   <button
+                    ref={resendRef}
                     type="button"
                     onClick={() => void resend()}
-                    disabled={resending}
-                    className="font-semibold text-gold hover:text-gold-2 disabled:opacity-60"
+                    aria-disabled={resending || undefined}
+                    className="font-semibold text-gold hover:text-gold-2 aria-disabled:opacity-60"
                   >
                     {resending ? 'Sending' : 'Send a new link'}
                   </button>
@@ -369,11 +388,10 @@ export default function Auth() {
               )}
             </div>
           )}
-          {notice && (
-            <p className="text-[13px] text-up" role="status">
-              {notice}
-            </p>
-          )}
+          {/* Always in the page, so a screen reader is already listening when the words arrive. */}
+          <p className={notice ? 'text-[13px] text-up' : 'sr-only'} role="status">
+            {notice}
+          </p>
           <Button type="submit" size="lg" className="w-full" disabled={busy || resending || !email.trim() || (mode !== 'forgot' && !password)}>
             {busy ? 'One moment' : mode === 'signup' ? 'Create account' : mode === 'forgot' ? 'Send the link' : 'Sign in'}
           </Button>

@@ -499,3 +499,48 @@ test('switching forms drops the new link offer', async ({ page }) => {
   await page.getByRole('button', { name: 'Back to sign in' }).click();
   await expect(page.getByRole('button', { name: 'Send a new link' })).toHaveCount(0);
 });
+
+test('a new link still sending when the form switches leaves no word behind', async ({ page }) => {
+  const mock = await mockBackends(page, { authFails: { signIn: 'unconfirmed' }, resendDelayMs: 1500 });
+  await signInWith(page);
+  const answered = page.waitForResponse((r) => r.url().includes('/auth/v1/resend'));
+  await page.getByRole('button', { name: 'Send a new link' }).click();
+  await expect(page.getByRole('button', { name: 'Sending' })).toBeVisible();
+  await page.getByRole('button', { name: 'Forgot password?' }).click();
+  await page.getByRole('button', { name: 'Back to sign in' }).click();
+  await answered;
+  // The late answer belongs to the form that's gone, so the fresh one stays quiet.
+  await page.waitForTimeout(200);
+  await expect(page.getByRole('status')).toHaveText('');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
+  expect(mock.resends).toHaveLength(1);
+});
+
+test('a new link that fails keeps focus on the button to try again', async ({ page }) => {
+  await mockBackends(page, { authFails: { signIn: 'unconfirmed', resend: 'outage' } });
+  await signInWith(page);
+  const button = page.getByRole('button', { name: 'Send a new link' });
+  await button.click();
+  await expect(page.getByRole('alert')).toHaveText(OUTAGE);
+  await expect(button).toBeFocused();
+});
+
+test('a new link leaves focus where the person moved it', async ({ page }) => {
+  await mockBackends(page, { authFails: { signIn: 'unconfirmed' }, resendDelayMs: 800 });
+  await signInWith(page);
+  await page.getByRole('button', { name: 'Send a new link' }).click();
+  await page.getByLabel('Email').focus();
+  await expect(page.getByRole('status')).toHaveText('We sent a new link to someone@example.com. Tap it, then sign in.');
+  await expect(page.getByLabel('Email')).toBeFocused();
+});
+
+test('a second tap while a new link is sending sends only one', async ({ page }) => {
+  const mock = await mockBackends(page, { authFails: { signIn: 'unconfirmed' }, resendDelayMs: 800 });
+  await signInWith(page);
+  await page.getByRole('button', { name: 'Send a new link' }).click();
+  // aria-disabled reads as not enabled to Playwright, so the tap is forced the way a person's would land.
+  await page.getByRole('button', { name: 'Sending' }).click({ force: true });
+  await expect(page.getByRole('status')).toHaveText('We sent a new link to someone@example.com. Tap it, then sign in.');
+  expect(mock.resends).toHaveLength(1);
+});
