@@ -392,7 +392,13 @@ export default function Auth() {
           <p className={notice ? 'text-[13px] text-up' : 'sr-only'} role="status">
             {notice}
           </p>
-          <Button type="submit" size="lg" className="w-full" disabled={busy || resending || !email.trim() || (mode !== 'forgot' && !password)}>
+          {/* A send only holds the form while its offer shows. Once the email changes, signing in drops it. */}
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={busy || (resending && resendFor === email.trim()) || !email.trim() || (mode !== 'forgot' && !password)}
+          >
             {busy ? 'One moment' : mode === 'signup' ? 'Create account' : mode === 'forgot' ? 'Send the link' : 'Sign in'}
           </Button>
         </form>

@@ -544,3 +544,17 @@ test('a second tap while a new link is sending sends only one', async ({ page })
   await expect(page.getByRole('status')).toHaveText('We sent a new link to someone@example.com. Tap it, then sign in.');
   expect(mock.resends).toHaveLength(1);
 });
+
+test('a new email mid-send can sign in at once and the late answer stays quiet', async ({ page }) => {
+  await mockBackends(page, { authFails: { signIn: 'unconfirmed' }, resendDelayMs: 1500 });
+  await signInWith(page);
+  const answered = page.waitForResponse((r) => r.url().includes('/auth/v1/resend'));
+  await page.getByRole('button', { name: 'Send a new link' }).click();
+  await page.getByLabel('Email').fill('someone-else@example.com');
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText('Confirm your email first. Tap the link we sent you, then sign in.');
+  await answered;
+  await page.waitForTimeout(200);
+  await expect(page.getByRole('status')).toHaveText('');
+});
