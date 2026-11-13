@@ -6,6 +6,7 @@ import { usePageMeta } from '../hooks/usePageMeta';
 import { stillSignedInAs } from '../lib/account';
 import { Button, Field, Input } from '../ui/primitives';
 import { authThrew, authTrouble } from '../lib/authErrors';
+import { clearPasswordNote } from '../lib/passwordNote';
 
 const RESET_TOO_OLD = 'This reset link is too old to change your password now. Get a new link, then try again.';
 
@@ -64,7 +65,10 @@ export default function ResetPassword() {
       // Signing out and back in doesn't help here, since the reset link is what signed them in.
       if (err?.code === 'reauthentication_needed') setError(RESET_TOO_OLD);
       else if (err) setError(authTrouble(err, 'try again'));
-      else setDone(true);
+      else {
+        clearPasswordNote();
+        setDone(true);
+      }
     } catch (e) {
       if (stillSignedInAs(owner)) setError(authThrew(e));
     } finally {

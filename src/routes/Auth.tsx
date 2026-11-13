@@ -7,7 +7,8 @@ import { countStep } from '../lib/funnel';
 import { PRIVACY_URL, TERMS_URL } from '../lib/appStore';
 import { Button, Field, Input } from '../ui/primitives';
 import { NewTabNote } from '../ui/NewTabNote';
-import { authThrew, authTrouble, isUnconfirmed, isWeakPassword, type AuthErr } from '../lib/authErrors';
+import { authThrew, authTrouble, isLeakedPassword, isUnconfirmed, isWeakPassword, type AuthErr } from '../lib/authErrors';
+import { rememberPasswordNote } from '../lib/passwordNote';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 
@@ -209,7 +210,10 @@ export default function Auth() {
           // account in the iPhone app under looser rules still signs in with
           // it, and checkout opens on this form, so try it as a sign-in before
           // asking for a new password.
-          const { error: inErr } = await signIn(email.trim(), password);
+          const { error: inErr, userId } = await signIn(email.trim(), password);
+          // Kept even when the person moved on, since the sign-in went through
+          // either way and the password is still worth changing.
+          if (!inErr && userId) rememberPasswordNote(userId, isLeakedPassword(err) ? 'leaked' : 'weak');
           if (stale()) return;
           if (inErr && isUnconfirmed(inErr)) {
             // The account is there with this password, it only needs the link.

@@ -20,6 +20,7 @@ import {
   Warehouse,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { PasswordNote } from './PasswordNote';
 import { useSignOut } from '../contexts/SignOutContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { useWebGoldOffer } from '../hooks/useWebGoldOffer';
@@ -532,6 +533,7 @@ export default function AppShell() {
         <MobileTopBar onMenu={() => setMenuPath(pathname)} />
         <DesktopTopBar />
         <main id="main" ref={mainRef} className={cx('flex-1 min-w-0', showTabs ? 'pb-24 lg:pb-0' : '')}>
+          {showTabs && <PasswordNote />}
           <ErrorBoundary resetKey={pathname}>
             <Suspense fallback={<PageLoading />}>
               <Outlet />
