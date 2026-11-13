@@ -84,9 +84,9 @@ function WebCheckout({
   // The sheet counts each plan someone goes on with, once a plan for each
   // opening. The Gold page counts its own tap and opens the sheet with that
   // plan picked, so that one has counted already. A different plan picked in
-  // a sheet the Gold page opened is a new pick and counts, and it becomes the
-  // Gold page's remembered tap, so backing out of Stripe on it doesn't count
-  // it again there.
+  // a sheet the Gold page opened is a new pick and counts, and it joins the
+  // Gold page's remembered taps, so backing out of Stripe doesn't count it or
+  // the first pick again there.
   const counted = useRef(new Set<WebPlan>(initialPlan ? [initialPlan] : []));
   const go = async () => {
     setError(null);

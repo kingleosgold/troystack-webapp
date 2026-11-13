@@ -127,6 +127,35 @@ test('a Gold-page checkout with no troystack.com token backs out to the plans, n
   expect(steps).toEqual([{ step: 'plan_tap', plan: 'yearly', campaign: 'webapp-gold' }]);
 });
 
+test('a second back-out from the Gold page counts neither plan already picked in this tab', async ({ page, baseURL }) => {
+  await mockBackends(page);
+  await stubStripe(page);
+  const checkouts = watch(page);
+  await page.goto('/gold');
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  await page.getByLabel('Email').fill('new@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('a-long-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+
+  const steps: Array<Record<string, unknown>> = [];
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/funnel') && r.method() === 'POST') steps.push(r.postDataJSON());
+  });
+  // Back out, pick yearly, back out again.
+  await page.goto(checkouts[0].cancel_url as string);
+  await page.getByRole('button', { name: 'Start free week' }).first().click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  expect(checkouts[1].cancel_url).toBe(`${baseURL}/gold?back=1`);
+  await page.goto(checkouts[1].cancel_url as string);
+  await expect(page).toHaveURL(/\/gold$/);
+  // Lifetime was this tab's first pick, so it doesn't count a second time.
+  await page.getByRole('button', { name: 'Get Lifetime' }).click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  expect(checkouts).toHaveLength(3);
+  expect(steps).toEqual([{ step: 'plan_tap', plan: 'yearly', campaign: 'webapp-gold' }]);
+});
+
 test("a troystack.com link straight to checkout backs out to the plans and counts the view there", async ({ page, baseURL }) => {
   await mockBackends(page);
   await stubStripe(page);

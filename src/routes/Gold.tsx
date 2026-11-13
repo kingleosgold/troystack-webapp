@@ -7,7 +7,7 @@ import { useTrial } from '../contexts/TrialContext';
 import { useAuth } from '../contexts/AuthContext';
 import SEO from '../lib/seo.json';
 import { GOLD } from '../lib/appStore';
-import { backedOutPlan, goldPagePlans, rememberGoldTap, siteCampaign, webCheckoutReady, type WebPlan } from '../lib/checkout';
+import { backedOutPlans, goldPagePlans, rememberGoldTap, siteCampaign, webCheckoutReady, type WebPlan } from '../lib/checkout';
 import { appCampaign, countStep } from '../lib/funnel';
 import { FREE_FEATURES, GOLD_FEATURES } from '../lib/gold';
 import { cx } from '../lib/cx';
@@ -34,13 +34,13 @@ export default function Gold() {
   const [params, setParams] = useSearchParams();
   const [campaign] = useState(() => siteCampaign(params.get('campaign')) ?? 'webapp-gold');
   // Someone back from Stripe already counted a view and a tap on the way in,
-  // so this visit doesn't count the view again, or a tap on the same plan.
-  // A different plan is a new pick and counts.
-  const [tappedBefore] = useState(() => backedOutPlan(params.get('back'), campaign));
+  // so this visit doesn't count the view again, or a tap on any plan this tab
+  // already picked under the campaign. A plan not picked yet is new and counts.
+  const [tappedBefore] = useState(() => backedOutPlans(params.get('back'), campaign));
   // The card already showed the plan and its price, so where it can be bought
   // here the button goes on to sign-up or Stripe without a second pick.
   const start = (plan: WebPlan) => {
-    if (plan !== tappedBefore) countStep('plan_tap', plan, campaign);
+    if (!tappedBefore?.includes(plan)) countStep('plan_tap', plan, campaign);
     rememberGoldTap(plan, campaign);
     openTrial({ campaign, plan, start: webCheckoutReady(plan) });
   };

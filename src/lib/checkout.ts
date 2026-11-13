@@ -201,44 +201,53 @@ export function takeNextPath(now = Date.now()): string | null {
   }
 }
 
-// The plan this tab last tapped on the Gold page, and under which campaign.
-// It's how checkout knows the view and tap already counted, so a back-out
-// can say so, and only for someone who came through the Gold page. A tap
-// older than the half hour a sign-up or checkout intent lasts no longer
-// counts, so the same tab back much later counts its view again.
+// The plans this tab tapped on the Gold page, and under which campaign. It's
+// how checkout knows the view and those taps already counted, so a back-out
+// can say so, and only for someone who came through the Gold page. Every plan
+// tapped under the campaign is kept, so one picked, switched in the sheet and
+// picked again after a back-out still counts once. A tap under another
+// campaign starts the list over. The list lasts the half hour a sign-up or
+// checkout intent lasts from its newest tap, so the same tab back much later
+// counts its view again.
 const GOLD_TAP_KEY = 'stg_gold_tap';
 
 export function rememberGoldTap(plan: WebPlan, campaign: CheckoutCampaign, now = Date.now()): void {
   try {
-    sessionStorage.setItem(GOLD_TAP_KEY, JSON.stringify({ plan, campaign, at: now }));
+    const before = goldTap(now);
+    const plans = before?.campaign === campaign ? before.plans.filter((p) => p !== plan) : [];
+    sessionStorage.setItem(GOLD_TAP_KEY, JSON.stringify({ plans: [...plans, plan], campaign, at: now }));
   } catch {
     // the back-out counts again, as before
   }
 }
 
-export function goldTap(now = Date.now()): { plan: WebPlan; campaign: string } | null {
+export function goldTap(now = Date.now()): { plans: WebPlan[]; campaign: string } | null {
   try {
     const raw = sessionStorage.getItem(GOLD_TAP_KEY);
     if (!raw || !raw.startsWith('{')) return null;
-    const parsed = JSON.parse(raw) as { plan?: unknown; campaign?: unknown; at?: unknown };
+    const parsed = JSON.parse(raw) as { plans?: unknown; plan?: unknown; campaign?: unknown; at?: unknown };
     const at = typeof parsed.at === 'number' ? parsed.at : 0;
     if (now - at > INTENT_TTL_MS || at > now + 60_000) return null;
-    if (!isWebPlan(parsed.plan) || typeof parsed.campaign !== 'string') return null;
-    return { plan: parsed.plan, campaign: parsed.campaign };
+    if (typeof parsed.campaign !== 'string') return null;
+    // A tab open across the deploy may still hold the one plan it kept before.
+    const listed = Array.isArray(parsed.plans) ? parsed.plans : [parsed.plan];
+    const plans = listed.filter(isWebPlan);
+    if (plans.length === 0) return null;
+    return { plans, campaign: parsed.campaign };
   } catch {
     return null;
   }
 }
 
 /**
- * The plan someone back from Stripe already tapped on the Gold page, when the
- * address says back=1 and this tab's tap was under the same campaign. Their
- * view and that tap already counted, so the page counts neither again.
+ * The plans someone back from Stripe already tapped on the Gold page, when the
+ * address says back=1 and this tab's taps were under the same campaign. Their
+ * view and those taps already counted, so the page counts none of them again.
  */
-export function backedOutPlan(back: string | null, campaign: string, now = Date.now()): WebPlan | undefined {
+export function backedOutPlans(back: string | null, campaign: string, now = Date.now()): readonly WebPlan[] | undefined {
   if (back !== '1') return undefined;
   const before = goldTap(now);
-  return before?.campaign === campaign ? before.plan : undefined;
+  return before?.campaign === campaign ? before.plans : undefined;
 }
 
 /**
