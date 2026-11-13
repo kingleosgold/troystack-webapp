@@ -280,6 +280,16 @@ describe('a plan tapped on the Gold page', () => {
     expect(c.goldTap(now)).toBeNull();
   });
 
+  it('reads a tap up to a minute ahead of the clock and none further, so a skewed clock still counts once', async () => {
+    const c = await withPrices({ monthly: 'price_m' });
+    store.set('stg_gold_tap', JSON.stringify({ plans: ['monthly'], campaign: 'webapp-gold', at: now + 60_000 }));
+    expect(c.goldTap(now)).toEqual({ plans: ['monthly'], campaign: 'webapp-gold' });
+    expect(c.backedOutPlans('1', 'webapp-gold', now)).toEqual(['monthly']);
+    store.set('stg_gold_tap', JSON.stringify({ plans: ['monthly'], campaign: 'webapp-gold', at: now + 60_001 }));
+    expect(c.goldTap(now)).toBeNull();
+    expect(c.backedOutPlans('1', 'webapp-gold', now)).toBeUndefined();
+  });
+
   it("keeps a back-out to the Gold page from saying the counts happened once the tap is stale", async () => {
     const c = await withPrices({ monthly: 'price_m' });
     c.rememberGoldTap('monthly', 'webapp-gold', Date.now() - 31 * 60 * 1000);
