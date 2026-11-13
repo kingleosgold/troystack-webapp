@@ -175,12 +175,24 @@ export default function Auth() {
               setError(authTrouble(inErr, 'sign in'));
             }
           }
-        } else if (err) {
-          setError(authTrouble(err, 'try again'));
-          if (isWeakPassword(err)) {
+        } else if (err && isWeakPassword(err)) {
+          // Supabase checks a password only when one is set, and it refuses a
+          // weak one before it looks for the email. Someone who made their
+          // account in the iPhone app under looser rules still signs in with
+          // it, and checkout opens on this form, so try it as a sign-in before
+          // asking for a new password.
+          const { error: inErr } = await signIn(email.trim(), password);
+          if (inErr && inErr.code === 'email_not_confirmed') {
+            // The account is there with this password, it only needs the link.
+            setMode('signin');
+            setError(authTrouble(inErr, 'sign in'));
+          } else if (inErr) {
+            setError(authTrouble(err, 'try again'));
             setPasswordRefused(true);
             retypePassword();
           }
+        } else if (err) {
+          setError(authTrouble(err, 'try again'));
         } else if (needsConfirmation) {
           setNotice(
             forCheckout
@@ -204,7 +216,11 @@ export default function Auth() {
   };
 
   const oauth = async (provider: 'google' | 'apple') => {
+    // What the email form said last doesn't belong under an Apple or Google error.
     setError(null);
+    setNotice(null);
+    setOfferSignUp(false);
+    setPasswordRefused(false);
     const { error: err } = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
     if (err) setError(authTrouble(err, 'try again'));
   };

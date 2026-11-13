@@ -364,3 +364,72 @@ test("an old reset link whose sign-out can't reach the server still lands on the
   await expect(page).toHaveURL(/\/auth\?mode=forgot/);
   await expect(page.getByRole('button', { name: 'Send the link' })).toBeVisible();
 });
+
+const LEAKED = "That password shows up in lists of leaked passwords, so it isn't safe to use. Pick a longer one you don't use anywhere else.";
+
+test('an app user whose old password hits the leak check on sign-up is signed in with it', async ({ page }) => {
+  const tried: string[] = [];
+  page.on('request', (r) => { if (r.url().includes('/auth/v1/token')) tried.push(r.postData() ?? ''); });
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page).not.toHaveURL(/\/auth/);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  expect(tried.some((b) => b.includes('new-person@example.com') && b.includes('a-good-password'))).toBe(true);
+});
+
+test('a leaked password on sign-up for an account with another password still asks for a new one', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'other', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText(LEAKED);
+  await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
+  await expect(page.getByLabel('Password', { exact: true })).toBeFocused();
+});
+
+test('a leaked password on sign-up stays the reason when the quiet sign-in is rate limited', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'rate-limited', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText(LEAKED);
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+});
+
+test('a leaked password on sign-up for an unconfirmed account points to the link', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password', signIn: 'unconfirmed' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText('Confirm your email first. Tap the link we sent you, then sign in.');
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+});
+
+test('a leaked password in Settings says so in plain words', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { authFails: { updateUser: 'leaked-password' } });
+  await page.goto('/settings');
+  await page.getByText('Email and password').click();
+  const sheet = page.getByRole('dialog', { name: /email (or|and) (a )?password/i });
+  await sheet.getByLabel('New password').fill('a longer password');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(sheet.getByText(LEAKED)).toBeVisible();
+  await expect(page.getByText(/known to be weak/)).toHaveCount(0);
+});
+
+test('a leaked password from a reset link says so in plain words', async ({ page }) => {
+  await signIn(page);
+  await mockBackends(page, { authFails: { updateUser: 'leaked-password' } });
+  await page.goto('/reset-password');
+  await page.getByLabel('New password', { exact: true }).fill('a longer password');
+  await page.getByLabel('New password again').fill('a longer password');
+  await page.getByRole('button', { name: /save|set|update/i }).click();
+  await expect(page.getByRole('alert')).toHaveText(LEAKED);
+  await expect(page.getByText(/known to be weak/)).toHaveCount(0);
+});
+
+test('a stand-in user for another email still goes to sign-in', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'other', hideExistingAccount: true });
+  await page.goto('/auth?mode=signup');
+  await page.getByLabel('Email').fill('someone-else@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('a-good-password');
+  const sent = page.waitForResponse((r) => r.url().includes('/auth/v1/signup'));
+  await page.getByRole('button', { name: 'Create account' }).click();
+  expect(((await (await sent).json()) as { email: string }).email).toBe('someone-else@example.com');
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Email')).toHaveValue('someone-else@example.com');
+});
