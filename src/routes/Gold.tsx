@@ -58,10 +58,12 @@ export default function Gold() {
   // One view per visit, under the token it landed with, counted the way the
   // plan sheet counts. It waits until sign-in and the plan are known, so a
   // Gold account isn't counted. A session or plan that can't be read still
-  // counts, since the page showed its plans. Where checkout can't run here the
-  // plans send people to the app, so the view counts under -app.
+  // counts, since the page showed its plans. A session that can't be read
+  // still waits on the plan of anyone the listener has reported signed in by
+  // then, so that Gold account isn't counted either. Where checkout can't run
+  // here the plans send people to the app, so the view counts under -app.
   const viewed = useRef(false);
-  const known = (!authLoading && !(user && loading)) || sessionUnreadable || unreadable;
+  const known = ((!authLoading || sessionUnreadable) && !(user && loading)) || unreadable;
   useEffect(() => {
     if (viewed.current || tappedBefore !== undefined || !known || isGold) return;
     viewed.current = true;
