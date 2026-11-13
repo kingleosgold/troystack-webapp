@@ -3,7 +3,7 @@ import { createElement as h, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { rememberGoldTap, type WebPlan } from '../lib/checkout';
+import { goldTap, rememberGoldTap, type WebPlan } from '../lib/checkout';
 import Gold from './Gold';
 
 // Lets act() flush effects without React warning that this isn't a test setup.
@@ -97,6 +97,8 @@ describe('a visit back from Stripe', () => {
     tap('yearly');
     expect(taps()).toEqual([['plan_tap', 'yearly', 'webapp-gold']]);
     expect(openTrial).toHaveBeenLastCalledWith(expect.objectContaining({ plan: 'yearly', counted: ['yearly', 'lifetime'] }));
+    // The page remembers it, so the next back-out doesn't count it again.
+    expect(goldTap()).toEqual({ plans: ['lifetime', 'yearly'], campaign: 'webapp-gold' });
 
     // The sheet counts monthly on its own and adds it to the remembered taps.
     rememberGoldTap('monthly', 'webapp-gold');
@@ -111,6 +113,33 @@ describe('a visit back from Stripe', () => {
     ]);
     expect(openTrial).toHaveBeenLastCalledWith(expect.objectContaining({ plan: 'lifetime', counted: ['lifetime'] }));
     expect(counts.filter((c) => c[0] === 'gold_view')).toEqual([]);
+  });
+});
+
+describe('a fresh visit', () => {
+  it('counts the view under the plain campaign where checkout runs here', () => {
+    render('/gold');
+    expect(counts).toEqual([['gold_view', null, 'webapp-gold']]);
+  });
+
+  it('counts the view and a tap again on a reload with no back=1, whatever this tab picked before', () => {
+    rememberGoldTap('yearly', 'webapp-gold');
+    render('/gold');
+    tap('yearly');
+    expect(counts).toEqual([
+      ['gold_view', null, 'webapp-gold'],
+      ['plan_tap', 'yearly', 'webapp-gold'],
+    ]);
+  });
+
+  it('counts a back=1 landing under a site token when the earlier taps were under another campaign', () => {
+    rememberGoldTap('yearly', 'webapp-gold');
+    render('/gold?campaign=site-pricing&back=1');
+    tap('yearly');
+    expect(counts).toEqual([
+      ['gold_view', null, 'site-pricing'],
+      ['plan_tap', 'yearly', 'site-pricing'],
+    ]);
   });
 });
 
