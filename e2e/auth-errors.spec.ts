@@ -694,3 +694,52 @@ test('a plain sign-in leaves no password note', async ({ page }) => {
   await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
   await expect(page.getByText(WEAK_NOTE)).toHaveCount(0);
 });
+
+test('waving off the password note keeps focus on the page', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  await page.getByRole('button', { name: 'Dismiss the password note' }).click();
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+  await expect(page.locator('main#main')).toBeFocused();
+});
+
+test('the password note arrives in a status region that was already on the page', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  const note = page.getByRole('status').filter({ hasText: LEAKED_NOTE });
+  await expect(note).toBeVisible();
+  await page.getByRole('button', { name: 'Dismiss the password note' }).click();
+  // The region stays, empty, so the next note is announced.
+  await expect(page.locator('main#main > [role="status"]')).toHaveCount(1);
+  await expect(page.locator('main#main > [role="status"]')).toHaveText('');
+});
+
+test('Change password on Settings opens the sheet without adding a Back step', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  const landed = page.url();
+  await page.goto('/settings');
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  await page.getByRole('button', { name: 'Change password' }).click();
+  await expect(page.getByRole('dialog', { name: /email (or|and) (a )?password/i })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.goBack();
+  await expect(page).toHaveURL(landed);
+});
+
+test('signing out drops the password note, so signing back in shows none', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  await page.goto('/settings');
+  await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  expect(await page.evaluate(() => sessionStorage.getItem('ts_password_note'))).toBeNull();
+  await signInWith(page);
+  await expect(page).not.toHaveURL(/\/auth/);
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+});
