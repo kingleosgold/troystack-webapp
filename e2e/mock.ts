@@ -498,13 +498,17 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       if (opts.existingAccount === 'other') return fulfillAuthError(route, 400, 'invalid_credentials', 'Invalid login credentials');
       if (opts.existingAccount === 'rate-limited') return fulfillAuthError(route, 429, 'over_request_rate_limit', 'Request rate limit reached');
       if (opts.existingAccount === 'outage') return route.fulfill({ status: 503, headers: CORS, body: '' });
+      // A refused sign-up with no account behind it has nothing to sign in to.
+      if (opts.authFails?.signUp && !opts.existingAccount) return fulfillAuthError(route, 400, 'invalid_credentials', 'Invalid login credentials');
       return fulfillJson(route, sessionFor());
     }
     // A new email account gets its session at once, as production confirms email sign-ups.
     if (url.pathname === '/auth/v1/signup' && req.method() === 'POST') {
       if (opts.authFails?.signUp) return fulfillAuthFailure(route, opts.authFails.signUp);
       if (opts.existingAccount && opts.hideExistingAccount) {
-        return fulfillJson(route, { id: '00000000-0000-4000-8000-0000000000aa', aud: 'authenticated', role: '', email: 'new-person@example.com', identities: [], user_metadata: {}, app_metadata: {}, created_at: '2026-11-13T00:00:00Z', updated_at: '2026-11-13T00:00:00Z' });
+        // The stand-in carries back the email it was sent, as Supabase's does.
+        const sent = (req.postDataJSON() as { email?: string } | null)?.email ?? '';
+        return fulfillJson(route, { id: '00000000-0000-4000-8000-0000000000aa', aud: 'authenticated', role: '', email: sent, identities: [], user_metadata: {}, app_metadata: {}, created_at: '2026-11-13T00:00:00Z', updated_at: '2026-11-13T00:00:00Z' });
       }
       if (opts.existingAccount) return fulfillAuthError(route, 422, 'user_already_exists', 'User already registered');
       return fulfillJson(route, sessionFor());

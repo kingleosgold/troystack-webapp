@@ -226,3 +226,16 @@ test.describe('what checkout says is in the way, in the Gold sheet', () => {
     await expect(page).toHaveURL(/\/settings$/);
   });
 });
+
+test('an app user whose old password hits the leak check on the checkout sign-up goes on to Stripe', async ({ page }) => {
+  const bodies = watchCheckouts(page);
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await stubStripe(page);
+  await page.goto('/auth?mode=signup&redirect=checkout&plan=yearly');
+  await page.getByLabel('Email').fill('app-user@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('an-old-password');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page.getByRole('heading', { name: 'Stripe checkout' })).toBeVisible();
+  expect(bodies).toHaveLength(1);
+  expect(bodies[0].price_id).toBeTruthy();
+});
