@@ -128,8 +128,34 @@ test('a sign-in that matches no account offers to make one with the same email',
   await expect(page.getByRole('alert')).toHaveText("That email and password don't match an account.");
   await page.getByRole('button', { name: 'Make one with this email' }).click();
   await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
+  await expect(page.getByLabel('Password', { exact: true })).toBeFocused();
   await expect(page.getByLabel('Email')).toHaveValue('someone@example.com');
   await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('a sign-up Supabase hides behind a stand-in user goes to sign-in, not a link that never comes', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'other', hideExistingAccount: true });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText(
+    "There's already an account for that email. Enter its password to sign in, or use Apple or Google if that's how you made it.",
+  );
+  await expect(page.getByText(/Check your email/)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
+});
+
+test('a sign-up Supabase hides behind a stand-in user signs in when the password matches', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', hideExistingAccount: true });
+  await signUpWith(page);
+  await expect(page).not.toHaveURL(/\/auth/);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('a leaked password marks the password field and ties the reason to it', async ({ page }) => {
+  await mockBackends(page, { authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  const field = page.getByLabel('Password', { exact: true });
+  await expect(field).toHaveAttribute('aria-invalid', 'true');
+  await expect(field).toHaveAccessibleDescription(/lists of leaked passwords/);
 });
 
 test('a sign-in that fails for another reason does not offer a new account', async ({ page }) => {

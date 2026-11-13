@@ -124,6 +124,12 @@ export interface MockOptions {
    * 'outage' answers the sign-in with a 503.
    */
   existingAccount?: 'same-password' | 'other' | 'rate-limited' | 'outage';
+  /**
+   * Sign-up for an existing account answers the way hosted Supabase does with
+   * email confirmation on: a stand-in user with no identities and no session,
+   * instead of a refusal.
+   */
+  hideExistingAccount?: boolean;
   /** How the plain sign-in, sign-up and reset calls fail, each on its own. */
   authFails?: Partial<Record<'signIn' | 'signUp' | 'recover' | 'updateUser', AuthFailure>>;
 }
@@ -497,6 +503,9 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     // A new email account gets its session at once, as production confirms email sign-ups.
     if (url.pathname === '/auth/v1/signup' && req.method() === 'POST') {
       if (opts.authFails?.signUp) return fulfillAuthFailure(route, opts.authFails.signUp);
+      if (opts.existingAccount && opts.hideExistingAccount) {
+        return fulfillJson(route, { id: '00000000-0000-4000-8000-0000000000aa', aud: 'authenticated', role: '', email: 'new-person@example.com', identities: [], user_metadata: {}, app_metadata: {}, created_at: '2026-11-13T00:00:00Z', updated_at: '2026-11-13T00:00:00Z' });
+      }
       if (opts.existingAccount) return fulfillAuthError(route, 422, 'user_already_exists', 'User already registered');
       return fulfillJson(route, sessionFor());
     }

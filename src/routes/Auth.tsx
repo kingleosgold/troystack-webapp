@@ -79,6 +79,8 @@ export default function Auth() {
   // A sign-in that didn't match may be someone with no account yet, so the
   // form offers to make one with the email already typed.
   const [offerSignUp, setOfferSignUp] = useState(false);
+  // Supabase turned the password away, so the field is marked as the one to fix.
+  const [passwordRefused, setPasswordRefused] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
 
   const plan = params.get('plan');
@@ -126,6 +128,7 @@ export default function Auth() {
     setError(null);
     setNotice(null);
     setOfferSignUp(false);
+    setPasswordRefused(false);
   };
 
   // A refused password is the thing to change, so the cursor goes back to it
@@ -142,6 +145,7 @@ export default function Auth() {
     setError(null);
     setNotice(null);
     setOfferSignUp(false);
+    setPasswordRefused(false);
     setBusy(true);
     try {
       if (mode === 'forgot') {
@@ -151,11 +155,11 @@ export default function Auth() {
       } else if (mode === 'signup') {
         // Read before signing up, since signing in uses the waiting plan up.
         const campaign = forCheckout ? checkoutIntentCampaign() : undefined;
-        const { error: err, needsConfirmation } = await signUp(email.trim(), password);
-        if (!err) countStep('signup', forCheckout ? plan : null, campaign);
+        const { error: err, needsConfirmation, existingAccount } = await signUp(email.trim(), password);
+        if (!err && !existingAccount) countStep('signup', forCheckout ? plan : null, campaign);
         // Supabase refuses a weak password before it looks for the email, so a
         // weak password on an existing account shows the password rule, not this.
-        if (err && isExistingAccount(err)) {
+        if (existingAccount || (err && isExistingAccount(err))) {
           // Most people who land here already use this password in the
           // iPhone app, so try it before asking them to switch forms.
           const { error: inErr } = await signIn(email.trim(), password);
@@ -173,7 +177,10 @@ export default function Auth() {
           }
         } else if (err) {
           setError(authTrouble(err, 'try again'));
-          if (isWeakPassword(err)) retypePassword();
+          if (isWeakPassword(err)) {
+            setPasswordRefused(true);
+            retypePassword();
+          }
         } else if (needsConfirmation) {
           setNotice(
             forCheckout
@@ -253,7 +260,8 @@ export default function Auth() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pr-16"
-                  aria-describedby={mode === 'signup' ? 'auth-password-hint' : undefined}
+                  aria-describedby={[mode === 'signup' && 'auth-password-hint', passwordRefused && error && 'auth-error'].filter(Boolean).join(' ') || undefined}
+                  aria-invalid={passwordRefused || undefined}
                 />
               </Field>
               <button
@@ -273,13 +281,21 @@ export default function Auth() {
           )}
           {error && (
             <div className="rounded-xl border border-down/40 bg-down-soft px-3.5 py-3">
-              <p className="text-[13px] font-medium text-down" role="alert">
+              <p id="auth-error" className="text-[13px] font-medium text-down" role="alert">
                 {error}
               </p>
               {offerSignUp && mode === 'signin' && (
                 <p className="mt-1.5 text-[13px] text-fg-2">
                   No account yet?{' '}
-                  <button type="button" onClick={() => switchMode('signup')} className="font-semibold text-gold hover:text-gold-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // The button goes away with the error, so focus moves on to what's next.
+                      switchMode('signup');
+                      passwordRef.current?.focus();
+                    }}
+                    className="font-semibold text-gold hover:text-gold-2"
+                  >
                     Make one with this email
                   </button>
                 </p>
