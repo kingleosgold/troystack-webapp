@@ -1,4 +1,25 @@
-export type AuthErr = { code?: string; message: string; status?: number; name?: string };
+export type AuthErr = { code?: string; message: string; status?: number; name?: string; reasons?: unknown };
+
+/** What a form says when Supabase turns a password away because it shows up in leaked password lists. */
+export const LEAKED_PASSWORD =
+  "That password shows up in lists of leaked passwords, so it isn't safe to use. Pick a longer one you don't use anywhere else.";
+
+/** Supabase turned the password away, whether for its length, its characters or a leak. */
+export function isWeakPassword(err: AuthErr): boolean {
+  return err.code === 'weak_password' || err.name === 'AuthWeakPasswordError';
+}
+
+/**
+ * Supabase's leaked password check sends weak_password with the reason pwned and
+ * the words "known to be weak and easy to guess". Those words read like a typo
+ * in the password, so the form says what happened instead. A short password or
+ * a missing kind of character keeps Supabase's words, which already say what to fix.
+ */
+function isLeakedPassword(err: AuthErr): boolean {
+  if (!isWeakPassword(err)) return false;
+  if (Array.isArray(err.reasons) && err.reasons.includes('pwned')) return true;
+  return /known to be weak|easy to guess|pwned|leaked/i.test(err.message ?? '');
+}
 
 /** What a form says when the auth call threw instead of answering. Matches the helper's own fault line. */
 export const AUTH_THREW = 'Something went wrong on our side. Try again in a minute.';
@@ -19,6 +40,7 @@ export function authThrew(e: unknown): string {
  * which, so it says the fault is ours, asks for a minute and logs it.
  */
 export function authTrouble(err: AuthErr, then: 'sign in' | 'try again'): string {
+  if (isLeakedPassword(err)) return LEAKED_PASSWORD;
   // Checked before the status, since Supabase sends this one as a 429 too.
   // GoTrue also sends this for its project-wide email cap and its resend guard,
   // so the words don't promise anything about this one address.

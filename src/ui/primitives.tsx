@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ImgHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ComponentProps, type ImgHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { buttonClass, cx, type ButtonSize, type ButtonVariant } from '../lib/cx';
@@ -226,7 +226,8 @@ export function Field({ label, hint, children, htmlFor }: { label: string; hint?
 
 const INPUT = 'w-full h-11 rounded-xl border border-line-strong bg-surface-2 px-3.5 text-[15px] text-fg placeholder:text-fg-3 outline-none focus:border-gold transition-colors';
 
-export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+// ComponentProps carries ref, which React 19 passes to a function component as a plain prop.
+export function Input({ className, ...rest }: ComponentProps<'input'>) {
   return <input className={cx(INPUT, className)} {...rest} />;
 }
 
