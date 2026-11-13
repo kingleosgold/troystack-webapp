@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSignOut } from '../contexts/SignOutContext';
@@ -22,6 +22,7 @@ import { InstallPath } from '../ui/AppStore';
 import { NewTabNote } from '../ui/NewTabNote';
 import { Button, Field, Input, PageHeader, Segmented, Sheet } from '../ui/primitives';
 import { authThrew, authTrouble } from '../lib/authErrors';
+import { clearPasswordNote } from '../lib/passwordNote';
 
 /** What a checkout that didn't open leaves in the address for this page to say. */
 const CHECKOUT_NOTES = ['failed', 'have-gold', 'payment-issue', 'app-store', 'in-progress'];
@@ -112,6 +113,17 @@ export default function Settings() {
     setBillingBusy(false);
     setRefreshing(false);
   });
+
+  // The password note's button opens the change sheet here, once the account
+  // is known, then drops the ask so Back or a reload doesn't open it again.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const wantsPasswordChange = Boolean((location.state as { changePassword?: boolean } | null)?.changePassword);
+  useEffect(() => {
+    if (!wantsPasswordChange || authLoading) return;
+    if (user) setCredsOpen(true);
+    navigate({ pathname: location.pathname, search: location.search, hash: location.hash }, { replace: true, state: null });
+  }, [wantsPasswordChange, authLoading, user, navigate, location.pathname, location.search, location.hash]);
 
   // Back from Stripe Checkout, or from a checkout that didn't open. It waits
   // for the sign-in to load, so the plan read after verifying is the account's own.
@@ -273,6 +285,7 @@ export default function Settings() {
       setCredsOpen(false);
       setNewEmail('');
       setNewPassword('');
+      if (newPassword) clearPasswordNote();
       setBanner({ tone: 'up', text: emailChanged ? 'Check both inboxes to confirm the new email.' : 'Your password is updated.' });
     } catch (e) {
       if (stillSignedInAs(owner)) setCredsError(authThrew(e));

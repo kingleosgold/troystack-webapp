@@ -15,7 +15,7 @@ export function isWeakPassword(err: AuthErr): boolean {
  * in the password, so the form says what happened instead. A short password or
  * a missing kind of character keeps Supabase's words, which already say what to fix.
  */
-function isLeakedPassword(err: AuthErr): boolean {
+export function isLeakedPassword(err: AuthErr): boolean {
   if (!isWeakPassword(err)) return false;
   if (Array.isArray(err.reasons) && err.reasons.includes('pwned')) return true;
   return /known to be weak|easy to guess|pwned|leaked/i.test(err.message ?? '');

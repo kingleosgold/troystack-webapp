@@ -618,3 +618,79 @@ test('an existing account answering late after a switch to the forgot form tries
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Send the link' })).toBeEnabled();
 });
+
+const LEAKED_NOTE = 'Your password shows up in lists of leaked passwords, so someone else could guess it. Change it to keep your stack safe.';
+const WEAK_NOTE = 'Your password is shorter or simpler than we ask for now. Change it to keep your stack safe.';
+
+test('a quiet sign-in with a leaked old password leaves a note that opens the password change', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page).not.toHaveURL(/\/auth/);
+  const note = page.getByRole('status').filter({ hasText: LEAKED_NOTE });
+  await expect(note).toBeVisible();
+  await note.getByRole('button', { name: 'Change password' }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByRole('dialog', { name: /email (or|and) (a )?password/i })).toBeVisible();
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+  // The ask to open the sheet is used up, so a reload doesn't open it again.
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('a quiet sign-in with a short old password says it is weak, not leaked', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'weak-password' } });
+  await signUpWith(page);
+  await expect(page).not.toHaveURL(/\/auth/);
+  await expect(page.getByText(WEAK_NOTE)).toBeVisible();
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+});
+
+test('a short password on sign-up for an account with another password keeps Supabase words and leaves no note', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'other', authFails: { signUp: 'weak-password' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText('Password should be at least 8 characters.');
+  await expect(page.getByLabel('Password', { exact: true })).toBeFocused();
+  await expect(page.getByText(WEAK_NOTE)).toHaveCount(0);
+});
+
+test('a leaked password on sign-up stays the reason when the quiet sign-in hits an outage', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'outage', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByRole('alert')).toHaveText(LEAKED);
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+});
+
+test('the password note goes when waved off and stays gone', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  await page.getByRole('button', { name: 'Dismiss the password note' }).click();
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+  await page.goto('/settings');
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+});
+
+test('the password note goes once the password is changed in Settings', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  await page.goto('/settings');
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  await page.getByText('Email and password').click();
+  const sheet = page.getByRole('dialog', { name: /email (or|and) (a )?password/i });
+  await sheet.getByLabel('New password').fill('a much longer new password');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Your password is updated.')).toBeVisible();
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+});
+
+test('a plain sign-in leaves no password note', async ({ page }) => {
+  await mockBackends(page);
+  await signInWith(page);
+  await expect(page).not.toHaveURL(/\/auth/);
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+  await expect(page.getByText(WEAK_NOTE)).toHaveCount(0);
+});

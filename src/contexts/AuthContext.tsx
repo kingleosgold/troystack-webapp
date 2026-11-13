@@ -17,7 +17,7 @@ interface AuthContextType {
   sessionUnreadable: boolean;
   isConfigured: boolean;
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null; needsConfirmation: boolean; existingAccount: boolean }>;
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null; userId?: string | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signInWithApple: () => Promise<{ error: AuthError | null }>;
   /**
@@ -120,11 +120,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { error };
+    return { error, userId: data?.user?.id ?? null };
   };
 
   const signInWithGoogle = async () => {
