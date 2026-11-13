@@ -96,6 +96,8 @@ export interface MockOptions {
   scanStatusDelayMs?: number;
   /** How long a confirmation email resend takes to answer. */
   resendDelayMs?: number;
+  /** How long an email sign-in, sign-up or reset takes to answer. */
+  authDelayMs?: number;
   /**
    * The visitor count says questions are left, but they were used on another
    * device on the same connection, so the next question is refused.
@@ -498,6 +500,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     if (url.pathname.startsWith('/auth/v1/user')) return fulfillJson(route, sessionUser());
     // Email and password sign-in on the page itself, with no reload.
     if (url.pathname === '/auth/v1/token' && req.method() === 'POST') {
+      if (opts.authDelayMs) await wait(opts.authDelayMs);
       if (opts.authFails?.signIn) return fulfillAuthFailure(route, opts.authFails.signIn);
       if (opts.existingAccount === 'other') return fulfillAuthError(route, 400, 'invalid_credentials', 'Invalid login credentials');
       if (opts.existingAccount === 'rate-limited') return fulfillAuthError(route, 429, 'over_request_rate_limit', 'Request rate limit reached');
@@ -508,6 +511,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
     }
     // A new email account gets its session at once, as production confirms email sign-ups.
     if (url.pathname === '/auth/v1/signup' && req.method() === 'POST') {
+      if (opts.authDelayMs) await wait(opts.authDelayMs);
       if (opts.authFails?.signUp) return fulfillAuthFailure(route, opts.authFails.signUp);
       if (opts.existingAccount && opts.hideExistingAccount) {
         // The stand-in carries back the email it was sent, as Supabase's does.
@@ -518,6 +522,7 @@ export async function mockBackends(page: Page, opts: MockOptions = {}) {
       return fulfillJson(route, sessionFor());
     }
     if (url.pathname === '/auth/v1/recover' && req.method() === 'POST') {
+      if (opts.authDelayMs) await wait(opts.authDelayMs);
       if (opts.authFails?.recover) return fulfillAuthFailure(route, opts.authFails.recover);
       return fulfillJson(route, {});
     }
