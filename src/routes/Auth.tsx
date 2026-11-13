@@ -88,6 +88,9 @@ export default function Auth() {
   // Bumped by anything that moves the form on, so a resend that answers late
   // can't write over what the person did since.
   const resendSeq = useRef(0);
+  // Bumped by a form switch, a new submit or Apple or Google, so a sign-in or
+  // sign-up that answers late can't write over the form the person moved to.
+  const formSeq = useRef(0);
   const resendRef = useRef<HTMLButtonElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
@@ -139,6 +142,7 @@ export default function Auth() {
   };
 
   const switchMode = (m: Mode) => {
+    formSeq.current += 1;
     setMode(m);
     setError(null);
     setNotice(null);
@@ -163,10 +167,14 @@ export default function Auth() {
     setOfferSignUp(false);
     setPasswordRefused(false);
     dropResend();
+    const mine = ++formSeq.current;
+    // True once the person moved on, so this answer stays off the page.
+    const stale = () => mine !== formSeq.current;
     setBusy(true);
     try {
       if (mode === 'forgot') {
         const { error: err } = await resetPasswordForEmail(email.trim());
+        if (stale()) return;
         if (err) setError(authTrouble(err, 'try again'));
         else setNotice('Check your email for a link to reset your password.');
       } else if (mode === 'signup') {
@@ -174,12 +182,14 @@ export default function Auth() {
         const campaign = forCheckout ? checkoutIntentCampaign() : undefined;
         const { error: err, needsConfirmation, existingAccount } = await signUp(email.trim(), password);
         if (!err && !existingAccount) countStep('signup', forCheckout ? plan : null, campaign);
+        if (stale()) return;
         // Supabase refuses a weak password before it looks for the email, so a
         // weak password on an existing account shows the password rule, not this.
         if (existingAccount || (err && isExistingAccount(err))) {
           // Most people who land here already use this password in the
           // iPhone app, so try it before asking them to switch forms.
           const { error: inErr } = await signIn(email.trim(), password);
+          if (stale()) return;
           if (inErr) {
             // The account is there either way, so the sign-in form is the right one.
             setMode('signin');
@@ -200,6 +210,7 @@ export default function Auth() {
           // it, and checkout opens on this form, so try it as a sign-in before
           // asking for a new password.
           const { error: inErr } = await signIn(email.trim(), password);
+          if (stale()) return;
           if (inErr && isUnconfirmed(inErr)) {
             // The account is there with this password, it only needs the link.
             setMode('signin');
@@ -222,6 +233,7 @@ export default function Auth() {
         }
       } else {
         const { error: err } = await signIn(email.trim(), password);
+        if (stale()) return;
         if (err && isWrongPassword(err)) {
           setError("That email and password don't match an account.");
           setOfferSignUp(true);
@@ -231,8 +243,10 @@ export default function Auth() {
         }
       }
     } catch (e) {
-      setError(authThrew(e));
+      if (!stale()) setError(authThrew(e));
     } finally {
+      // Only one request runs at a time, so the button holds until this one
+      // settles even on a new form. A late sign-in still saves its session.
       setBusy(false);
     }
   };
@@ -276,8 +290,9 @@ export default function Auth() {
     setOfferSignUp(false);
     setPasswordRefused(false);
     dropResend();
+    const mine = ++formSeq.current;
     const { error: err } = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
-    if (err) setError(authTrouble(err, 'try again'));
+    if (err && mine === formSeq.current) setError(authTrouble(err, 'try again'));
   };
 
   return (
