@@ -746,20 +746,24 @@ test('the heading gives back its tabindex once focus leaves it', async ({ page }
   expect(await heading.getAttribute('tabindex')).toBeNull();
 });
 
-test('waving off the password note when the heading is hidden falls back to main', async ({ page }) => {
-  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
-  await signUpWith(page);
-  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
-  const heading = page.locator('main#main h1').first();
-  expect(await heading.getAttribute('tabindex')).toBeNull();
-  // Hidden by a stylesheet, as a page's own styles would hide it.
-  await page.addStyleTag({ content: 'main#main h1 { display: none; }' });
-  await expect(heading).toBeHidden();
-  await page.getByRole('button', { name: 'Dismiss the password note' }).click();
-  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
-  await expect(page.locator('main#main')).toBeFocused();
-  expect(await heading.getAttribute('tabindex')).toBeNull();
-});
+for (const hide of ['display: none', 'visibility: hidden']) {
+  test(`waving off the password note when the heading is hidden by ${hide} falls back to main`, async ({ page }) => {
+    await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+    await signUpWith(page);
+    await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+    const heading = page.locator('main#main h1').first();
+    // One heading, so hiding it leaves nothing else for focusHeading to find.
+    await expect(page.locator('main#main h1')).toHaveCount(1);
+    expect(await heading.getAttribute('tabindex')).toBeNull();
+    // Hidden by a stylesheet, as a page's own styles would hide it.
+    await page.addStyleTag({ content: `main#main h1 { ${hide}; }` });
+    await expect(heading).toBeHidden();
+    await page.getByRole('button', { name: 'Dismiss the password note' }).click();
+    await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+    await expect(page.locator('main#main')).toBeFocused();
+    expect(await heading.getAttribute('tabindex')).toBeNull();
+  });
+}
 
 /**
  * Records each time words arrive in the note's region: whether the region was

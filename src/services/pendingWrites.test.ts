@@ -15,6 +15,7 @@ import {
   savePending,
   sendBeforeSignOut,
   sendPending,
+  subscribePending,
   withPending,
   type PendingWrite,
 } from './pendingWrites';
@@ -388,8 +389,14 @@ describe('signing out', () => {
   });
 
   it('tells the page when either one goes, and stays quiet when neither can', () => {
+    // A real event target stands in for the window, so the test hears the
+    // announce the way the page does, through subscribePending.
+    const target = new EventTarget();
+    vi.stubGlobal('addEventListener', target.addEventListener.bind(target));
+    vi.stubGlobal('removeEventListener', target.removeEventListener.bind(target));
+    vi.stubGlobal('dispatchEvent', target.dispatchEvent.bind(target));
     const heard = vi.fn();
-    vi.stubGlobal('dispatchEvent', heard);
+    const stop = subscribePending(heard);
     try {
       for (const stuck of [['refused'], ['writes'], ['refused', 'writes']]) {
         const store = memoryStore();
@@ -403,10 +410,9 @@ describe('signing out', () => {
         };
         dropQueuedChanges(USER, store);
         expect(heard, `stuck: ${stuck.join(' and ')}`).toHaveBeenCalledTimes(stuck.length === 2 ? 0 : 1);
-        // It's the event the page listens for, the one subscribePending hears.
-        for (const [event] of heard.mock.calls) expect((event as Event).type).toBe('troystack:pending-writes');
       }
     } finally {
+      stop();
       vi.unstubAllGlobals();
     }
   });
