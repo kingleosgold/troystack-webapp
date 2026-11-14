@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { clearPasswordNote } from '../lib/passwordNote';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured, authStorageKey } from '../lib/supabase';
@@ -93,7 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // A sign-out that didn't come through signOut below, as an expired
+      // session or a sign-out everywhere from another device, drops the note too.
+      if (event === 'SIGNED_OUT') clearPasswordNote();
       setSignedInAs(session?.user?.id ?? null);
       setSession(session);
       setUser(session?.user ?? null);
@@ -161,6 +165,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('stg_checkout_redirect');
       localStorage.removeItem('stg_checkout_campaign');
       localStorage.removeItem('stg_auth_next');
+      // The note to change a leaked or weak password belongs to this sign-in,
+      // so it doesn't come back if the same account signs in here again.
+      clearPasswordNote();
       // The cached stacks go with the stored ones. A guest stack left cached
       // after it was cleared here would keep showing, and the next guest add
       // would write it back.

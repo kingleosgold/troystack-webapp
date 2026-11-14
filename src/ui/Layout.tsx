@@ -532,8 +532,8 @@ export default function AppShell() {
       <div className={cx('flex min-h-screen flex-col transition-[padding] duration-200', collapsed ? 'lg:pl-[72px]' : 'lg:pl-[252px]')}>
         <MobileTopBar onMenu={() => setMenuPath(pathname)} />
         <DesktopTopBar />
-        <main id="main" ref={mainRef} className={cx('flex-1 min-w-0', showTabs ? 'pb-24 lg:pb-0' : '')}>
-          {showTabs && <PasswordNote />}
+        <main id="main" ref={mainRef} tabIndex={-1} className={cx('flex-1 min-w-0 focus:outline-none', showTabs ? 'pb-24 lg:pb-0' : '')}>
+          <PasswordNote show={showTabs} />
           <ErrorBoundary resetKey={pathname}>
             <Suspense fallback={<PageLoading />}>
               <Outlet />
