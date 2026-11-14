@@ -64,12 +64,21 @@ export function updateStackCopy(userId: string, change: (holdings: Holding[]) =>
 
 /** Every account's copy goes, as at sign-out on a shared computer. */
 export function clearStackCopies(): void {
+  let keys: string[];
   try {
-    for (const key of Object.keys(localStorage)) {
-      if (key.startsWith(PREFIX)) localStorage.removeItem(key);
-    }
+    keys = Object.keys(localStorage);
   } catch {
-    // nothing kept to clear
+    return; // nothing kept to clear
+  }
+  // Each copy goes on its own, so one that can't be removed doesn't keep the
+  // others.
+  for (const key of keys) {
+    if (!key.startsWith(PREFIX)) continue;
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // this one stays, the rest still go
+    }
   }
 }
 

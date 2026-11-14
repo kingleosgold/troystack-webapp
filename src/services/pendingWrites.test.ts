@@ -371,6 +371,22 @@ describe('signing out', () => {
     expect(readPending('user-b', store), "another account's changes stay").toHaveLength(1);
   });
 
+  it('drops the waiting changes even when the refused count can\'t be removed, and the other way round', () => {
+    for (const stuck of ['refused', 'writes']) {
+      const store = memoryStore();
+      savePending(USER, [addWrite()], store);
+      addRefused(USER, 2, store);
+      const remove = store.removeItem;
+      store.removeItem = (k: string) => {
+        if (k.includes(stuck)) throw new Error('storage blocked');
+        remove(k);
+      };
+      expect(() => dropQueuedChanges(USER, store)).not.toThrow();
+      if (stuck === 'refused') expect(readPending(USER, store)).toEqual([]);
+      else expect(readRefused(USER, store)).toBe(0);
+    }
+  });
+
   it("doesn't wait when nothing is waiting", async () => {
     const store = memoryStore();
     const send = vi.fn(async () => undefined);

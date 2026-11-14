@@ -835,11 +835,19 @@ test('signing out leaves another account\'s password note in another tab', async
   await other.goto('/');
   const theirs = JSON.stringify({ userId: 'someone-else', kind: 'leaked' });
   await other.evaluate((v) => sessionStorage.setItem('ts_password_note', v), theirs);
+  // Hears the sign-out after the app's own listener, which mounted first, so
+  // the check below runs once the app has had its turn with the message.
+  await other.evaluate(() => {
+    const ch = new BroadcastChannel('ts-password-note');
+    ch.onmessage = () => {
+      (window as unknown as { heardDrop: boolean }).heardDrop = true;
+    };
+  });
   await page.goto('/settings');
   await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
   await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
-  await other.waitForTimeout(300);
+  await expect.poll(() => other.evaluate(() => (window as unknown as { heardDrop?: boolean }).heardDrop === true)).toBe(true);
   expect(await other.evaluate(() => sessionStorage.getItem('ts_password_note'))).toBe(theirs);
 });
 

@@ -91,4 +91,24 @@ describe("the stack copy for reading offline", () => {
     expect(localStorage.getItem('stacktracker_theme')).toBe('dark');
     vi.unstubAllGlobals();
   });
+
+  it('clears the other copies when one of them can\'t be removed', () => {
+    const data: Record<string, string> = {
+      'troystack_stack_copy_user-a': '{}',
+      'troystack_stack_copy_user-b': '{}',
+      'troystack_stack_copy_user-c': '{}',
+    };
+    const store = {
+      ...data,
+      removeItem(k: string) {
+        if (k === 'troystack_stack_copy_user-b') throw new Error('storage blocked');
+        delete (this as Record<string, unknown>)[k];
+      },
+    };
+    Object.defineProperty(store, 'removeItem', { enumerable: false });
+    vi.stubGlobal('localStorage', store);
+    expect(() => clearStackCopies()).not.toThrow();
+    expect(Object.keys(store).sort()).toEqual(['troystack_stack_copy_user-b']);
+    vi.unstubAllGlobals();
+  });
 });

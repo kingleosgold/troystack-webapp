@@ -119,13 +119,18 @@ export function clearRefused(userId: string, store: Store | null = defaultStore(
  */
 export function dropQueuedChanges(userId: string, store: Store | null = defaultStore()): void {
   if (!store) return;
-  try {
-    store.removeItem(keyFor(userId));
-    store.removeItem(refusedKeyFor(userId));
-  } catch {
-    return;
+  // Each goes on its own, so a refused count that can't be removed doesn't
+  // keep the waiting changes, or the other way round.
+  let dropped = false;
+  for (const key of [keyFor(userId), refusedKeyFor(userId)]) {
+    try {
+      store.removeItem(key);
+      dropped = true;
+    } catch {
+      // this one stays, the other still goes
+    }
   }
-  announce();
+  if (dropped) announce();
 }
 
 /** How long signing out waits for an account's waiting changes to go. */
