@@ -387,6 +387,29 @@ describe('signing out', () => {
     }
   });
 
+  it('tells the page when either one goes, and stays quiet when neither can', () => {
+    const heard = vi.fn();
+    vi.stubGlobal('dispatchEvent', heard);
+    try {
+      for (const stuck of [['refused'], ['writes'], ['refused', 'writes']]) {
+        heard.mockClear();
+        const store = memoryStore();
+        savePending(USER, [addWrite()], store);
+        addRefused(USER, 2, store);
+        heard.mockClear();
+        const remove = store.removeItem;
+        store.removeItem = (k: string) => {
+          if (stuck.some((s) => k.includes(s))) throw new Error('storage blocked');
+          remove(k);
+        };
+        dropQueuedChanges(USER, store);
+        expect(heard, `stuck: ${stuck.join(' and ')}`).toHaveBeenCalledTimes(stuck.length === 2 ? 0 : 1);
+      }
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("doesn't wait when nothing is waiting", async () => {
     const store = memoryStore();
     const send = vi.fn(async () => undefined);

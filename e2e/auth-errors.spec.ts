@@ -833,6 +833,9 @@ test('signing out leaves another account\'s password note in another tab', async
   const other = await context.newPage();
   await mockBackends(other, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
   await other.goto('/');
+  // The app's listener mounts with the page, so once the page has drawn it's
+  // listening, and the one added below hears each message after it.
+  await expect(other.getByRole('heading', { level: 1 })).toBeVisible();
   const theirs = JSON.stringify({ userId: 'someone-else', kind: 'leaked' });
   await other.evaluate((v) => sessionStorage.setItem('ts_password_note', v), theirs);
   // Hears the sign-out after the app's own listener, which mounted first, so

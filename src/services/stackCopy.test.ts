@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearStackCopies, copyShownSince, markCopyShown, readStackCopy, saveStackCopy, subscribeStackCopy, updateStackCopy } from './stackCopy';
 import type { Holding } from '../types/holding';
 
@@ -14,6 +14,11 @@ function memoryStore() {
 const HOLDING = { id: 'h1', metal: 'gold', type: 'Gold Maple Leaf', weight: 1, weightUnit: 'oz', quantity: 1, purchasePrice: 3480, purchaseDate: '2026-01-05', createdAt: '2026-01-05T00:00:00Z', updatedAt: '2026-01-05T00:00:00Z' } as Holding;
 
 describe("the stack copy for reading offline", () => {
+  // A stub left behind by a failed check would leak into the tests after it.
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('keeps each account its own copy with the time it was read', () => {
     const store = memoryStore();
     saveStackCopy('user-a', [HOLDING], store, new Date('2026-10-09T18:00:00Z'));
@@ -64,7 +69,6 @@ describe("the stack copy for reading offline", () => {
     expect(copyShownSince(undefined)).toBeNull();
     expect(seen).toHaveBeenCalledTimes(2);
     stop();
-    vi.unstubAllGlobals();
   });
 
   it('clears every account at once', () => {
@@ -89,7 +93,6 @@ describe("the stack copy for reading offline", () => {
     expect(localStorage.getItem('troystack_stack_copy_user-a')).toBeNull();
     expect(localStorage.getItem('troystack_stack_copy_user-b')).toBeNull();
     expect(localStorage.getItem('stacktracker_theme')).toBe('dark');
-    vi.unstubAllGlobals();
   });
 
   it('clears the other copies when one of them can\'t be removed', () => {
@@ -109,6 +112,5 @@ describe("the stack copy for reading offline", () => {
     vi.stubGlobal('localStorage', store);
     expect(() => clearStackCopies()).not.toThrow();
     expect(Object.keys(store).sort()).toEqual(['troystack_stack_copy_user-b']);
-    vi.unstubAllGlobals();
   });
 });
