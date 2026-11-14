@@ -1,9 +1,14 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { PASSWORD_NOTE_WORDS, clearPasswordNote, onPasswordNoteChange, passwordNoteFor } from '../lib/passwordNote';
 import { Button } from './primitives';
+
+// The note this tab has already read out, as its account and kind. Coming
+// back to it from Troy, where it's off the page, shows it without reading it
+// again. It resets once the note goes, so a later note is heard.
+let heard: string | null = null;
 
 function focusPage() {
   document.getElementById('main')?.focus({ preventScroll: true });
@@ -18,7 +23,8 @@ function focusPage() {
  * without a note, so a screen reader hears the note when it arrives. `show`
  * is off on the form pages, where the note waits for the next page. It's a
  * plain polite live region rather than role=status, so it doesn't stand in
- * for the sign-in form's own status line.
+ * for the sign-in form's own status line. Once the note has been read out it
+ * goes quiet until the note goes, so a trip through Troy doesn't read it twice.
  */
 export function PasswordNote({ show }: { show: boolean }) {
   const { user } = useAuth();
@@ -30,6 +36,15 @@ export function PasswordNote({ show }: { show: boolean }) {
     () => null,
   );
   const kind = show ? stored : null;
+  const storedKey = stored && user ? `${user.id}:${stored}` : null;
+  // Once heard, the region is quiet for as long as the note is kept, on Troy
+  // as well, so putting the words back doesn't read them again.
+  const live = storedKey !== null && storedKey === heard ? 'off' : 'polite';
+
+  useEffect(() => {
+    if (kind && storedKey) heard = storedKey;
+    else if (!storedKey) heard = null;
+  }, [kind, storedKey]);
 
   const change = () => {
     clearPasswordNote();
@@ -49,7 +64,7 @@ export function PasswordNote({ show }: { show: boolean }) {
   };
 
   return (
-    <div aria-live="polite" aria-atomic="true" data-password-note className={kind ? 'mx-auto w-full max-w-5xl px-4 pt-4 sm:px-6' : 'sr-only'}>
+    <div aria-live={live} aria-atomic="true" data-password-note className={kind ? 'mx-auto w-full max-w-5xl px-4 pt-4 sm:px-6' : 'sr-only'}>
       {kind && (
         <div className="flex items-start gap-3 rounded-xl border border-down/40 bg-down-soft px-4 py-3 text-[14px] text-fg">
           <div className="min-w-0 flex-1">
