@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mockBackends, signIn } from './mock';
+import { mockBackends, sessionFor, signIn, signInElsewhereAs, signOutElsewhere } from './mock';
 
 // Every way the sign-in, sign-up and reset forms can fail shows plain words,
 // never Supabase's own text or the "{}" supabase-js gives for an outage.
@@ -626,7 +626,7 @@ test('a quiet sign-in with a leaked old password leaves a note that opens the pa
   await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
   await signUpWith(page);
   await expect(page).not.toHaveURL(/\/auth/);
-  const note = page.locator('[data-password-note][aria-live="polite"]').filter({ hasText: LEAKED_NOTE });
+  const note = page.locator('[data-password-note]').filter({ hasText: LEAKED_NOTE });
   await expect(note).toBeVisible();
   await note.getByRole('button', { name: 'Change password' }).click();
   await expect(page).toHaveURL(/\/settings$/);
@@ -704,27 +704,74 @@ test('waving off the password note keeps focus on the page', async ({ page }) =>
   await expect(page.locator('main#main')).toBeFocused();
 });
 
-test('the password note arrives in a live region that was already on the page', async ({ page }) => {
-  // Records whether the note's live region was in the page, empty, before the
-  // note's words arrived in it, which is what lets a screen reader hear them.
+/**
+ * Records each time words arrive in the note's region: whether the region was
+ * in the page, empty, before them, and how live it was when they landed,
+ * which is what decides whether a screen reader reads them.
+ */
+async function watchNoteRegion(page: Page) {
   await page.addInitScript(() => {
-    const w = window as unknown as { __noteRegionFirst?: boolean };
+    const w = window as unknown as { __noteArrivals?: { firstInEmptyRegion: boolean; live: string | null }[]; __noteRegion?: Element };
+    w.__noteArrivals = [];
+    let had = false;
+    let seenEmpty = false;
     new MutationObserver(() => {
       const region = document.querySelector('[data-password-note]');
       if (!region) return;
-      if (w.__noteRegionFirst === undefined) w.__noteRegionFirst = region.textContent === '';
-    }).observe(document, { childList: true, subtree: true });
+      w.__noteRegion ??= region;
+      const has = (region.textContent ?? '') !== '';
+      if (!has) seenEmpty = true;
+      if (has && !had) w.__noteArrivals!.push({ firstInEmptyRegion: seenEmpty && region === w.__noteRegion, live: region.getAttribute('aria-live') });
+      had = has;
+    }).observe(document, { childList: true, subtree: true, attributes: true, characterData: true });
   });
+}
+
+function noteArrivals(page: Page) {
+  return page.evaluate(() => (window as unknown as { __noteArrivals?: { firstInEmptyRegion: boolean; live: string | null }[] }).__noteArrivals ?? []);
+}
+
+test('the password note arrives in a live region that was already on the page', async ({ page }) => {
+  await watchNoteRegion(page);
   await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
   await signUpWith(page);
   await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  // The same region node, empty and polite, took the words, so they were read out.
+  expect(await noteArrivals(page)).toEqual([{ firstInEmptyRegion: true, live: 'polite' }]);
   const region = page.locator('[data-password-note]');
-  await expect(region).toHaveAttribute('aria-live', 'polite');
-  expect(await page.evaluate(() => (window as unknown as { __noteRegionFirst?: boolean }).__noteRegionFirst)).toBe(true);
   await page.getByRole('button', { name: 'Dismiss the password note' }).click();
-  // The region stays, empty, so the next note is announced.
+  // The region stays, empty and polite, so the next note is announced.
   await expect(region).toHaveCount(1);
   await expect(region).toHaveText('');
+  await expect(region).toHaveAttribute('aria-live', 'polite');
+});
+
+test('the password note is read out once, not again after a trip through Troy', async ({ page }) => {
+  await watchNoteRegion(page);
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  const back = page.url();
+  await page.locator('a[href="/troy"]:visible').first().click();
+  await expect(page).toHaveURL(/\/troy/);
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+  await page.goBack();
+  await expect(page).toHaveURL(back);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  // It came back into a quiet region, so it shows without being read again.
+  expect((await noteArrivals(page)).map((a) => a.live)).toEqual(['polite', 'off']);
+});
+
+test('a sign-out that comes from elsewhere keeps the password note for that account', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  await signOutElsewhere(page);
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+  // The password is still the leaked one, so the note waits for the account.
+  expect(await page.evaluate(() => sessionStorage.getItem('ts_password_note'))).not.toBeNull();
+  await signInElsewhereAs(page, sessionFor());
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
 });
 
 test('Change password on Settings opens the sheet without adding a Back step', async ({ page }) => {
