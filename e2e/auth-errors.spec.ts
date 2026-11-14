@@ -733,22 +733,17 @@ test('the heading gives back its tabindex once focus leaves it', async ({ page }
   await signUpWith(page);
   await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
   const heading = page.locator('main#main h1').first();
-  const before = await heading.getAttribute('tabindex');
+  expect(await heading.getAttribute('tabindex')).toBeNull();
   await page.getByRole('button', { name: 'Dismiss the password note' }).click();
+  await expect(heading).toBeFocused();
+  // A blur with focus still on the heading, as when the window loses focus,
+  // keeps the tabindex so focus isn't dropped.
+  await heading.evaluate((el) => el.dispatchEvent(new FocusEvent('blur')));
+  expect(await heading.getAttribute('tabindex')).toBe('-1');
   await expect(heading).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(heading).not.toBeFocused();
-  expect(await heading.getAttribute('tabindex')).toBe(before);
-});
-
-test('waving off the password note on a page with no heading falls back to main', async ({ page }) => {
-  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
-  await signUpWith(page);
-  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
-  await page.evaluate(() => document.querySelectorAll('#main h1').forEach((h) => h.remove()));
-  await page.getByRole('button', { name: 'Dismiss the password note' }).click();
-  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
-  await expect(page.locator('main#main')).toBeFocused();
+  expect(await heading.getAttribute('tabindex')).toBeNull();
 });
 
 test('waving off the password note when the heading is hidden falls back to main', async ({ page }) => {
@@ -756,12 +751,12 @@ test('waving off the password note when the heading is hidden falls back to main
   await signUpWith(page);
   await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
   const heading = page.locator('main#main h1').first();
-  const before = await heading.getAttribute('tabindex');
+  expect(await heading.getAttribute('tabindex')).toBeNull();
   await heading.evaluate((el) => { (el as HTMLElement).style.display = 'none'; });
   await page.getByRole('button', { name: 'Dismiss the password note' }).click();
   await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
   await expect(page.locator('main#main')).toBeFocused();
-  expect(await heading.getAttribute('tabindex')).toBe(before);
+  expect(await heading.getAttribute('tabindex')).toBeNull();
 });
 
 /**

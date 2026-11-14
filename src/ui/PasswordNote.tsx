@@ -31,7 +31,15 @@ function focusHeading() {
     if (added) heading.removeAttribute('tabindex');
     return focusPage();
   }
-  if (added) heading.addEventListener('blur', () => heading.removeAttribute('tabindex'), { once: true });
+  if (!added) return;
+  // blur also fires when the whole window loses focus, with the heading still
+  // the active element, so the tabindex stays until focus really moves.
+  const drop = () => {
+    if (document.activeElement === heading) return;
+    heading.removeAttribute('tabindex');
+    heading.removeEventListener('blur', drop);
+  };
+  heading.addEventListener('blur', drop);
 }
 
 /**
