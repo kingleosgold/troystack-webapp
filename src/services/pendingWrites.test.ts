@@ -392,7 +392,6 @@ describe('signing out', () => {
     vi.stubGlobal('dispatchEvent', heard);
     try {
       for (const stuck of [['refused'], ['writes'], ['refused', 'writes']]) {
-        heard.mockClear();
         const store = memoryStore();
         savePending(USER, [addWrite()], store);
         addRefused(USER, 2, store);
@@ -404,6 +403,8 @@ describe('signing out', () => {
         };
         dropQueuedChanges(USER, store);
         expect(heard, `stuck: ${stuck.join(' and ')}`).toHaveBeenCalledTimes(stuck.length === 2 ? 0 : 1);
+        // It's the event the page listens for, the one subscribePending hears.
+        for (const [event] of heard.mock.calls) expect((event as Event).type).toBe('troystack:pending-writes');
       }
     } finally {
       vi.unstubAllGlobals();

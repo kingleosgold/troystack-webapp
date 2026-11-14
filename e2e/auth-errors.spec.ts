@@ -752,7 +752,9 @@ test('waving off the password note when the heading is hidden falls back to main
   await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
   const heading = page.locator('main#main h1').first();
   expect(await heading.getAttribute('tabindex')).toBeNull();
-  await heading.evaluate((el) => { (el as HTMLElement).style.display = 'none'; });
+  // Hidden by a stylesheet, as a page's own styles would hide it.
+  await page.addStyleTag({ content: 'main#main h1 { display: none; }' });
+  await expect(heading).toBeHidden();
   await page.getByRole('button', { name: 'Dismiss the password note' }).click();
   await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
   await expect(page.locator('main#main')).toBeFocused();
