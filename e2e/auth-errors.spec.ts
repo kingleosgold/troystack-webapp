@@ -805,3 +805,61 @@ test('signing out drops the password note, so signing back in shows none', async
   await expect(page).not.toHaveURL(/\/auth/);
   await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
 });
+
+test('signing out in one tab drops the password note in the account\'s other tabs', async ({ page, context }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  const kept = await page.evaluate(() => sessionStorage.getItem('ts_password_note'));
+  // A second tab on the same account, holding the note in its own storage.
+  const other = await context.newPage();
+  await mockBackends(other, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await other.goto('/');
+  await other.evaluate((v) => sessionStorage.setItem('ts_password_note', v as string), kept);
+  await other.reload();
+  await expect(other.getByText(LEAKED_NOTE)).toBeVisible();
+  await page.goto('/settings');
+  await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect.poll(() => other.evaluate(() => sessionStorage.getItem('ts_password_note'))).toBeNull();
+  await expect(other.getByText(LEAKED_NOTE)).toHaveCount(0);
+});
+
+test('signing out leaves another account\'s password note in another tab', async ({ page, context }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  const other = await context.newPage();
+  await mockBackends(other, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await other.goto('/');
+  const theirs = JSON.stringify({ userId: 'someone-else', kind: 'leaked' });
+  await other.evaluate((v) => sessionStorage.setItem('ts_password_note', v), theirs);
+  await page.goto('/settings');
+  await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await other.waitForTimeout(300);
+  expect(await other.evaluate(() => sessionStorage.getItem('ts_password_note'))).toBe(theirs);
+});
+
+test('signing out drops the password note even when clearing stored data throws', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  await page.goto('/settings');
+  await page.evaluate(() => {
+    const remove = Storage.prototype.removeItem;
+    Storage.prototype.removeItem = function (this: Storage, key: string) {
+      if (this === localStorage && key === 'stacktracker_holdings') throw new Error('storage blocked');
+      return remove.call(this, key);
+    };
+    localStorage.setItem('stg_auth_next', '/gold');
+  });
+  await page.locator('section').getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('dialog', { name: 'Sign out?' }).getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+  expect(await page.evaluate(() => sessionStorage.getItem('ts_password_note'))).toBeNull();
+  // The keys after the one that threw still go.
+  expect(await page.evaluate(() => localStorage.getItem('stg_auth_next'))).toBeNull();
+});

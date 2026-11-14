@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearPasswordNote, onPasswordNoteChange, passwordNoteFor, rememberPasswordNote } from './passwordNote';
+import {
+  clearPasswordNote,
+  dropPasswordNoteEverywhere,
+  listenForPasswordNoteDrops,
+  onPasswordNoteChange,
+  passwordNoteFor,
+  rememberPasswordNote,
+} from './passwordNote';
 
 describe('the note about a password the sign-up form turned away', () => {
   let store: Map<string, string>;
@@ -68,5 +75,72 @@ describe('the note about a password the sign-up form turned away', () => {
     expect(() => rememberPasswordNote('user-a', 'leaked')).not.toThrow();
     expect(passwordNoteFor('user-a')).toBeNull();
     expect(() => clearPasswordNote()).not.toThrow();
+  });
+
+  describe('across tabs', () => {
+    // A stand-in for BroadcastChannel that hands each message to every other
+    // open channel of the same name, as browsers do between tabs.
+    let open: Set<{ name: string; onmessage: ((e: MessageEvent) => void) | null }>;
+    beforeEach(() => {
+      open = new Set();
+      class FakeChannel {
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        name: string;
+        constructor(name: string) {
+          this.name = name;
+          open.add(this);
+        }
+        postMessage(data: unknown) {
+          for (const ch of open) if (ch !== this && ch.name === this.name) ch.onmessage?.({ data } as MessageEvent);
+        }
+        close() {
+          open.delete(this);
+        }
+      }
+      vi.stubGlobal('BroadcastChannel', FakeChannel);
+    });
+
+    it('drops the note in another tab for the same account', () => {
+      const stop = listenForPasswordNoteDrops();
+      rememberPasswordNote('user-a', 'leaked');
+      const ch = new BroadcastChannel('ts-password-note');
+      ch.postMessage({ drop: 'user-a' });
+      ch.close();
+      expect(passwordNoteFor('user-a')).toBeNull();
+      stop();
+    });
+
+    it('keeps another account\'s note', () => {
+      const stop = listenForPasswordNoteDrops();
+      rememberPasswordNote('user-b', 'leaked');
+      dropPasswordNoteEverywhere('user-a');
+      // The local clear drops it here, as Sign out in this tab should.
+      expect(passwordNoteFor('user-b')).toBeNull();
+      rememberPasswordNote('user-b', 'leaked');
+      const ch = new BroadcastChannel('ts-password-note');
+      ch.postMessage({ drop: 'user-a' });
+      ch.postMessage({ drop: 42 });
+      ch.postMessage(null);
+      ch.close();
+      expect(passwordNoteFor('user-b')).toBe('leaked');
+      stop();
+    });
+
+    it('closes its channel once sent and stops listening when asked', () => {
+      const stop = listenForPasswordNoteDrops();
+      expect(open.size).toBe(1);
+      dropPasswordNoteEverywhere('user-a');
+      expect(open.size).toBe(1);
+      stop();
+      expect(open.size).toBe(0);
+    });
+
+    it('still drops the note here without BroadcastChannel', () => {
+      vi.stubGlobal('BroadcastChannel', undefined);
+      rememberPasswordNote('user-a', 'leaked');
+      expect(() => dropPasswordNoteEverywhere('user-a')).not.toThrow();
+      expect(passwordNoteFor('user-a')).toBeNull();
+      expect(listenForPasswordNoteDrops()).toBeTypeOf('function');
+    });
   });
 });

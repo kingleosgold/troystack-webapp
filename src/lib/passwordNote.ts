@@ -62,6 +62,47 @@ export function clearPasswordNote(): void {
   changed();
 }
 
+const CHANNEL = 'ts-password-note';
+
+function channel(): BroadcastChannel | null {
+  try {
+    return typeof BroadcastChannel === 'function' ? new BroadcastChannel(CHANNEL) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Drops the note here and in this account's other tabs, as the app's own Sign
+ * out does. Each tab keeps its note in its own storage, so the others hear it
+ * by message. A tab holding another account's note keeps it.
+ */
+export function dropPasswordNoteEverywhere(userId: string | null | undefined): void {
+  clearPasswordNote();
+  if (!userId) return;
+  const ch = channel();
+  if (!ch) return;
+  try {
+    ch.postMessage({ drop: userId });
+  } catch {
+    // ignore
+  } finally {
+    ch.close();
+  }
+}
+
+/** Listens for another tab's Sign out. Returns the way to stop listening. */
+export function listenForPasswordNoteDrops(): () => void {
+  const ch = channel();
+  if (!ch) return () => {};
+  ch.onmessage = (e: MessageEvent) => {
+    const drop = (e.data as { drop?: unknown } | null)?.drop;
+    const v = read();
+    if (typeof drop === 'string' && v && v.userId === drop) clearPasswordNote();
+  };
+  return () => ch.close();
+}
+
 /** Calls `onChange` when the note is kept or dropped in this tab. */
 export function onPasswordNoteChange(onChange: () => void): () => void {
   window.addEventListener(EVENT, onChange);
