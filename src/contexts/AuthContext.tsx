@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { clearPasswordNote } from '../lib/passwordNote';
+import { dropPasswordNoteEverywhere, listenForPasswordNoteDrops } from '../lib/passwordNote';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured, authStorageKey } from '../lib/supabase';
@@ -59,6 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [sessionUnreadable, setSessionUnreadable] = useState(false);
   const queryClient = useQueryClient();
+
+  // Sign out in another tab drops this tab's note for the same account.
+  useEffect(() => listenForPasswordNoteDrops(), []);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -157,31 +160,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async (opts?: { scope?: 'global' | 'local'; fallback?: string }) => {
     const userId = user?.id;
     const { error } = await supabase.auth.signOut({ scope: opts?.scope ?? 'global' });
-    try {
-      // Clear app data on sign out (keep theme preference)
-      localStorage.removeItem('stacktracker_holdings');
-      localStorage.removeItem('stacktracker_pending_actions');
-      localStorage.removeItem('advisor_usage');
-      localStorage.removeItem('stg_upgrade_banner_dismissed');
-      localStorage.removeItem('stg_checkout_redirect');
-      localStorage.removeItem('stg_checkout_campaign');
-      localStorage.removeItem('stg_auth_next');
-      // The note to change a leaked or weak password belongs to this sign-in,
-      // so it doesn't come back if the same account signs in here again.
-      clearPasswordNote();
-      // The cached stacks go with the stored ones. A guest stack left cached
-      // after it was cleared here would keep showing, and the next guest add
-      // would write it back.
-      queryClient.removeQueries({ queryKey: ['holdings'] });
-      // So do the copies kept for reading the stack offline.
-      clearStackCopies();
-      // And this account's changes still waiting to be sent, with its count of
-      // refused ones, so a shared browser keeps no holding details and a later
-      // sign-in doesn't send stale changes.
-      if (userId) dropQueuedChanges(userId);
-    } catch {
-      // storage blocked, nothing kept here to clear
+    // Clear app data on sign out (keep theme preference). Each key goes on its
+    // own, so storage that throws on one doesn't keep the rest.
+    for (const key of [
+      'stacktracker_holdings',
+      'stacktracker_pending_actions',
+      'advisor_usage',
+      'stg_upgrade_banner_dismissed',
+      'stg_checkout_redirect',
+      'stg_checkout_campaign',
+      'stg_auth_next',
+    ]) {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // storage blocked, nothing kept here to clear
+      }
     }
+    // The note to change a leaked or weak password belongs to this sign-in,
+    // so it doesn't come back if the same account signs in here again, or in
+    // another tab that still shows it.
+    dropPasswordNoteEverywhere(userId);
+    // The cached stacks go with the stored ones. A guest stack left cached
+    // after it was cleared here would keep showing, and the next guest add
+    // would write it back.
+    queryClient.removeQueries({ queryKey: ['holdings'] });
+    // So do the copies kept for reading the stack offline.
+    clearStackCopies();
+    // And this account's changes still waiting to be sent, with its count of
+    // refused ones, so a shared browser keeps no holding details and a later
+    // sign-in doesn't send stale changes.
+    if (userId) dropQueuedChanges(userId);
     if (error) {
       // The sign-out didn't reach the server, a dropped connection say, and
       // the client keeps its session when that happens. This browser still
