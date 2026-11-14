@@ -15,6 +15,18 @@ function focusPage() {
 }
 
 /**
+ * After the note is waved off, focus goes to the page's own heading, so a
+ * screen reader starts from the page's name and a keyboard user sees where
+ * they are. A page without a heading falls back to main.
+ */
+function focusHeading() {
+  const heading = document.querySelector<HTMLElement>('#main h1');
+  if (!heading) return focusPage();
+  if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+  heading.focus({ preventScroll: true });
+}
+
+/**
  * The note at the top of the page after the sign-up form signed someone in
  * with a password it turned away. It shows for that account only, and goes
  * when they open the password change or wave it off.
@@ -58,9 +70,9 @@ export function PasswordNote({ show }: { show: boolean }) {
 
   const dismiss = () => {
     clearPasswordNote();
-    // The button goes with the note, so focus moves to the page rather than
-    // falling back to the top of the document.
-    focusPage();
+    // The button goes with the note, so focus moves to the page's heading
+    // rather than falling back to the top of the document.
+    focusHeading();
   };
 
   return (

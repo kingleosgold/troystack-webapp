@@ -701,7 +701,20 @@ test('waving off the password note keeps focus on the page', async ({ page }) =>
   await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
   await page.getByRole('button', { name: 'Dismiss the password note' }).click();
   await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
-  await expect(page.locator('main#main')).toBeFocused();
+  await expect(page.locator('main#main h1').first()).toBeFocused();
+});
+
+test('waving off the password note by keyboard shows where focus went', async ({ page }) => {
+  await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
+  await signUpWith(page);
+  await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
+  await page.getByRole('button', { name: 'Dismiss the password note' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
+  const heading = page.locator('main#main h1').first();
+  await expect(heading).toBeFocused();
+  // The heading draws the focus ring, so a keyboard user can see it.
+  expect(await heading.evaluate((el) => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle !== 'none')).toBe(true);
 });
 
 /**
