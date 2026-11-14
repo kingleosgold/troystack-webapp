@@ -17,13 +17,29 @@ function focusPage() {
 /**
  * After the note is waved off, focus goes to the page's own heading, so a
  * screen reader starts from the page's name and a keyboard user sees where
- * they are. A page without a heading falls back to main.
+ * they are. A page without a heading, or one whose heading can't take focus
+ * because it's hidden, falls back to main. A tabindex added here comes off
+ * again once focus leaves, so the heading doesn't stay a click target.
  */
 function focusHeading() {
   const heading = document.querySelector<HTMLElement>('#main h1');
   if (!heading) return focusPage();
-  if (!heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+  const added = !heading.hasAttribute('tabindex');
+  if (added) heading.setAttribute('tabindex', '-1');
   heading.focus({ preventScroll: true });
+  if (document.activeElement !== heading) {
+    if (added) heading.removeAttribute('tabindex');
+    return focusPage();
+  }
+  if (!added) return;
+  // blur also fires when the whole window loses focus, with the heading still
+  // the active element, so the tabindex stays until focus really moves.
+  const drop = () => {
+    if (document.activeElement === heading) return;
+    heading.removeAttribute('tabindex');
+    heading.removeEventListener('blur', drop);
+  };
+  heading.addEventListener('blur', drop);
 }
 
 /**
