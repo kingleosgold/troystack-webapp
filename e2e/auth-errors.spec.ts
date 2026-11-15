@@ -751,9 +751,10 @@ for (const hide of ['display: none', 'visibility: hidden']) {
     await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
     await signUpWith(page);
     await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
-    const heading = page.locator('main#main h1').first();
-    // One heading, so hiding it leaves nothing else for focusHeading to find.
-    await expect(page.locator('main#main h1')).toHaveCount(1);
+    // The same query focusHeading makes, pinned to one heading, so hiding it
+    // leaves nothing else for focusHeading to find.
+    const heading = page.locator('#main h1');
+    await expect(heading).toHaveCount(1);
     expect(await heading.getAttribute('tabindex')).toBeNull();
     // Hidden by a stylesheet, as a page's own styles would hide it.
     await page.addStyleTag({ content: `main#main h1 { ${hide}; }` });
