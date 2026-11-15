@@ -695,13 +695,17 @@ test('a plain sign-in leaves no password note', async ({ page }) => {
   await expect(page.getByText(WEAK_NOTE)).toHaveCount(0);
 });
 
+// The query focusHeading in src/ui/PasswordNote.tsx makes, so every focus
+// test reads the heading it focuses.
+const NOTE_HEADING = '#main h1';
+
 test('waving off the password note keeps focus on the page', async ({ page }) => {
   await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
   await signUpWith(page);
   await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
   await page.getByRole('button', { name: 'Dismiss the password note' }).click();
   await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
-  await expect(page.locator('main#main h1').first()).toBeFocused();
+  await expect(page.locator(NOTE_HEADING)).toBeFocused();
 });
 
 test('waving off the password note by keyboard shows where focus went', async ({ page }) => {
@@ -711,7 +715,7 @@ test('waving off the password note by keyboard shows where focus went', async ({
   await page.getByRole('button', { name: 'Dismiss the password note' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
-  const heading = page.locator('main#main h1').first();
+  const heading = page.locator(NOTE_HEADING);
   await expect(heading).toBeFocused();
   // The heading draws the focus ring, so a keyboard user can see it.
   expect(await heading.evaluate((el) => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle !== 'none')).toBe(true);
@@ -723,7 +727,7 @@ test('waving off the password note by mouse draws no focus ring', async ({ page 
   await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
   await page.getByRole('button', { name: 'Dismiss the password note' }).click();
   await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
-  const heading = page.locator('main#main h1').first();
+  const heading = page.locator(NOTE_HEADING);
   await expect(heading).toBeFocused();
   expect(await heading.evaluate((el) => el.matches(':focus-visible'))).toBe(false);
 });
@@ -732,7 +736,7 @@ test('the heading gives back its tabindex once focus leaves it', async ({ page }
   await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });
   await signUpWith(page);
   await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
-  const heading = page.locator('main#main h1').first();
+  const heading = page.locator(NOTE_HEADING);
   expect(await heading.getAttribute('tabindex')).toBeNull();
   await page.getByRole('button', { name: 'Dismiss the password note' }).click();
   await expect(heading).toBeFocused();
@@ -753,12 +757,12 @@ for (const hide of ['display: none', 'visibility: hidden']) {
     await expect(page.getByText(LEAKED_NOTE)).toBeVisible();
     // The same query focusHeading makes, pinned to one heading, so hiding it
     // leaves nothing else for focusHeading to find.
-    const heading = page.locator('#main h1');
+    const heading = page.locator(NOTE_HEADING);
     await expect(heading).toHaveCount(1);
     expect(await heading.getAttribute('tabindex')).toBeNull();
     // Hidden by a stylesheet, as a page's own styles would hide it, using
     // the same selector the locator reads.
-    await page.addStyleTag({ content: `#main h1 { ${hide}; }` });
+    await page.addStyleTag({ content: `${NOTE_HEADING} { ${hide}; }` });
     await expect(heading).toBeHidden();
     await page.getByRole('button', { name: 'Dismiss the password note' }).click();
     await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
