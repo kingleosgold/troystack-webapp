@@ -756,8 +756,9 @@ for (const hide of ['display: none', 'visibility: hidden']) {
     const heading = page.locator('#main h1');
     await expect(heading).toHaveCount(1);
     expect(await heading.getAttribute('tabindex')).toBeNull();
-    // Hidden by a stylesheet, as a page's own styles would hide it.
-    await page.addStyleTag({ content: `main#main h1 { ${hide}; }` });
+    // Hidden by a stylesheet, as a page's own styles would hide it, using
+    // the same selector the locator reads.
+    await page.addStyleTag({ content: `#main h1 { ${hide}; }` });
     await expect(heading).toBeHidden();
     await page.getByRole('button', { name: 'Dismiss the password note' }).click();
     await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
