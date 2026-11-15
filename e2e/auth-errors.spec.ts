@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockBackends, sessionFor, signIn, signInElsewhereAs, signOutElsewhere } from './mock';
+// The selector focusHeading queries, imported so every focus test reads the
+// heading it focuses.
+import { NOTE_HEADING } from '../src/ui/noteHeading';
 
 // Every way the sign-in, sign-up and reset forms can fail shows plain words,
 // never Supabase's own text or the "{}" supabase-js gives for an outage.
@@ -694,10 +697,6 @@ test('a plain sign-in leaves no password note', async ({ page }) => {
   await expect(page.getByText(LEAKED_NOTE)).toHaveCount(0);
   await expect(page.getByText(WEAK_NOTE)).toHaveCount(0);
 });
-
-// The query focusHeading in src/ui/PasswordNote.tsx makes, so every focus
-// test reads the heading it focuses.
-const NOTE_HEADING = '#main h1';
 
 test('waving off the password note keeps focus on the page', async ({ page }) => {
   await mockBackends(page, { existingAccount: 'same-password', authFails: { signUp: 'leaked-password' } });

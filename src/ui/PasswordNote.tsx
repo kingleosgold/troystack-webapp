@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { PASSWORD_NOTE_WORDS, clearPasswordNote, onPasswordNoteChange, passwordNoteFor } from '../lib/passwordNote';
 import { Button } from './primitives';
+import { NOTE_HEADING } from './noteHeading';
 
 // The note this tab has already read out, as its account and kind. Coming
 // back to it from Troy, where it's off the page, shows it without reading it
@@ -22,7 +23,7 @@ function focusPage() {
  * again once focus leaves, so the heading doesn't stay a click target.
  */
 function focusHeading() {
-  const heading = document.querySelector<HTMLElement>('#main h1');
+  const heading = document.querySelector<HTMLElement>(NOTE_HEADING);
   if (!heading) return focusPage();
   const added = !heading.hasAttribute('tabindex');
   if (added) heading.setAttribute('tabindex', '-1');
